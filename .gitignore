@@ -1,0 +1,7 @@
+JuicyPixelsTest
+RasterificTest
+*.o
+*.hi
+.cabal-sandbox
+cabal.sandbox.config
+*.png
