@@ -1,0 +1,3 @@
+#!/bin/bash
+ghc-sandbox --make RasterificTest.hs && ./RasterificTest && open rasterific.png
+
