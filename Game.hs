@@ -1,4 +1,4 @@
-module Main where
+module Game where
 
 import Graphics.Rasterific
 import Graphics.Rasterific.Texture
@@ -12,8 +12,8 @@ sinU = sin . (2*pi*)
 cosU = cos . (2*pi*)
 tanU a = sinU a / cosU a
 
-blue  = PixelRGBA8 0 0 0xFF 0xFF
 white = PixelRGBA8 0xFF 0xFF 0xFF 0xFF
+blue  = PixelRGBA8 0 0 0xFF 0xFF
 green = PixelRGBA8 0x00 0xFF 0x00 0xFF
 
 type GermGradient = (PixelRGBA8, PixelRGBA8)
@@ -187,21 +187,3 @@ randomGerm radius = do
   return $ Germ k radius g g' pts
 
 -----------------------------------------
-
-main :: IO ()
-main = do
-  let white     = PixelRGBA8 0xFF 0xFF 0xFF 0xFF
-      magenta   = PixelRGBA8 0xFF    0 0xFF 0xFF
-      w         = 512
-      h         = 512
-      r         = 256
-      grad      = radialGradientTexture [(0.0, blue), (1.0, green)] (V2 0 0) r
-  germ <- evalRandIO $ randomGerm r
-  putStrLn $ show germ
-  let drawing   = drawGerm germ
-      img       = renderDrawing w h white $
-                    withTransformation (translate (V2 (fromIntegral w/2) (fromIntegral h/2))) $
-                    withTexture grad $
-                    drawing
-
-  writePng "rasterific.png" img
