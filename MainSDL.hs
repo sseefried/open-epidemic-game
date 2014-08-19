@@ -8,7 +8,6 @@ import           System.Exit
 import           Graphics.Rendering.Cairo as C
 import qualified Graphics.UI.SDL as S
 import           Data.IORef
-import           Data.Word (Word8)
 import           Control.Monad
 import           Text.Printf
 import           Foreign.Ptr
@@ -44,7 +43,7 @@ initLoopState = do
   -- Getting the RGB masks correct and also setting the alpha mask to 0
   -- is important. Look into the Cairo SDL backend if you want to do alpha.
   --
-  surface <- S.createRGBSurface [S.SWSurface] screenWidth screenHeight bitsPerPixel
+  surface <- S.createRGBSurface [S.HWSurface] screenWidth screenHeight bitsPerPixel
                                          0x00FF0000 0x0000FF00 0x000000FF 0
   pixels <- fmap castPtr $ S.surfaceGetPixels surface
   canvas <- createImageSurfaceForData pixels FormatRGB24 screenWidth screenHeight
@@ -89,11 +88,8 @@ display sRef render = do
       h = fromIntegral screenHeight
   s <- readIORef sRef
   screen <- S.getVideoSurface
-  let format = S.surfaceGetPixelFormat screen
-  white <- S.mapRGB format 0xFF 0xFF 0xFF
-  S.fillRect screen Nothing white
   -- Cairo
-  renderWith (lsCanvas s) $ renderCenter (w/2) (h/2) render
+  renderWith (lsCanvas s) $ renderCenter w h render
   _ <- S.blitSurface (lsSurface s) Nothing screen (Just (S.Rect 0 0 0 0))
   S.flip screen
   writeIORef sRef $ s { lsFrames = lsFrames s + 1}

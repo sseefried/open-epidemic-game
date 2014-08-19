@@ -68,7 +68,7 @@ wobble bumpiness radius = do
       smallCircle pt = circle pt (l/4) >> fill
   mapM_ smallCircle evenPts
   polygon evenPts >> fill
-  withColor black $ mapM_ smallCircle oddPts
+  mapM_ (clear . smallCircle) oddPts
     where
       bumps = fromIntegral (2*bumpiness)
 
@@ -155,6 +155,11 @@ alpha n = (n'-2)/(2*n') where n' = fromIntegral n
 ----------------
 -- Random helpers
 
+clear :: Render () -> Render ()
+clear r = inContext $ do
+  setOperator OperatorClear
+  r
+
 circle :: Point -> Double -> Render ()
 circle (x,y) r = arc x y r 0 (2*pi)
 
@@ -225,14 +230,27 @@ randomGerm radius = do
   k   <- randomGermKind
   g   <- randomGradient
   g'  <- randomGradient
-  pts <- randomRadialPoints 10
+  pts <-   randomRadialPoints 10
   return $ Germ k radius g g' pts
 
 --------------------------
 
+onNewSurface :: Render () -> Render ()
+onNewSurface r = do
+  pushGroup
+  r
+  popGroupToSource
+  paint
+
+
 renderCenter :: Double -> Double -> Render () -> Render ()
 renderCenter w h render = do
-  translate w h
-  render
-
-
+  setAntialias AntialiasSubpixel
+  drawBackground
+  translate (w/2) (h/2)
+  onNewSurface render
+  where
+    drawBackground = do
+      setColor white
+      rectangle 0 0 w h
+      fill
