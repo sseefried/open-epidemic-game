@@ -1,8 +1,20 @@
 module Game where
 
+import Prelude
 import Graphics.Rendering.Cairo
 import Control.Monad.Random
 import Control.Applicative
+-- import Data.Foldable
+
+-------------------------------------------
+-- Constants
+
+-- number of sin waves to sum together to produce a fairly unpredictable periodic motion
+periodicsToSum :: Int
+periodicsToSum = 3
+
+-------------------------------------------
+
 
 sinU, cosU :: Floating a => a -> a
 sinU = sin . (2*pi*)
@@ -154,8 +166,8 @@ midPt (x,y) (x',y') = ((x+x')/2, (y+y')/2)
 alpha :: (Integral a, Fractional f) => a -> f
 alpha n = (n'-2)/(2*n') where n' = fromIntegral n
 
-----------------
--- Random helpers
+-------------------------------------------------
+-- Random helpers to make Cairo more declarative
 
 clear :: Render () -> Render ()
 clear r = inContext $ do
@@ -201,6 +213,22 @@ randomColor = do
   (r:g:b:_)  <- getRandomRs (0, 1)
   return $ Color r g b 1
 
+--
+-- mag:    any value
+-- period: in seconds
+-- phase:  between 0 and 1
+--
+--
+periodic :: Floating a => a -> a -> a -> a -> a
+periodic mag period phase t = mag * sinU ((t+phase)/period)
+
+--
+-- Like mod but for RealFrac's
+--
+fmod :: RealFrac a => a -> a -> a
+fmod a b = snd (properFraction (a / b)) * b
+
+-----------------------
 
 --
 -- Given [n] and number of points and bounds [(lo, hi)] produces a series
@@ -209,38 +237,33 @@ randomColor = do
 --
 randomRadialPoints :: RandomGen g => Int -> Rand g (Time -> [NormalisedPoint])
 randomRadialPoints n = do
-  let n' = fromIntegral n
-  rs      <- getRandomRs (0.3,1)
-  mags    <- getRandomRs (0.1,0.2)
-  periods <- getRandomRs (5,10)
-  let as = [0,1/n'..1-1/n']
-      specs = zip mags periods
-      movingRs t = zipWith (f t) specs rs
+  rs            <- getRandomRs (0.5,0.7)
+  periodicFs    <- sequence . repeat $ randomPeriodicSum (0.1,0.3) (7,13) (0,1)
+  let as         = [0,1/n'..1-1/n']
+      movingRs t = zipWith (f t) periodicFs rs
   return $ \t -> map (NormalisedPoint . polarPtToPt) $ zipWith P2 (movingRs t) as
   where
-    f t (mag,period) r = r + periodic mag period 0 t
------------------------
+    n'              = fromIntegral n
+    f t periodicF r = r + periodicF t
 
 --
--- period in seconds
--- phase between 0 and 1
+-- Returns a periodic function that is a sum of several sin waves
+-- (for added randomness)
 --
---
-periodic :: Double -> Double -> Double -> Time -> Double
-periodic mag period phase t = mag * sinU ((t+(1-phase/2))/period)
-
-
-
-
-
------------------------
-
+randomPeriodicSum :: (RandomGen g, Random a, Floating a) => (a,a) -> (a,a) -> (a,a)
+                  -> Rand g (a -> a)
+randomPeriodicSum magBounds periodBounds phaseBounds = do
+  -- we are summing [periodicstoSum] magnitudes together so we have to divide each
+  -- by [periodicsToSum] to ensure min/max magnitude is in magBounds
+  mags    <- getRandomRs $ pmap (/fromIntegral periodicsToSum) magBounds
+  periods <- getRandomRs periodBounds
+  phases  <- getRandomRs phaseBounds
+  return $ foldl1 (liftA2 (+)) $ take periodicsToSum $ periodic <$> mags <*> periods <*> phases
 
 randomGermKind :: RandomGen g => Rand g GermKind
 randomGermKind = do
   n <- getRandomR (5,13)
   return $ Spiky n
-
 
 --
 -- We want the two colours to be a minimum distance apart
@@ -253,11 +276,7 @@ randomGradient = do
   return (c, Color (f r dr) (f g dg) (f b db) 1)
   where
     f x dx = if x < 0.5 then x + dx else x - dx
---
--- Like mod but for RealFrac's
---
-fmod :: RealFrac a => a -> a -> a
-fmod a b = snd (properFraction (a / b)) * b
+
 
 
 randomGerm :: RandomGen g => Double -> Rand g Germ
