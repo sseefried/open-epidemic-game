@@ -1,13 +1,15 @@
 module Game where
 
 import Graphics.Rendering.Cairo
-
 import Control.Monad.Random
+import Control.Applicative
 
 sinU, cosU :: Floating a => a -> a
 sinU = sin . (2*pi*)
 cosU = cos . (2*pi*)
 tanU a = sinU a / cosU a
+
+type Time = Double
 
 data Color = Color Double Double Double Double deriving Show
 
@@ -31,17 +33,17 @@ data Germ = Germ { germKind         :: GermKind
                  , germRadius       :: Double
                  , germBodyGrad     :: GermGradient
                  , germNucleusGrad  :: GermGradient
-                 , germNucleusPts   :: [NormalisedPoint]
-                 } deriving Show
+                 , germNucleusPts   :: Time -> [NormalisedPoint]
+                 }
 
 normalisedPtToPt :: Double -> NormalisedPoint -> Point
 normalisedPtToPt scale (NormalisedPoint (x,y)) = (scale*x, scale*y)
 
-drawGerm :: Germ -> Render ()
-drawGerm g = do
+drawGerm :: Germ -> Time -> Render ()
+drawGerm g t = do
   let r = germRadius g
   withGermGradient (germBodyGrad g) r    $ drawBody (germKind g) r
-  withGermGradient (germNucleusGrad g) r $ blob (map (normalisedPtToPt (r/2)) $ germNucleusPts g)
+  withGermGradient (germNucleusGrad g) r $ blob (map (normalisedPtToPt (r/2)) $ germNucleusPts g t)
   where
     drawBody :: GermKind -> Double -> Render ()
     drawBody k r = case k of
@@ -49,12 +51,12 @@ drawGerm g = do
       Spiky  n -> spiky n (r/2) r
 
 withGermGradient :: GermGradient -> Double -> Render () -> Render ()
-withGermGradient (Color r g b a, Color r' g' b' a') radius render = do
+withGermGradient (Color r g b a, Color r' g' b' a') radius drawing = do
   withRadialPattern 0 0 0 0 0 radius $ \p -> do
     patternAddColorStopRGBA p 0 r  g  b  a
     patternAddColorStopRGBA p 1 r' g' b' a'
     setSource p
-    render
+    drawing
     fill
 
 -- TODO: Draw some pictures of how you derived radCircle and lenPolySide
@@ -130,7 +132,7 @@ starPolyPoints n ri ro = map polarPtToPt pairs
 
 blob :: [Point] -> Render ()
 blob ps = do
-  uncurry moveTo start
+  moveTo' start
   mapM_ (uncurry quadraticCurveTo) rest
   fill
   where
@@ -199,44 +201,83 @@ randomColor = do
   (r:g:b:_)  <- getRandomRs (0, 1)
   return $ Color r g b 1
 
+
 --
 -- Given [n] and number of points and bounds [(lo, hi)] produces a series
 -- of points. Angularly they are equal spaced around the origin. Their
 -- radii differ though.
 --
-randomRadialPoints :: RandomGen g => Int -> Rand g [NormalisedPoint]
+randomRadialPoints :: RandomGen g => Int -> Rand g (Time -> [NormalisedPoint])
 randomRadialPoints n = do
   let n' = fromIntegral n
-  rs <- getRandomRs (0.3,1)
+  rs      <- getRandomRs (0.3,1)
+  mags    <- getRandomRs (0.1,0.2)
+  periods <- getRandomRs (5,10)
   let as = [0,1/n'..1-1/n']
-  return $ map (NormalisedPoint . polarPtToPt) $ zipWith P2 rs as
+      specs = zip mags periods
+      movingRs t = zipWith (f t) specs rs
+  return $ \t -> map (NormalisedPoint . polarPtToPt) $ zipWith P2 (movingRs t) as
+  where
+    f t (mag,period) r = r + periodic mag period 0 t
+-----------------------
+
+--
+-- period in seconds
+-- phase between 0 and 1
+--
+--
+periodic :: Double -> Double -> Double -> Time -> Double
+periodic mag period phase t = mag * sinU ((t+(1-phase/2))/period)
+
+
+
+
+
+-----------------------
+
 
 randomGermKind :: RandomGen g => Rand g GermKind
 randomGermKind = do
-  k <- getRandomR (0::Int,1)
   n <- getRandomR (5,13)
-  return $ case k of
-    0 -> Wobble n
-    1 -> Spiky n
+  return $ Spiky n
 
+
+--
+-- We want the two colours to be a minimum distance apart
+--
+--
 randomGradient :: RandomGen g => Rand g GermGradient
 randomGradient = do
-  c  <- randomColor
-  c' <- randomColor
-  return (c,c')
+  c@(Color r g b _) <- randomColor
+  (dr:dg:db:_)   <- getRandomRs (0.1,0.5)
+  return (c, Color (f r dr) (f g dg) (f b db) 1)
+  where
+    f x dx = if x < 0.5 then x + dx else x - dx
+--
+-- Like mod but for RealFrac's
+--
+fmod :: RealFrac a => a -> a -> a
+fmod a b = snd (properFraction (a / b)) * b
+
 
 randomGerm :: RandomGen g => Double -> Rand g Germ
 randomGerm radius = do
   k   <- randomGermKind
   g   <- randomGradient
-  g'  <- randomGradient
-  pts <-   randomRadialPoints 10
+  g'  <- pmap (changeAlpha 0.5) <$> randomGradient
+  pts <- randomRadialPoints 10
   return $ Germ k radius g g' pts
+
+changeAlpha :: Double -> Color -> Color
+changeAlpha a' (Color r g b a) = Color r g b a'
+
+pmap :: (a -> b) -> (a,a) -> (b,b)
+pmap f (a,b) = (f a, f b)
 
 --------------------------
 
-onNewSurface :: Render () -> Render ()
-onNewSurface r = do
+asGroup :: Render () -> Render ()
+asGroup r = do
   pushGroup
   r
   popGroupToSource
@@ -244,11 +285,11 @@ onNewSurface r = do
 
 
 renderCenter :: Double -> Double -> Render () -> Render ()
-renderCenter w h render = do
+renderCenter w h drawing = do
   setAntialias AntialiasSubpixel
   drawBackground
   translate (w/2) (h/2)
-  onNewSurface render
+  asGroup drawing
   where
     drawBackground = do
       setColor white

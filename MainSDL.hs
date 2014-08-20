@@ -11,14 +11,19 @@ import           Data.IORef
 import           Control.Monad
 import           Text.Printf
 import           Foreign.Ptr
+import           Control.Applicative
 
 -- friends
 import Game
 
 foreign export ccall "haskell_mainSDL" mainSDL :: IO ()
 
-data LoopState = LoopState { lsStartTime :: UTCTime, lsFrames :: Integer
-                           , lsSurface :: S.Surface, lsCanvas :: C.Surface }
+data LoopState = LoopState { lsStartTime   :: UTCTime
+                           , lsFrames      :: Integer
+                           , lsSurface     :: S.Surface
+                           , lsCanvas      :: C.Surface
+                           , lsGermAnim    :: Time -> C.Render ()
+                           }
 
 screenWidth, screenHeight :: Int
 screenWidth = 512
@@ -48,48 +53,56 @@ initLoopState = do
   pixels <- fmap castPtr $ S.surfaceGetPixels surface
   canvas <- createImageSurfaceForData pixels FormatRGB24 screenWidth screenHeight
              (screenWidth * bytesPerPixel)
+  germAnim <- newGermAnim
+  newIORef $ LoopState t 0 surface canvas germAnim
 
-  newIORef $ LoopState t 0 surface canvas
+newGermAnim :: IO (Time -> Render ())
+newGermAnim = drawGerm <$> (evalRandIO $ randomGerm (fromIntegral (min screenWidth screenHeight) / 2))
 
 mainSDL :: IO ()
 mainSDL = S.withInit [S.InitVideo] $ do
-  let r = fromIntegral (min screenWidth screenHeight) / 2
   _ <- S.setVideoMode screenWidth screenHeight bitsPerPixel
               [S.HWSurface, S.DoubleBuf]
   S.setCaption "Epidemic" ""
   S.enableUnicode True
   sRef <- initLoopState
-  germ <- evalRandIO $ randomGerm r
-  let draw = display sRef (drawGerm germ)
+  let draw = display sRef
   loop sRef draw
+
+toDouble :: NominalDiffTime -> Double
+toDouble = fromRational . toRational
 
 loop :: IORef LoopState -> IO () -> IO ()
 loop sRef display' = do
+  s <- readIORef sRef
   let logFrameRate = do
-         s <- readIORef sRef
          let n = lsFrames s
              t = lsStartTime s
          when (n `mod` 30 == 29) $ do
            t' <- getCurrentTime
            let d = diffUTCTime t' t
-           printf "Framerate = %.2f frames/s\n" (fromIntegral n / ((fromRational . toRational) d) :: Float)
+           printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
   event <- S.pollEvent
   case event of
     S.Quit -> exitWith ExitSuccess
     S.KeyDown (S.Keysym _ _ 'q') -> exitWith ExitSuccess
+    S.KeyDown _ -> do
+      germAnim <- newGermAnim
+      writeIORef sRef $ s { lsGermAnim = germAnim}
+
     _ -> display'
   logFrameRate
   loop sRef display'
 
-
-display :: IORef LoopState -> Render () -> IO ()
-display sRef render = do
+display :: IORef LoopState -> IO ()
+display sRef = do
   let w = fromIntegral screenWidth
       h = fromIntegral screenHeight
   s <- readIORef sRef
   screen <- S.getVideoSurface
   -- Cairo
-  renderWith (lsCanvas s) $ renderCenter w h render
+  t <- diffUTCTime <$> getCurrentTime <*> return (lsStartTime s)
+  renderWith (lsCanvas s) $ renderCenter w h (lsGermAnim s . toDouble $ t)
   _ <- S.blitSurface (lsSurface s) Nothing screen (Just (S.Rect 0 0 0 0))
   S.flip screen
   writeIORef sRef $ s { lsFrames = lsFrames s + 1}
