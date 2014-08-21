@@ -28,6 +28,11 @@ data LoopState = LoopState { lsStartTime   :: UTCTime
 screenWidth, screenHeight :: Int
 screenWidth = 512
 screenHeight = 512
+tileGermsPerRow = 10
+
+w, h :: Double
+w = fromIntegral screenWidth
+h = fromIntegral screenHeight
 
 --
 -- You need to do a few things to write a Haskell SDL application
@@ -56,8 +61,26 @@ initLoopState = do
   germAnim <- newGermAnim
   newIORef $ LoopState t 0 surface canvas germAnim
 
-newGermAnim :: IO (Time -> Render ())
-newGermAnim = drawGerm <$> (evalRandIO $ randomGerm (fromIntegral (min screenWidth screenHeight) / 2))
+newSingleGermAnim :: IO (Time -> Render ())
+newSingleGermAnim = do
+  g <- evalRandIO $ randomGerm (fromIntegral (min screenWidth screenHeight) / 2)
+  return $ \t -> do
+    translate (w/2) (h/2)
+    drawGerm g t
+
+-- newGermAnim = newSingleGermAnim
+newGermAnim = evalRandIO $ tiledGerms tileGermsPerRow screenWidth screenHeight
+
+renderOnWhite :: Render () -> Render ()
+renderOnWhite drawing = do
+  setAntialias AntialiasSubpixel
+  drawBackground
+  asGroup drawing
+  where
+    drawBackground = do
+      setColor white
+      rectangle 0 0 w h
+      fill
 
 mainSDL :: IO ()
 mainSDL = S.withInit [S.InitVideo] $ do
@@ -102,7 +125,7 @@ display sRef = do
   screen <- S.getVideoSurface
   -- Cairo
   t <- diffUTCTime <$> getCurrentTime <*> return (lsStartTime s)
-  renderWith (lsCanvas s) $ renderCenter w h (lsGermAnim s . toDouble $ t)
+  renderWith (lsCanvas s) $ renderOnWhite $ lsGermAnim s . toDouble $ t
   _ <- S.blitSurface (lsSurface s) Nothing screen (Just (S.Rect 0 0 0 0))
   S.flip screen
   writeIORef sRef $ s { lsFrames = lsFrames s + 1}
