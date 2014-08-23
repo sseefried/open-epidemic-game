@@ -8,3 +8,4 @@ cabal.sandbox.config
 *_stub.h
 Makefile
 epidemic
+*.trace

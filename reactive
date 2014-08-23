@@ -1,1 +1,0 @@
-commando "echo" -c . | egrep --line-buffered 'Mod.*RasterificTest.hs'  | conscript ./show
