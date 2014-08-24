@@ -1,0 +1,26 @@
+#!/usr/bin/env ruby
+
+unless ARGV.length > 0
+  puts "Usage: #{File.basename($0)} <CairoScript>"
+  exit 1
+end
+
+CAIRO_DIR="/Users/sseefried/build/cairo-1.12.16"
+ANY2PPM="#{CAIRO_DIR}/test/any2ppm"
+PERF="#{CAIRO_DIR}/perf/cairo-perf-trace"
+
+file = ARGV[0]
+tmp_file = "/tmp/#{file}.cs"
+
+File.open(tmp_file, "w") do |f|
+  File.open(file, "r").each do |line|
+    f.write(line.gsub(/image dup.*/,"surface context").gsub(/.*undef.*/,""))
+  end
+end
+
+system("EXPORT CAIRO_TRACE_DIR=/tmp")
+system("#{PERF} #{file}")
+system("#{ANY2PPM} #{tmp_file} > #{file}.ppm")
+system("convert #{file}.ppm #{file}.png")
+system("rm -f #{file}.ppm")
+system("open #{file}.png")
