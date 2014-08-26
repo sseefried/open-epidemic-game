@@ -6,6 +6,7 @@ import Control.Monad
 import Control.Monad.Random
 import Control.Applicative
 import Debug.Trace
+-- import GameMonad
 -- import Data.Foldable
 
 -------------------------------------------
@@ -18,13 +19,29 @@ periodicsToSum = 3
 jigglePeriodBounds :: (Double, Double)
 jigglePeriodBounds = (3,7)
 
+tileGermsPerRow = 10
 -------------------------------------------
-
 
 sinU, cosU :: Floating a => a -> a
 sinU = sin . (2*pi*)
 cosU = cos . (2*pi*)
 tanU a = sinU a / cosU a
+
+data GameInput = GameInput { giDuration   :: Time
+                           , giSinceStart :: Time
+                           , giEvents     :: [Event] }
+
+data GameState = GameState { gsRender :: Render () }
+
+game :: GameInput -> GameState -> GameState
+game = error "Game not defined yet"
+
+type KeyCode = Int
+
+data Event = KeyDown KeyCode
+           | KeyUp   KeyCode
+           | Quit
+
 
 type Time = Double
 type Anim = Time -> Render ()
@@ -53,6 +70,17 @@ data Germ = Germ { germBody         :: Double -> Anim -- function from radius to
                  , germNucleusGrad  :: GermGradient
                  , germNucleusPts   :: Time -> [NormalisedPoint]
                  }
+
+renderOnWhite :: Int -> Int -> Render () -> Render ()
+renderOnWhite w h drawing = do
+  setAntialias AntialiasSubpixel
+  drawBackground
+  asGroup drawing
+  where
+    drawBackground = do
+      setColor white
+      rectangle 0 0 (fromIntegral w) (fromIntegral h)
+      fill
 
 normalisedPtToPt :: Double -> NormalisedPoint -> Point
 normalisedPtToPt scale (NormalisedPoint (x,y)) = (scale*x, scale*y)
@@ -358,3 +386,15 @@ renderCenter w h drawing = do
       setColor white
       rectangle 0 0 w h
       fill
+
+newSingleGermAnim :: Int -> Int -> IO (Time -> Render ())
+newSingleGermAnim screenWidth screenHeight = do
+  let w = fromIntegral screenWidth
+      h = fromIntegral screenHeight
+  g <- evalRandIO $ randomGerm (fromIntegral (min screenWidth screenHeight) / 2)
+  return $ \t -> do
+    translate (w/2) (h/2)
+    drawGerm g t
+
+newGermAnim screenWidth screenHeight =
+  evalRandIO $ tiledGerms tileGermsPerRow screenWidth screenHeight
