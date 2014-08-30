@@ -1,7 +1,12 @@
 module Game where
 
+--
+-- This module will contain all the game mechanics but will not concern itself
+-- with issues of rendering.
+--
+
 -- friends
-import Germ
+import Graphics
 
 data GameInput = GameInput { giDuration   :: Time
                            , giSinceStart :: Time
@@ -10,12 +15,9 @@ data GameInput = GameInput { giDuration   :: Time
 data FSMState = FSMQuit
               | FSMPlay
 
-
 data GameState = GameState { gsFSMState  :: FSMState
                            , gsRender    :: Anim }
 
-game :: GameInput -> GameState -> GameState
-game gi gs = if Quit `elem` giEvents gi then gs { gsFSMState = FSMQuit } else gs
 
 type KeyCode = Int
 
@@ -27,3 +29,9 @@ newGameState :: Int -> Int -> IO GameState
 newGameState screenHeight screenWidth = do
   germAnim <- newGermAnim screenHeight screenWidth
   return $ GameState FSMPlay germAnim
+
+--
+-- The game as a Finite State Machine
+--
+game :: GameInput -> GameState -> GameState
+game gi gs = if Quit `elem` giEvents gi then gs { gsFSMState = FSMQuit } else gs

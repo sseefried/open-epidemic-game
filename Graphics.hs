@@ -1,5 +1,4 @@
-module Germ where
-
+module Graphics where
 
 import Graphics.Rendering.Cairo
 import Control.Monad
@@ -48,12 +47,12 @@ data GermKind = Wobble Int -- number of wobbles
 -- point which lies inside a unit circle. Invariant: x*x + y*y < 1
 newtype NormalisedPoint = NormalisedPoint Point deriving Show
 
-data Germ = Germ { germBody         :: Double -> Anim -- function from radius to animation
-                 , germRadius       :: Double
-                 , germBodyGrad     :: GermGradient
-                 , germNucleusGrad  :: GermGradient
-                 , germNucleusPts   :: Time -> [NormalisedPoint]
-                 }
+data GermGfx = GermGfx { germBody         :: Double -> Anim -- function from radius to animation
+                       , germRadius       :: Double
+                       , germBodyGrad     :: GermGradient
+                       , germNucleusGrad  :: GermGradient
+                       , germNucleusPts   :: Time -> [NormalisedPoint]
+                       }
 
 renderOnWhite :: Int -> Int -> Render () -> Render ()
 renderOnWhite w h drawing = do
@@ -69,7 +68,7 @@ renderOnWhite w h drawing = do
 normalisedPtToPt :: Double -> NormalisedPoint -> Point
 normalisedPtToPt scale (NormalisedPoint (x,y)) = (scale*x, scale*y)
 
-drawGerm :: Germ -> Anim
+drawGerm :: GermGfx -> Anim
 drawGerm g t = do
   let r = germRadius g
   withGermGradient (germBodyGrad g) r    $ germBody g r t
@@ -314,14 +313,14 @@ randomGradient = do
   where
     f x dx = if x < 0.5 then x + dx else x - dx
 
-randomGerm :: RandomGen g => Double -> Rand g Germ
+randomGerm :: RandomGen g => Double -> Rand g GermGfx
 randomGerm radius = do
   n      <- getRandomR (5,13)
   body   <- spikyAnim n
   g      <- randomGradient
   g'     <- pmap (changeAlpha 0.5) <$> randomGradient
   pts    <- randomRadialPoints 7
-  return $ Germ body radius g g' pts
+  return $ GermGfx body radius g g' pts
 
 changeAlpha :: Double -> Color -> Color
 changeAlpha a' (Color r g b a) = Color r g b a'
