@@ -9,6 +9,9 @@ import Control.Monad.Random
 -- friends
 import Graphics
 
+-- The game monad
+type GameM a = Rand StdGen a
+
 data GameInput = GameInput { giDuration   :: Time
                            , giSinceStart :: Time
                            , giEvents     :: [Event] }
@@ -30,16 +33,14 @@ data Event = KeyDown KeyCode
 
 newGameState :: (Int,Int) -> IO GameState
 newGameState (w, h) = do
-  germAnim <- evalRandIO $ newSingleGermAnim (w, h)
+  germAnim <- runGameM $ newSingleGermAnim (w, h)
   return $ GameState FSMPlay germAnim (w, h)
 
 --
 -- The game as a Finite State Machine
 --
--- FIXME: Is the return type going to have to be IO GameState?
--- we will need to generate new animations.
 --
-game :: GameInput -> GameState -> Rand StdGen GameState
+game :: GameInput -> GameState -> GameM GameState
 game gi gs = if Quit `elem` es
              then return $ gs { gsFSMState = FSMQuit }
              else if not . null . filter isKeyDown $ es
@@ -51,3 +52,6 @@ game gi gs = if Quit `elem` es
     es = giEvents gi
     isKeyDown (KeyDown _) = True
     isKeyDown _           = False
+
+runGameM :: GameM a -> IO a
+runGameM = evalRandIO
