@@ -5,7 +5,7 @@ HCFLAGS=-package-db ./.cabal-sandbox/x86_64-osx-ghc-$(VER)-packages.conf.d -DSDL
 OPTFLAGS=-O2
 HC=ghc $(HCFLAGS)
 
-OBJS=mainc.o MainSDL.o Game.o Backend/SDL.o
+OBJS=mainc.o MainSDL.o Game.o Germ.o Backend/SDL.o
 
 $(PROGNAME): $(OBJS)
 	$(HC) $(OPTFLAGS) -no-hs-main $(OBJS) -o $@ -package SDL -package MonadRandom \
@@ -13,6 +13,8 @@ $(PROGNAME): $(OBJS)
 
 mainc.o: mainc.c
 	$(HC) -no-hs-main `sdl-config --cflags` -Wall $*.c -c
+
+Game.o: Germ.o
 
 MainSDL.o: Game.o Backend/SDL.o
 

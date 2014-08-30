@@ -14,6 +14,7 @@ import           System.Exit
 
 -- friends
 import Game
+import Germ
 
 {-
 
