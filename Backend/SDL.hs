@@ -10,6 +10,7 @@ import           Data.Time
 import           Text.Printf
 import           Control.Monad
 import           Foreign.Ptr
+import           System.Exit
 
 -- friends
 import Game
@@ -35,11 +36,12 @@ bitsPerPixel  = 32
 bytesPerPixel = bitsPerPixel `div` 8
 
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
-initialize title screenWidth screenHeight gs = S.withInit [S.InitVideo] $ do
+initialize title screenWidth screenHeight gs = do
   _ <- S.setVideoMode screenWidth screenHeight bitsPerPixel
               [S.HWSurface, S.DoubleBuf]
   S.setCaption title ""
   S.enableUnicode True
+
   t    <- getCurrentTime
   surf <- S.createRGBSurface [S.HWSurface] screenWidth screenHeight bitsPerPixel
                              0x00FF0000 0x0000FF00 0x000000FF 0
@@ -60,22 +62,30 @@ mainLoop besRef gameFun = do
            printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
   sdlEvent <- S.pollEvent
   t <- getCurrentTime
-  let event = case sdlEvent of
-                S.Quit                       -> Quit
-                S.KeyDown (S.Keysym _ _ 'q') -> Quit
-                S.KeyDown _                  -> KeyDown 666 -- FIXME
-                S.KeyUp   _                  -> KeyUp 666 -- FIXME
-      duration = toDouble $ diffUTCTime t (besStartTime bes)
-      sinceStart = toDouble $ diffUTCTime t (besLastTime bes)
+  let events = case sdlEvent of
+                S.Quit                       -> [Quit]
+                S.KeyDown (S.Keysym _ _ 'q') -> [Quit]
+                S.KeyDown _                  -> [KeyDown 666] -- FIXME
+                S.KeyUp   _                  -> [KeyUp 666] -- FIXME
+                _                            -> []
+      duration = toDouble $ diffUTCTime t (besLastTime bes)
+      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
   -- draw a single frame
-      gs' =  gameFun (GameInput duration sinceStart [event]) (besGameState bes)
+      gs' =  gameFun (GameInput duration sinceStart events) (besGameState bes)
       (w,h) = besDimensions bes
   screen <- S.getVideoSurface
-  C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs'
+
+  C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
   _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
   S.flip screen
   logFrameRate
-  writeIORef besRef $ bes { besGameState = gs', besLastTime = t }
-  mainLoop besRef gameFun
+  writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFrames = besFrames bes + 1 }
+  loopIfNotQuit gs'
+
+
+
   where
     toDouble = fromRational . toRational
+    loopIfNotQuit gs = case gsFSMState gs of
+      FSMQuit -> exitWith ExitSuccess
+      FSMPlay -> mainLoop besRef gameFun -- continue playing

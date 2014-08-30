@@ -31,16 +31,21 @@ data GameInput = GameInput { giDuration   :: Time
                            , giSinceStart :: Time
                            , giEvents     :: [Event] }
 
-data GameState = GameState { gsRender :: Render () }
+data FSMState = FSMQuit
+              | FSMPlay
+
+
+data GameState = GameState {  gsFSMState  :: FSMState
+                           ,  gsRender    :: Time -> Render () }
 
 game :: GameInput -> GameState -> GameState
-game = error "Game not defined yet"
+game gi gs = if Quit `elem` giEvents gi then gs { gsFSMState = FSMQuit } else gs
 
 type KeyCode = Int
 
 data Event = KeyDown KeyCode
            | KeyUp   KeyCode
-           | Quit
+           | Quit deriving (Show,Eq)
 
 
 type Time = Double
@@ -396,5 +401,6 @@ newSingleGermAnim screenWidth screenHeight = do
     translate (w/2) (h/2)
     drawGerm g t
 
+newGermAnim :: Int -> Int -> IO (Time -> Render ())
 newGermAnim screenWidth screenHeight =
   evalRandIO $ tiledGerms tileGermsPerRow screenWidth screenHeight
