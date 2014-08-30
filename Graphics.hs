@@ -16,7 +16,7 @@ periodicsToSum :: Int
 periodicsToSum = 3
 
 jigglePeriodBounds :: (Double, Double)
-jigglePeriodBounds = (3,7)
+jigglePeriodBounds = (7,15)
 
 tileGermsPerRow = 10
 -------------------------------------------
@@ -369,15 +369,15 @@ renderCenter w h drawing = do
       rectangle 0 0 w h
       fill
 
-newSingleGermAnim :: Int -> Int -> IO Anim
-newSingleGermAnim screenWidth screenHeight = do
+newSingleGermAnim :: RandomGen g => (Int, Int) -> Rand g Anim
+newSingleGermAnim (screenWidth, screenHeight) = do
   let w = fromIntegral screenWidth
       h = fromIntegral screenHeight
-  g <- evalRandIO $ randomGerm (fromIntegral (min screenWidth screenHeight) / 2)
+  g <- randomGerm (fromIntegral (min screenWidth screenHeight) / 2)
   return $ \t -> do
     translate (w/2) (h/2)
     drawGerm g t
 
-newGermAnim :: Int -> Int -> IO Anim
-newGermAnim screenWidth screenHeight =
-  evalRandIO $ tiledGerms tileGermsPerRow screenWidth screenHeight
+newGermAnim :: RandomGen g => (Int,Int) -> Rand g Anim
+newGermAnim (screenWidth, screenHeight) =
+  tiledGerms tileGermsPerRow screenWidth screenHeight

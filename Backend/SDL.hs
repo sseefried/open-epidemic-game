@@ -9,6 +9,7 @@ import           Data.IORef
 import           Data.Time
 import           Text.Printf
 import           Control.Monad
+import           Control.Monad.Random
 import           Foreign.Ptr
 import           System.Exit
 
@@ -51,7 +52,7 @@ initialize title screenWidth screenHeight gs = do
              (screenWidth * bytesPerPixel)
   newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0
 
-mainLoop :: IORef BackendState -> (GameInput -> GameState -> GameState) -> IO ()
+mainLoop :: IORef BackendState -> (GameInput -> GameState -> Rand StdGen GameState) -> IO ()
 mainLoop besRef gameFun = do
   bes <- readIORef besRef
   let logFrameRate = do
@@ -72,9 +73,11 @@ mainLoop besRef gameFun = do
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
   -- draw a single frame
-      gs' =  gameFun (GameInput duration sinceStart events) (besGameState bes)
       (w,h) = besDimensions bes
+  gs' <- evalRandIO $ gameFun (GameInput duration sinceStart events) (besGameState bes)
+
   screen <- S.getVideoSurface
+
 
   C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
   _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
