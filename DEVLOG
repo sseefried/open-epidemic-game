@@ -1,0 +1,11 @@
+---------------
+Mon 08 Sep 2014
+---------------
+
+At the moment I'm checking for events (such as keypresses/mouselicks)
+on every frame. This is not really the way I should be doing it. I should
+be handling the events asynchronously in a separate thread. In order not to
+have a race conditions when updating the state of the game I'm going to need
+to use MVars or some such mechanism.
+
+However, I'll do this later. I've put it in the TODO file.
