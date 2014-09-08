@@ -13,6 +13,8 @@ import           Foreign.Ptr
 import           System.Exit
 import           Data.Maybe (catMaybes)
 import           Control.Applicative
+import           Control.Concurrent
+import           Control.Concurrent.MVar
 
 -- friends
 import Game
@@ -31,6 +33,7 @@ data BackendState = BackendState { besStartTime    :: UTCTime
                                  , besGameState    :: GameState
                                  , besDimensions   :: (Int,Int)
                                  , besFrames       :: Integer
+                                 , besSemaphore    :: MVar () -- required because of event handling.
                                  }
 
 bitsPerPixel, bytesPerPixel :: Int
@@ -50,7 +53,8 @@ initialize title screenWidth screenHeight gs = do
   pixels <- fmap castPtr $ S.surfaceGetPixels surf
   csurf  <- C.createImageSurfaceForData pixels C.FormatRGB24 screenWidth screenHeight
              (screenWidth * bytesPerPixel)
-  newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0
+  semaphore <- newMVar ()
+  newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0 semaphore
 
 debugPrintKey sdlEvent = case sdlEvent of
   S.KeyDown (S.Keysym key mods unicode) ->
@@ -81,52 +85,70 @@ runOnGameState besRef f cont = do
 runOnGameState' :: IORef BackendState -> (GameState -> GameM GameState) -> IO ()
 runOnGameState' besRef f = runOnGameState besRef f (const $ return ())
 
+runAtomic :: IORef BackendState -> String -> IO () -> IO ()
+runAtomic besRef desc io = do
+  mvar <- besSemaphore <$> readIORef besRef
+  () <- takeMVar mvar
+  io
+  putMVar mvar ()
+
+runFrameUpdate :: IORef BackendState -> (Time -> Time -> GameState -> GameM GameState) -> IO ()
+runFrameUpdate besRef frameUpdate = runAtomic besRef "frameupdate" $ do
+    bes <- readIORef besRef
+    t <- getCurrentTime
+    let duration   = toDouble $ diffUTCTime t (besLastTime bes)
+        sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
+        (w,h)      = besDimensions bes
+        logFrameRate = do
+           let n = besFrames bes
+               t = besStartTime bes
+           when (n `mod` 30 == 29) $ do
+             t' <- getCurrentTime
+             let d = diffUTCTime t' t
+             printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
+             return ()
+    -- draw a single frame
+    runOnGameState besRef (frameUpdate duration sinceStart) $ \gs' -> do
+    screen <- S.getVideoSurface
+    C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
+    _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
+    S.flip screen
+    logFrameRate
+    writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFrames = besFrames bes + 1 }
+  where
+    toDouble = fromRational . toRational
+
+--
+-- Runs [handleEvent] until an SDL "Quit" event is received. Otherwise loops forever.
+--
+runEventHandler :: IORef BackendState -> ([Event] -> GameState -> GameM GameState) -> ThreadId -> IO ()
+runEventHandler besRef handleEvent frameUpdateId = do
+  sdlEvent <- S.waitEvent
+  case checkForQuit sdlEvent of
+    True  -> do
+      killThread frameUpdateId
+      return () -- return
+    False -> do
+      bes <- readIORef besRef
+      case sdlEventToEvent (gsFSMState . besGameState $ bes) sdlEvent of
+        Just e -> do
+          runAtomic besRef "handleEvent" $ runOnGameState' besRef $ handleEvent [e]
+        Nothing -> return ()
+      runEventHandler besRef handleEvent frameUpdateId -- loop again
+  where
+    quit = exitWith ExitSuccess
+    checkForQuit e = case e of
+        S.Quit                            -> True
+        S.KeyDown (S.Keysym S.SDLK_q _ _) -> True
+        _                                 -> False
+
 mainLoop :: IORef BackendState
          -> ([Event] -> GameState -> GameM GameState) -- event handler
          -> (Time -> Time -> GameState -> GameM GameState) -- frame update
          -> IO ()
 mainLoop besRef handleEvent frameUpdate = do
-  t <- getCurrentTime
-  bes <- readIORef besRef
-  let duration   = toDouble $ diffUTCTime t (besLastTime bes)
-      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-      (w,h)      = besDimensions bes
-  let logFrameRate = do
-         let n = besFrames bes
-             t = besStartTime bes
-         when (n `mod` 30 == 29) $ do
-           t' <- getCurrentTime
-           let d = diffUTCTime t' t
-           printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
-           return ()
-  checkForQuit
-  events <- catMaybes . map (sdlEventToEvent . gsFSMState . besGameState $ bes) <$> getSDLEvents
-  runOnGameState' besRef (handleEvent events) -- FIXME: Put in separate thread
-  -- draw a single frame
-  runOnGameState besRef (frameUpdate duration sinceStart) $ \gs' -> do
-  screen <- S.getVideoSurface
-  C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
-  _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
-  S.flip screen
-  logFrameRate
-  writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFrames = besFrames bes + 1 }
-  mainLoop besRef handleEvent frameUpdate -- continue playing
+  frameUpdateId <- forkIO $ loop $ runFrameUpdate besRef frameUpdate -- run as fast as possible
+  runEventHandler besRef handleEvent frameUpdateId
   where
-    toDouble = fromRational . toRational
-    checkForQuit = do
-      e <- S.pollEvent
-      let quit = exitWith ExitSuccess
-      case e of
-        S.Quit                            -> quit
-        S.KeyDown (S.Keysym S.SDLK_q _ _) -> quit
-        _                                 -> return ()
-      S.pushEvent e -- push the event back on the queue
-
-    -- polls repeatedly until NoEvent is received and returns a list of events
-    getSDLEvents :: IO [S.Event]
-    getSDLEvents = do
-      e <- S.pollEvent
-      case e of
-        S.NoEvent -> return []
-        _         -> do es <- getSDLEvents
-                        return $ e:es
+    loop :: IO () -> IO ()
+    loop io = io >> loop io

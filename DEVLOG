@@ -9,3 +9,13 @@ have a race conditions when updating the state of the game I'm going to need
 to use MVars or some such mechanism.
 
 However, I'll do this later. I've put it in the TODO file.
+
+
+Things I learned today:
+
+It is good to log information such as framerate. There was a point where
+I was doing what I thought was a blocking call to wait for an SDL event
+but in fact it was repeatedly polling eating up valuable CPU cycles.
+The game looked just the same to me but my logging told me differently.
+It reminds me of the phenomenon pilots go through when their eyes are telling
+them something different to their instruments.
