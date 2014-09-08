@@ -1,3 +1,4 @@
 TODO
 
 - Make germs the right radius
+- Have events be processed in a separate thread.

@@ -37,6 +37,6 @@ mainSDL = S.withInit [S.InitVideo] $ main
 
 main :: IO ()
 main = do
-  gameState <- newGameState (screenWidth, screenHeight)
+  gameState <- runGameM $ newGameState (screenWidth, screenHeight)
   besRef   <- B.initialize "Epidemic" screenWidth screenHeight gameState
-  B.mainLoop besRef game
+  B.mainLoop besRef handleEvent frameUpdate
