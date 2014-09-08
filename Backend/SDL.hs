@@ -86,7 +86,11 @@ mainLoop :: IORef BackendState
          -> (Time -> Time -> GameState -> GameM GameState) -- frame update
          -> IO ()
 mainLoop besRef handleEvent frameUpdate = do
+  t <- getCurrentTime
   bes <- readIORef besRef
+  let duration   = toDouble $ diffUTCTime t (besLastTime bes)
+      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
+      (w,h)      = besDimensions bes
   let logFrameRate = do
          let n = besFrames bes
              t = besStartTime bes
@@ -95,12 +99,8 @@ mainLoop besRef handleEvent frameUpdate = do
            let d = diffUTCTime t' t
            printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
            return ()
-  t <- getCurrentTime
   checkForQuit
   events <- catMaybes . map (sdlEventToEvent . gsFSMState . besGameState $ bes) <$> getSDLEvents
-  let duration   = toDouble $ diffUTCTime t (besLastTime bes)
-      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-      (w,h) = besDimensions bes
   runOnGameState' besRef (handleEvent events) -- FIXME: Put in separate thread
   -- draw a single frame
   runOnGameState besRef (frameUpdate duration sinceStart) $ \gs' -> do
