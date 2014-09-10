@@ -2,7 +2,7 @@
 Mon 08 Sep 2014
 ---------------
 
-At the moment I'm checking for events (such as keypresses/mouselicks)
+At the moment I'm checking for events (such as keypresses/mouseclicks)
 on every frame. This is not really the way I should be doing it. I should
 be handling the events asynchronously in a separate thread. In order not to
 have a race conditions when updating the state of the game I'm going to need
@@ -15,7 +15,72 @@ Things I learned today:
 
 It is good to log information such as framerate. There was a point where
 I was doing what I thought was a blocking call to wait for an SDL event
-but in fact it was repeatedly polling eating up valuable CPU cycles.
+but in fact it was repeatedly polling and eating up valuable CPU cycles.
 The game looked just the same to me but my logging told me differently.
 It reminds me of the phenomenon pilots go through when their eyes are telling
 them something different to their instruments.
+
+---------------
+Wed 10 Sep 2014
+---------------
+
+In the JavaScript version of the game I created a finite state machine
+that captured the essence of the game. I'd like to do that again but I want
+to think carefully about it. You see, there is only a need to run at
+several frames per second when the game is in the FSMLevel state, otherwise
+it makes sense to pause the main loop. At present I'm pretty sure I don't
+have a way to do that. If the frame updates were occurring in a separate
+thread and I triggered each frame update with a very simple message then
+it would be easy to stop and start it. Is this too heavy weight a solution?
+
+Also, if I start using threads will this interact well with an iOS
+backend? I seem to remember there being issues.
+
+Let's attack this problem from the other direction. Can we pause the
+frame loop if our program is just single threaded? Clearly not. If our
+program is single threaded we are forced to either be in this loop or
+somewhere else, and that is simply how it is.
+
+What we really want are three threads:
+
+1. frame loop.
+2. event loop.
+3. Control flow loop. Where all the game logic happens.
+
+In the Cocoa and iOS world we have a notion of "run loops" which handle input
+sources and can also have timers set on them. They are responsible for
+detecting input and dispatching events.
+
+Think from the perspective of the backend. You pass the backend
+the game functions, which are essentially callbacks.
+
+Okay, you're going to have to think carefully about architecture.
+
+Things to do:
+[ ] Get clear on what 'callback hell' is, and what the alternatives are.
+[ ] Look into using STM possibly.
+
+My suspicions about callback hell are this. You start your game loop
+and you set a bunch of callbacks. Now you are in a position where
+you have to think about 2 or more actors interacting with each other.
+You need to make sure that race conditions don't occur where both actors
+are manipulating shared memory at the same time. You cannot avoid this.
+As soon as you've put callbacks into place this is a real possibility!
+
+-------
+14:44
+
+I did a little bit of study into GLUT and discovered that the callbacks are
+all essentially called in sequence in a single thread. The "idle callback" is
+to be used whenever user input has finished being handled. Based on this,
+I'm going to go back and remove my threaded code. It required MVars to ensure
+that race conditions occurred and will be a lot simpler. However, I am
+going to add some more state to BackendState to track how long it takes
+to a) update the game state and b) render the frame.
+
+This way we can dynamically update the rate at which the game displays. Even
+in completely pathological cases we can reduce the frame rate to once every
+few seconds if it starts taking forever to render.
+
+
+
