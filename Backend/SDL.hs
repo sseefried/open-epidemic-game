@@ -24,6 +24,7 @@ All backends must render from C.Render () to the backend's screen somehow.
 
 -}
 
+----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { besStartTime    :: UTCTime
                                  , besLastTime     :: UTCTime
                                  , besSurface      :: S.Surface
@@ -33,10 +34,12 @@ data BackendState = BackendState { besStartTime    :: UTCTime
                                  , besFrames       :: Integer
                                  }
 
+----------------------------------------------------------------------------------------------------
 bitsPerPixel, bytesPerPixel :: Int
 bitsPerPixel  = 32
 bytesPerPixel = bitsPerPixel `div` 8
 
+----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
 initialize title screenWidth screenHeight gs = do
   _ <- S.setVideoMode screenWidth screenHeight bitsPerPixel
@@ -57,7 +60,7 @@ debugPrintKey sdlEvent = case sdlEvent of
     printf "Key: %s %s %s\n" (show key) (show mods) (show unicode)
   _ -> return ()
 
-
+----------------------------------------------------------------------------------------------------
 sdlEventToEvent :: FSMState -> S.Event -> Maybe Event
 sdlEventToEvent fsmState sdlEvent =
   -- events that can occur in any FSM State
@@ -66,6 +69,7 @@ sdlEventToEvent fsmState sdlEvent =
     _           -> (case fsmState of -- events that occur in specific FSM states
                       _ -> Nothing)
 
+----------------------------------------------------------------------------------------------------
 --
 -- Reads the current backend state, runs [f], writes the backend state back with modified GameState,
 -- and then runs the continuation [cont] with the latest GameState
@@ -77,14 +81,31 @@ runOnGameState besRef f cont = do
   writeIORef besRef $ bes { besGameState = gs}
   cont gs
 
+----------------------------------------------------------------------------------------------------
 -- Like [runOnGameState] but without the continuation
 runOnGameState' :: IORef BackendState -> (GameState -> GameM GameState) -> IO ()
 runOnGameState' besRef f = runOnGameState besRef f (const $ return ())
 
+----------------------------------------------------------------------------------------------------
+--
+-- Executes an IO action, times it and then updates the BackendState with that duration.
+runAndTime :: IORef BackendState -> (Time -> BackendState -> BackendState) -> IO a -> IO a
+runAndTime besRef upd io = do
+  bes <- readIORef besRef
+  t <- getCurrentTime
+  result <- io
+  t' <- getCurrentTime
+  writeIORef besRef $ upd (toDouble $ diffUTCTime t' t) bes
+  return result
+  where
+    toDouble = fromRational . toRational
+
+----------------------------------------------------------------------------------------------------
 runFrameUpdate :: IORef BackendState -> (Time -> Time -> GameState -> GameM GameState) -> IO ()
 runFrameUpdate besRef frameUpdate = do
     bes <- readIORef besRef
     t <- getCurrentTime
+
     let duration   = toDouble $ diffUTCTime t (besLastTime bes)
         sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
         (w,h)      = besDimensions bes
@@ -96,6 +117,7 @@ runFrameUpdate besRef frameUpdate = do
              let d = diffUTCTime t' t
              printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
              return ()
+
     -- draw a single frame
     runOnGameState besRef (frameUpdate duration sinceStart) $ \gs' -> do
     screen <- S.getVideoSurface
@@ -107,6 +129,7 @@ runFrameUpdate besRef frameUpdate = do
   where
     toDouble = fromRational . toRational
 
+----------------------------------------------------------------------------------------------------
 --
 -- Runs [handleEvent] until an SDL "Quit" event is received. Otherwise loops forever.
 --
@@ -121,6 +144,7 @@ runEventHandler besRef handleEvent = do
     Just es@(_:_) -> runOnGameState' besRef (handleEvent es)
     Nothing       -> exitWith ExitSuccess -- quit the game
 
+----------------------------------------------------------------------------------------------------
 --
 -- Repeatedly polls until an SDL [NoEvent] is received and returns all events received
 -- (except for [NoEvent]). Can return an empty list.
@@ -132,6 +156,7 @@ getSDLEvents = do
     S.NoEvent -> return []
     _         -> do { es <- getSDLEvents; return (e:es) }
 
+----------------------------------------------------------------------------------------------------
 --
 -- Given an FSMState [getEvents] returns [Nothing] if a quit event was received
 -- or it returns a (possibly empty) list of game events.
@@ -148,7 +173,7 @@ getEvents fsmState = do
       S.Quit                            -> True
       S.KeyDown (S.Keysym S.SDLK_q _ _) -> True
       _                                 -> False
-
+----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
          -> ([Event] -> GameState -> GameM GameState) -- event handler
          -> (Time -> Time -> GameState -> GameM GameState) -- frame update
@@ -159,3 +184,4 @@ mainLoop besRef handleEvent frameUpdate = loop $ do
   where
     loop :: IO () -> IO ()
     loop io = io >> loop io
+

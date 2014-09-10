@@ -82,5 +82,10 @@ This way we can dynamically update the rate at which the game displays. Even
 in completely pathological cases we can reduce the frame rate to once every
 few seconds if it starts taking forever to render.
 
+-------
+16:28
 
+Okay, it's getting a bit ridiculous that I still haven't implemented the
+state machine data structure, so I'm going to implement that right now. Then
+I will come back to the issue of avoiding "death spirals" in rendering.
 

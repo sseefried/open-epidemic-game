@@ -6,11 +6,11 @@ module Game where
 -- with issues of rendering.
 --
 
-import Control.Monad.Random
-import Control.Monad
-import Text.Printf
+import           Control.Monad.Random
+import           Control.Monad
+import           Text.Printf
 
-
+----------------------------------------------------------------------------------------------------
 --
 -- Events
 -- ~~~~~~
@@ -33,9 +33,11 @@ import Text.Printf
 -- friends
 import Graphics
 
+----------------------------------------------------------------------------------------------------
 -- The game monad
 type GameM a = Rand StdGen a
 
+----------------------------------------------------------------------------------------------------
 --
 -- Finite State Machine states for this game.
 --
@@ -45,11 +47,13 @@ data FSMState = FSMLevel Int -- level number
               | FSMGameOver
               | FSMQuit -- going into this state causes immediate close of program in backend
 
+----------------------------------------------------------------------------------------------------
 data GameState = GameState { gsFSMState  :: FSMState
                            , gsRender    :: Anim
                            , gsBounds    :: (Int, Int)
                            }
 
+----------------------------------------------------------------------------------------------------
 {-
 TODO: I would really like it if there was some (fairly easy) way of associating a particular
 data type with each constructor of the FSM. As it stands I could easily make a mistake in my
@@ -62,6 +66,7 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
            | Reset
            deriving (Show, Eq)
 
+----------------------------------------------------------------------------------------------------
 --
 -- The sorts of events that can occur are dependent on the state of the FSM.
 --
@@ -70,6 +75,7 @@ newGameState (w, h) = do
   germAnim <- newSingleGermAnim (w, h)
   return $ GameState (FSMLevel 1) germAnim (w, h)
 
+----------------------------------------------------------------------------------------------------
 --
 -- Advance the FSM by one step.
 --
@@ -93,14 +99,17 @@ fsm gs e = do
     fsmLevelComplete      = error "fsmLevelComplete not implemented"
     fsmGameOver           = error "fsmGameOver not implemented"
 
+----------------------------------------------------------------------------------------------------
 frameUpdate :: Time -> Time -> GameState -> GameM GameState
 frameUpdate duration sinceStart = return
 
+----------------------------------------------------------------------------------------------------
 --
 -- The game as a Finite State Machine
 --
 handleEvent :: [Event] -> GameState -> GameM GameState
 handleEvent events gs = foldM fsm gs events
 
+----------------------------------------------------------------------------------------------------
 runGameM :: GameM a -> IO a
 runGameM = evalRandIO
