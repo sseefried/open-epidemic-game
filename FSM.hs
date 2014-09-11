@@ -1,9 +1,11 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module FSM where
 
 
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           Control.Monad.State
+import           Control.Applicative
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -17,13 +19,13 @@ data FSMTransitions m ms =
                  , fsmConditionals   :: [FSMCondTrans m ms] }
 
 ----------------------------------------------------------------------------------------------------
-data FSMCondTrans m ms=
+data FSMCondTrans m ms =
   FSMCondTrans { fsmCondTrans :: m Bool
                , fsmNextState :: ms }
 
 ----------------------------------------------------------------------------------------------------
-type FSM m ev ms= Map ms (Map ev (FSMTransitions m ms))
-
+data FSM m ev ms = FSM { fsmAnyStateTransitions  :: Map ev (FSMTransitions m ms)
+                       , fsmDependentTransitions :: Map ms (Map ev (FSMTransitions m ms)) }
 
 ----------------------------------------------------------------------------------------------------
 -- [maybe] with a slightly different ordering of arguments. Useful
@@ -32,19 +34,26 @@ maybe' :: b -> Maybe a -> (a -> b) -> b
 maybe' deflt mb f = maybe deflt f mb
 
 ----------------------------------------------------------------------------------------------------
-appConds :: Monad m => [FSMCondTrans m ms] -> ms -> m ms
-appConds cts ms = go cts
+appConds :: Monad m => [FSMCondTrans m ms] -> m (Maybe ms)
+appConds cts = go cts
   where
-    go []       = return ms
+    go []       = return Nothing
     go (ct:cts) = do
       doTrans <- fsmCondTrans ct
       case doTrans of
-        True  -> return (fsmNextState ct)
+        True  -> return . Just . fsmNextState $ ct
         False -> go cts
 
-runFSM :: (Monad m, Ord ms, Ord ev) => FSM m ev ms-> ev -> ms -> m ms
+runFSM :: forall m ev ms. (Monad m, Functor m, Ord ms, Ord ev) => FSM m ev ms -> ev -> ms -> m ms
 runFSM fsm ev ms = do
-  maybe' (return ms) (M.lookup ms fsm) $ \transMap ->
-    maybe' (return ms) (M.lookup ev transMap) $ \transitions -> do
-      sequence_ (fsmUnconditionals transitions)
-      appConds (fsmConditionals transitions) ms
+  mbFSMState <- foo (fsmAnyStateTransitions fsm) ms
+  case mbFSMState of
+    Just ms' -> return ms'
+    Nothing  -> maybe' (return ms) (M.lookup ms (fsmDependentTransitions fsm)) $ \transMap ->
+                  maybe ms id <$> foo transMap ms
+  where
+    foo :: Map ev (FSMTransitions m ms) -> ms -> m (Maybe ms)
+    foo evMap ms =
+      maybe' (return $ Just ms) (M.lookup ev evMap) $ \transitions -> do
+        sequence_ (fsmUnconditionals transitions)
+        appConds  (fsmConditionals transitions)

@@ -1,4 +1,4 @@
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE GADTs, LiberalTypeSynonyms #-}
 module Game where
 
 --
@@ -12,9 +12,12 @@ import           Control.Monad.Random
 import           Control.Monad.State
 import           Control.Applicative
 import           Text.Printf
+import           Data.Map (Map)
+import qualified Data.Map as M
 
 -- friends
 import Graphics
+import FSM
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -41,6 +44,15 @@ import Graphics
 -- The game monad
 type GameM a = StateT GameState (Rand StdGen) a
 
+type GameFSM = FSM (StateT GameState (Rand StdGen)) Event FSMState
+-- ^ I want to write:
+--     type GameFSM = FSM GameM Event FSMState
+-- but I need to fully expand the type synonym for GameM Otherwise we can an annoying GHC error:
+--     Type synonym ‘GameM’ should have 1 argument, but has been given none
+--       In the type declaration for ‘GameFSM’
+
+
+
 ----------------------------------------------------------------------------------------------------
 --
 -- Finite State Machine states for this game.
@@ -50,10 +62,9 @@ data FSMState = FSMLevel Int -- level number
               | FSMLevelComplete
               | FSMGameOver
               | FSMQuit -- going into this state causes immediate close of program in backend
-
+              deriving (Show, Eq, Ord)
 ----------------------------------------------------------------------------------------------------
-data GameState = GameState { gsFSMState  :: FSMState
-                           , gsRender    :: Anim
+data GameState = GameState { gsRender    :: Anim
                            , gsBounds    :: (Int, Int)
                            }
 
@@ -68,7 +79,7 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
            | TapAnywhere          -- tap occurred but anywhere.
            | NextFrame
            | Reset
-           deriving (Show, Eq)
+           deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -80,38 +91,55 @@ newGameState bounds = do
   return $ germAnimToNewGameState bounds germAnim
 
 germAnimToNewGameState :: (Int, Int) -> Anim -> GameState
-germAnimToNewGameState bounds germAnim = GameState (FSMLevel 1) germAnim bounds
+germAnimToNewGameState bounds germAnim = GameState germAnim bounds
 
 
-resetGameState :: (Int, Int) -> GameM ()
-resetGameState bounds = do
-  germAnim <- lift $ newSingleGermAnim bounds
-  put $ germAnimToNewGameState bounds germAnim
+resetGameState :: GameM ()
+resetGameState = do
+  gs <- get
+  germAnim <- lift $ newSingleGermAnim (gsBounds gs)
+  put $ germAnimToNewGameState (gsBounds gs) germAnim
 
 ----------------------------------------------------------------------------------------------------
---
--- Advance the FSM by one step.
---
-fsm :: Event -> GameM ()
-fsm e = do
-  -- events that can occur in any FSM State
-  gs <- get
-  case e of
-    Reset -> resetGameState $ gsBounds gs
-    _  -> (case gsFSMState gs of -- events that depend on current FSM State
-            FSMLevel i            -> fsmLevel i
-            FSMAntibioticUnlocked -> fsmAntibioticUnlocked
-            FSMLevelComplete      -> fsmLevelComplete
-            FSMGameOver           -> fsmGameOver
-            FSMQuit               -> return () -- do nothing
-          )
-  where
-    fsmLevel i = case e of
-      Tap (x,y) -> error "This is where you kill a germ"
-      _ -> error $ printf "Event '%s' not handled by fsmLevel" (show e)
-    fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
-    fsmLevelComplete      = error "fsmLevelComplete not implemented"
-    fsmGameOver           = error "fsmGameOver not implemented"
+----
+---- Advance the FSM by one step.
+----
+--fsm :: Event -> GameM ()
+--fsm e = do
+--  -- events that can occur in any FSM State
+--  gs <- get
+--  case e of
+--    Reset -> resetGameState
+--    _  -> (case gsFSMState gs of -- events that depend on current FSM State
+--            FSMLevel i            -> fsmLevel i
+--            FSMAntibioticUnlocked -> fsmAntibioticUnlocked
+--            FSMLevelComplete      -> fsmLevelComplete
+--            FSMGameOver           -> fsmGameOver
+--            FSMQuit               -> return () -- do nothing
+--          )
+--  where
+--    fsmLevel i = case e of
+--      Tap (x,y) -> error "This is where you kill a germ"
+--      _ -> error $ printf "Event '%s' not handled by fsmLevel" (show e)
+--    fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
+--    fsmLevelComplete      = error "fsmLevelComplete not implemented"
+--    fsmGameOver           = error "fsmGameOver not implemented"
+
+
+----------------------------------------------------------------------------------------------------
+gameFSM :: GameFSM
+gameFSM = FSM {
+    fsmAnyStateTransitions = M.fromList [(Reset, FSMTransitions { fsmUnconditionals = []
+                                                               , fsmConditionals = [condTransReset] })]
+  , fsmDependentTransitions = M.fromList []
+
+  }
+
+condTransReset = FSMCondTrans { fsmCondTrans    = transitionReset
+                               , fsmNextState    = FSMLevel 1 }
+transitionReset :: GameM Bool
+transitionReset = resetGameState >> return True
+
 
 ----------------------------------------------------------------------------------------------------
 frameUpdate :: Time -> Time -> GameM ()
@@ -121,9 +149,9 @@ frameUpdate duration sinceStart = return ()
 --
 -- The game as a Finite State Machine
 --
-handleEvent :: [Event] -> GameM ()
-handleEvent events = sequence_ . map fsm $ events
+handleEvent :: FSMState -> Event -> GameM FSMState
+handleEvent fsmState event = runFSM gameFSM event fsmState
 
 ----------------------------------------------------------------------------------------------------
-runGameM :: GameM () -> GameState  -> IO GameState
-runGameM gameM gs = snd <$> (evalRandIO $ runStateT gameM gs)
+runGameM :: GameM a -> GameState  -> IO (a, GameState)
+runGameM gameM gs = evalRandIO $ runStateT gameM gs

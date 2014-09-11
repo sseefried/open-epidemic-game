@@ -32,6 +32,7 @@ data BackendState = BackendState { besStartTime    :: UTCTime
                                  , besGameState    :: GameState
                                  , besDimensions   :: (Int,Int)
                                  , besFrames       :: Integer
+                                 , besFSMState     :: FSMState
                                  }
 
 ----------------------------------------------------------------------------------------------------
@@ -53,7 +54,7 @@ initialize title screenWidth screenHeight gs = do
   pixels <- fmap castPtr $ S.surfaceGetPixels surf
   csurf  <- C.createImageSurfaceForData pixels C.FormatRGB24 screenWidth screenHeight
              (screenWidth * bytesPerPixel)
-  newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0
+  newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0 (FSMLevel 1)
 
 debugPrintKey sdlEvent = case sdlEvent of
   S.KeyDown (S.Keysym key mods unicode) ->
@@ -61,6 +62,9 @@ debugPrintKey sdlEvent = case sdlEvent of
   _ -> return ()
 
 ----------------------------------------------------------------------------------------------------
+--
+-- Returns Nothing if the SDL event is not understood by the game in this FSMState.
+--
 sdlEventToEvent :: FSMState -> S.Event -> Maybe Event
 sdlEventToEvent fsmState sdlEvent =
   -- events that can occur in any FSM State
@@ -74,17 +78,16 @@ sdlEventToEvent fsmState sdlEvent =
 -- Reads the current backend state, runs [f], writes the backend state back with modified GameState,
 -- and then runs the continuation [cont] with the latest GameState
 --
-runOnGameState :: IORef BackendState -> GameM () -> (GameState -> IO ()) -> IO ()
-runOnGameState besRef gameM cont = do
+runOnGameState :: (a -> BackendState -> BackendState)
+               -> IORef BackendState
+               -> GameM a
+               -> (GameState -> IO ())
+               -> IO ()
+runOnGameState upd besRef gameM cont  = do
   bes     <- readIORef besRef
-  gs      <- runGameM gameM (besGameState bes)
-  writeIORef besRef $ bes { besGameState = gs}
+  (a, gs) <- runGameM gameM (besGameState bes)
+  writeIORef besRef $ upd a $ bes { besGameState = gs }
   cont gs
-
-----------------------------------------------------------------------------------------------------
--- Like [runOnGameState] but without the continuation
-runOnGameState' :: IORef BackendState -> GameM () -> IO ()
-runOnGameState' besRef f = runOnGameState besRef f (const $ return ())
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -119,7 +122,7 @@ runFrameUpdate besRef frameUpdate = do
              return ()
 
     -- draw a single frame
-    runOnGameState besRef (frameUpdate duration sinceStart) $ \gs' -> do
+    runOnGameState (const id) besRef (frameUpdate duration sinceStart) $ \gs' -> do
     screen <- S.getVideoSurface
     C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
     _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
@@ -133,40 +136,51 @@ runFrameUpdate besRef frameUpdate = do
 --
 -- Runs [handleEvent] until an SDL "Quit" event is received. Otherwise loops forever.
 --
-runEventHandler :: IORef BackendState -> ([Event] -> GameM ()) -> IO ()
+runEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let gs       = besGameState bes
-      fsmState = gsFSMState gs
-  mbEvents <- getEvents fsmState
-  case mbEvents of
-    Just []       -> return () -- do nothing
-    Just es@(_:_) -> runOnGameState' besRef (handleEvent es)
-    Nothing       -> exitWith ExitSuccess -- quit the game
+      fsmState = besFSMState bes
+  mbEvent <- getEvent fsmState
+  case mbEvent of
+    Left ()         -> exitWith ExitSuccess
+    Right Nothing   -> return () -- do nothing
+    Right (Just ev) -> runOnGameState1 besRef (handleEvent fsmState ev)
+  where
+    runOnGameState1 b c = runOnGameState (\fsmState bes -> bes { besFSMState = fsmState }) b c (const $ return ())
 
 ----------------------------------------------------------------------------------------------------
 --
 -- Repeatedly polls until an SDL [NoEvent] is received and returns all events received
 -- (except for [NoEvent]). Can return an empty list.
 --
-getSDLEvents :: IO [S.Event]
-getSDLEvents = do
-  e <- S.pollEvent
-  case e of
-    S.NoEvent -> return []
-    _         -> do { es <- getSDLEvents; return (e:es) }
+--getSDLEvents :: IO [S.Event]
+--getSDLEvents = do
+--  e <- S.pollEvent
+--  case e of
+--    S.NoEvent -> return []
+--    _         -> do { es <- getSDLEvents; return (e:es) }
 
 ----------------------------------------------------------------------------------------------------
 --
--- Given an FSMState [getEvents] returns [Nothing] if a quit event was received
--- or it returns a (possibly empty) list of game events.
+-- We want to return *at most* one event per frame (as we want the finite state machine to
+-- evolve by one state at most per frame). We want to skip any events that the game does
+-- not understand (so that we do not have frames where nothing happened because
+-- an SDL event that was not understood was processed into returning Nothing)
 --
-getEvents :: FSMState -> IO (Maybe [Event])
-getEvents fsmState = do
-  sdlEvents <- getSDLEvents
-  return $ case any checkForQuit sdlEvents of
-    True  -> Nothing
-    False -> Just . catMaybes . map (sdlEventToEvent fsmState) $ sdlEvents
+-- Left ()        = SDL quit event occurred
+-- Right Nothing  = no game event
+-- Right ev       = event [ev] returned
+getEvent :: FSMState -> IO (Either () (Maybe Event))
+getEvent fsmState = do
+  sdlEvent <- S.pollEvent
+  case checkForQuit sdlEvent of
+    True -> return $ Left ()
+    False -> (case sdlEvent of
+                S.NoEvent -> return $ Right Nothing
+                _ -> (case sdlEventToEvent fsmState sdlEvent of
+                        Nothing -> getEvent fsmState -- keep polling
+                        Just ev -> return $ Right $ Just ev))
   where
     -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
     checkForQuit e = case e of
@@ -175,7 +189,7 @@ getEvents fsmState = do
       _                                 -> False
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
-         -> ([Event] -> GameM ()) -- event handler
+         -> (FSMState -> Event -> GameM FSMState) -- event handler
          -> (Time -> Time -> GameM ()) -- frame update
          -> IO ()
 mainLoop besRef handleEvent frameUpdate = loop $ do
