@@ -101,43 +101,32 @@ runAndTime besRef upd io = do
   writeIORef besRef $ upd (toDouble $ diffUTCTime t' t) bes
   return result
   where
-    toDouble = fromRational . toRational
+
+
+toDouble :: Real a => a -> Double
+toDouble = fromRational . toRational
 
 ----------------------------------------------------------------------------------------------------
-runFrameUpdate :: IORef BackendState -> (Time -> Time -> GameM ()) -> IO ()
-runFrameUpdate besRef frameUpdate = do
-    bes <- readIORef besRef
-    t <- getCurrentTime
-
-    let duration   = toDouble $ diffUTCTime t (besLastTime bes)
-        sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-        (w,h)      = besDimensions bes
-        logFrameRate = do
-           let n = besFrames bes
-               t = besStartTime bes
-           when (n `mod` 30 == 29) $ do
-             t' <- getCurrentTime
-             let d = diffUTCTime t' t
-             printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
-             return ()
-
-    -- draw a single frame
-    runOnGameState (const id) besRef (frameUpdate duration sinceStart) $ \gs' -> do
-    screen <- S.getVideoSurface
-    C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs' sinceStart
-    _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
-    S.flip screen
-    logFrameRate
-    writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFrames = besFrames bes + 1 }
-  where
-    toDouble = fromRational . toRational
+runFrameUpdate :: IORef BackendState -> IO ()
+runFrameUpdate besRef = do
+  bes <- readIORef besRef
+  t <- getCurrentTime
+  let (w,h)      = besDimensions bes
+      gs         = besGameState bes
+      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
+  screen <- S.getVideoSurface
+  C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs sinceStart
+  _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
+  S.flip screen
+  writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
 
 ----------------------------------------------------------------------------------------------------
 --
--- Runs [handleEvent] until an SDL "Quit" event is received. Otherwise loops forever.
+-- [runInputEventHandler] tries to retrieve a game event. If it finds one then
+-- [handleEvent] is called on this event and the FSMState in the BackEndState is updated.
 --
-runEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
-runEventHandler besRef handleEvent = do
+runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
+runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let gs       = besGameState bes
       fsmState = besFSMState bes
@@ -145,9 +134,21 @@ runEventHandler besRef handleEvent = do
   case mbEvent of
     Left ()         -> exitWith ExitSuccess
     Right Nothing   -> return () -- do nothing
-    Right (Just ev) -> runOnGameState1 besRef (handleEvent fsmState ev)
+    Right (Just ev) -> runOnGameState' besRef (handleEvent fsmState ev)
   where
-    runOnGameState1 b c = runOnGameState (\fsmState bes -> bes { besFSMState = fsmState }) b c (const $ return ())
+    runOnGameState' b c = runOnGameState updFSMState b c (const $ return ())
+    updFSMState fsmState bes = bes { besFSMState = fsmState }
+
+----------------------------------------------------------------------------------------------------
+runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
+runPhysicsEventHandler besRef handleEvent = do
+  bes <- readIORef besRef
+  t <- getCurrentTime
+  let gs = besGameState bes
+      duration = toDouble $ diffUTCTime t (besLastTime bes)
+      fsmState = besFSMState bes
+  (fsmState', gs') <- runGameM (handleEvent fsmState (Physics duration)) gs
+  writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFSMState = fsmState' }
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -190,12 +191,22 @@ getEvent fsmState = do
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
          -> (FSMState -> Event -> GameM FSMState) -- event handler
-         -> (Time -> Time -> GameM ()) -- frame update
          -> IO ()
-mainLoop besRef handleEvent frameUpdate = loop $ do
-  runEventHandler besRef handleEvent
-  runFrameUpdate  besRef frameUpdate
+mainLoop besRef handleEvent = loop $ do
+  runFrameUpdate       besRef
+  runInputEventHandler besRef handleEvent
+  runPhysicsEventHandler besRef handleEvent
   where
     loop :: IO () -> IO ()
     loop io = io >> loop io
+--    let duration   = toDouble $ diffUTCTime t (besLastTime bes)
+--        sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
+     --logFrameRate = do
+     --      let n = besFrames bes
+     --          t = besStartTime bes
+     --      when (n `mod` 30 == 29) $ do
+     --        t' <- getCurrentTime
+     --        let d = diffUTCTime t' t
+     --        printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
+     --        return ()
 

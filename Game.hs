@@ -79,6 +79,7 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
            | TapAnywhere          -- tap occurred but anywhere.
            | NextFrame
            | Reset
+           | Physics Time -- how much time the last frame took
            deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
@@ -116,10 +117,6 @@ condTransReset = FSMCondTrans { fsmCondTrans    = transitionReset
 transitionReset :: GameM Bool
 transitionReset = resetGameState >> return True
 
-
-----------------------------------------------------------------------------------------------------
-frameUpdate :: Time -> Time -> GameM ()
-frameUpdate duration sinceStart = return ()
 
 ----------------------------------------------------------------------------------------------------
 --

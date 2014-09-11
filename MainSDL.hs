@@ -39,4 +39,4 @@ main :: IO ()
 main = do
   gs <- newGameState (screenWidth, screenHeight)
   besRef   <- B.initialize "Epidemic" screenWidth screenHeight gs
-  B.mainLoop besRef handleEvent frameUpdate
+  B.mainLoop besRef handleEvent
