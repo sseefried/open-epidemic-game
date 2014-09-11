@@ -74,16 +74,16 @@ sdlEventToEvent fsmState sdlEvent =
 -- Reads the current backend state, runs [f], writes the backend state back with modified GameState,
 -- and then runs the continuation [cont] with the latest GameState
 --
-runOnGameState :: IORef BackendState -> (GameState -> GameM GameState) -> (GameState -> IO ()) -> IO ()
-runOnGameState besRef f cont = do
-  bes <- readIORef besRef
-  gs <- runGameM . f $ besGameState bes
+runOnGameState :: IORef BackendState -> GameM () -> (GameState -> IO ()) -> IO ()
+runOnGameState besRef gameM cont = do
+  bes     <- readIORef besRef
+  gs      <- runGameM gameM (besGameState bes)
   writeIORef besRef $ bes { besGameState = gs}
   cont gs
 
 ----------------------------------------------------------------------------------------------------
 -- Like [runOnGameState] but without the continuation
-runOnGameState' :: IORef BackendState -> (GameState -> GameM GameState) -> IO ()
+runOnGameState' :: IORef BackendState -> GameM () -> IO ()
 runOnGameState' besRef f = runOnGameState besRef f (const $ return ())
 
 ----------------------------------------------------------------------------------------------------
@@ -101,7 +101,7 @@ runAndTime besRef upd io = do
     toDouble = fromRational . toRational
 
 ----------------------------------------------------------------------------------------------------
-runFrameUpdate :: IORef BackendState -> (Time -> Time -> GameState -> GameM GameState) -> IO ()
+runFrameUpdate :: IORef BackendState -> (Time -> Time -> GameM ()) -> IO ()
 runFrameUpdate besRef frameUpdate = do
     bes <- readIORef besRef
     t <- getCurrentTime
@@ -133,7 +133,7 @@ runFrameUpdate besRef frameUpdate = do
 --
 -- Runs [handleEvent] until an SDL "Quit" event is received. Otherwise loops forever.
 --
-runEventHandler :: IORef BackendState -> ([Event] -> GameState -> GameM GameState) -> IO ()
+runEventHandler :: IORef BackendState -> ([Event] -> GameM ()) -> IO ()
 runEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let gs       = besGameState bes
@@ -175,8 +175,8 @@ getEvents fsmState = do
       _                                 -> False
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
-         -> ([Event] -> GameState -> GameM GameState) -- event handler
-         -> (Time -> Time -> GameState -> GameM GameState) -- frame update
+         -> ([Event] -> GameM ()) -- event handler
+         -> (Time -> Time -> GameM ()) -- frame update
          -> IO ()
 mainLoop besRef handleEvent frameUpdate = loop $ do
   runEventHandler besRef handleEvent

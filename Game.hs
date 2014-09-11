@@ -6,9 +6,15 @@ module Game where
 -- with issues of rendering.
 --
 
-import           Control.Monad.Random
+-- system imports
 import           Control.Monad
+import           Control.Monad.Random
+import           Control.Monad.State
+import           Control.Applicative
 import           Text.Printf
+
+-- friends
+import Graphics
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -30,12 +36,10 @@ import           Text.Printf
 --
 
 
--- friends
-import Graphics
 
 ----------------------------------------------------------------------------------------------------
 -- The game monad
-type GameM a = Rand StdGen a
+type GameM a = StateT GameState (Rand StdGen) a
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -70,26 +74,36 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
 --
 -- The sorts of events that can occur are dependent on the state of the FSM.
 --
-newGameState :: (Int,Int) -> GameM GameState
-newGameState (w, h) = do
-  germAnim <- newSingleGermAnim (w, h)
-  return $ GameState (FSMLevel 1) germAnim (w, h)
+newGameState :: (Int,Int) -> IO GameState
+newGameState bounds = do
+  germAnim <- evalRandIO $ newSingleGermAnim bounds
+  return $ germAnimToNewGameState bounds germAnim
+
+germAnimToNewGameState :: (Int, Int) -> Anim -> GameState
+germAnimToNewGameState bounds germAnim = GameState (FSMLevel 1) germAnim bounds
+
+
+resetGameState :: (Int, Int) -> GameM ()
+resetGameState bounds = do
+  germAnim <- lift $ newSingleGermAnim bounds
+  put $ germAnimToNewGameState bounds germAnim
 
 ----------------------------------------------------------------------------------------------------
 --
 -- Advance the FSM by one step.
 --
-fsm :: GameState -> Event -> GameM GameState
-fsm gs e = do
+fsm :: Event -> GameM ()
+fsm e = do
   -- events that can occur in any FSM State
+  gs <- get
   case e of
-    Reset -> newGameState $ gsBounds gs
+    Reset -> resetGameState $ gsBounds gs
     _  -> (case gsFSMState gs of -- events that depend on current FSM State
             FSMLevel i            -> fsmLevel i
             FSMAntibioticUnlocked -> fsmAntibioticUnlocked
             FSMLevelComplete      -> fsmLevelComplete
             FSMGameOver           -> fsmGameOver
-            FSMQuit               -> return gs -- do nothing
+            FSMQuit               -> return () -- do nothing
           )
   where
     fsmLevel i = case e of
@@ -100,16 +114,16 @@ fsm gs e = do
     fsmGameOver           = error "fsmGameOver not implemented"
 
 ----------------------------------------------------------------------------------------------------
-frameUpdate :: Time -> Time -> GameState -> GameM GameState
-frameUpdate duration sinceStart = return
+frameUpdate :: Time -> Time -> GameM ()
+frameUpdate duration sinceStart = return ()
 
 ----------------------------------------------------------------------------------------------------
 --
 -- The game as a Finite State Machine
 --
-handleEvent :: [Event] -> GameState -> GameM GameState
-handleEvent events gs = foldM fsm gs events
+handleEvent :: [Event] -> GameM ()
+handleEvent events = sequence_ . map fsm $ events
 
 ----------------------------------------------------------------------------------------------------
-runGameM :: GameM a -> IO a
-runGameM = evalRandIO
+runGameM :: GameM () -> GameState  -> IO GameState
+runGameM gameM gs = snd <$> (evalRandIO $ runStateT gameM gs)
