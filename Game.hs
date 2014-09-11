@@ -61,7 +61,6 @@ data FSMState = FSMLevel Int -- level number
               | FSMAntibioticUnlocked
               | FSMLevelComplete
               | FSMGameOver
-              | FSMQuit -- going into this state causes immediate close of program in backend
               deriving (Show, Eq, Ord)
 ----------------------------------------------------------------------------------------------------
 data GameState = GameState { gsRender    :: Anim
@@ -108,12 +107,16 @@ gameFSM = FSM {
       M.fromList [(Reset,
                    FSMTransitions
                      { fsmUnconditionals = []
-                     , fsmConditionals = [condTransReset] })]
-  , fsmDependentTransitions = M.fromList []
+                     , fsmConditionals = [condTransReset] }
+                  )]
+  , fsmDependentTransitions =
+      M.fromList []
   }
 
+----------------------------------------------------------------------------------------------------
 condTransReset = FSMCondTrans { fsmCondTrans    = transitionReset
-                               , fsmNextState    = FSMLevel 1 }
+                              , fsmNextState    = FSMLevel 1 }
+----------------------------------------------------------------------------------------------------
 transitionReset :: GameM Bool
 transitionReset = resetGameState >> return True
 
@@ -123,7 +126,26 @@ transitionReset = resetGameState >> return True
 -- The game as a Finite State Machine
 --
 handleEvent :: FSMState -> Event -> GameM FSMState
-handleEvent fsmState event = runFSM gameFSM event fsmState
+handleEvent fsmState ev = do
+  -- events that can occur in any FSM State
+  gs <- get
+  case ev of
+    Reset   -> resetGameState >> (return $ FSMLevel 1)
+    _  -> (case fsmState of -- events that depend on current FSM State
+            FSMLevel i            -> fsmLevel i
+            FSMAntibioticUnlocked -> fsmAntibioticUnlocked
+            FSMLevelComplete      -> fsmLevelComplete
+            FSMGameOver           -> fsmGameOver
+          )
+  where
+    fsmLevel i = case ev of
+      Tap (x,y)        -> error "This is where you kill a germ"
+      Physics duration -> return fsmState
+      _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
+    fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
+    fsmLevelComplete      = error "fsmLevelComplete not implemented"
+    fsmGameOver           = error "fsmGameOver not implemented"
+
 
 ----------------------------------------------------------------------------------------------------
 runGameM :: GameM a -> GameState  -> IO (a, GameState)

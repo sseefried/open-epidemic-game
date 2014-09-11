@@ -152,18 +152,6 @@ runPhysicsEventHandler besRef handleEvent = do
 
 ----------------------------------------------------------------------------------------------------
 --
--- Repeatedly polls until an SDL [NoEvent] is received and returns all events received
--- (except for [NoEvent]). Can return an empty list.
---
---getSDLEvents :: IO [S.Event]
---getSDLEvents = do
---  e <- S.pollEvent
---  case e of
---    S.NoEvent -> return []
---    _         -> do { es <- getSDLEvents; return (e:es) }
-
-----------------------------------------------------------------------------------------------------
---
 -- We want to return *at most* one event per frame (as we want the finite state machine to
 -- evolve by one state at most per frame). We want to skip any events that the game does
 -- not understand (so that we do not have frames where nothing happened because
@@ -188,6 +176,7 @@ getEvent fsmState = do
       S.Quit                            -> True
       S.KeyDown (S.Keysym S.SDLK_q _ _) -> True
       _                                 -> False
+
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
          -> (FSMState -> Event -> GameM FSMState) -- event handler
