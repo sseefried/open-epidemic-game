@@ -101,38 +101,14 @@ resetGameState = do
   put $ germAnimToNewGameState (gsBounds gs) germAnim
 
 ----------------------------------------------------------------------------------------------------
-----
----- Advance the FSM by one step.
-----
---fsm :: Event -> GameM ()
---fsm e = do
---  -- events that can occur in any FSM State
---  gs <- get
---  case e of
---    Reset -> resetGameState
---    _  -> (case gsFSMState gs of -- events that depend on current FSM State
---            FSMLevel i            -> fsmLevel i
---            FSMAntibioticUnlocked -> fsmAntibioticUnlocked
---            FSMLevelComplete      -> fsmLevelComplete
---            FSMGameOver           -> fsmGameOver
---            FSMQuit               -> return () -- do nothing
---          )
---  where
---    fsmLevel i = case e of
---      Tap (x,y) -> error "This is where you kill a germ"
---      _ -> error $ printf "Event '%s' not handled by fsmLevel" (show e)
---    fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
---    fsmLevelComplete      = error "fsmLevelComplete not implemented"
---    fsmGameOver           = error "fsmGameOver not implemented"
-
-
-----------------------------------------------------------------------------------------------------
 gameFSM :: GameFSM
 gameFSM = FSM {
-    fsmAnyStateTransitions = M.fromList [(Reset, FSMTransitions { fsmUnconditionals = []
-                                                               , fsmConditionals = [condTransReset] })]
+    fsmAnyStateTransitions =
+      M.fromList [(Reset,
+                   FSMTransitions
+                     { fsmUnconditionals = []
+                     , fsmConditionals = [condTransReset] })]
   , fsmDependentTransitions = M.fromList []
-
   }
 
 condTransReset = FSMCondTrans { fsmCondTrans    = transitionReset
