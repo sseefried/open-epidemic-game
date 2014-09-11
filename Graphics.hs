@@ -40,10 +40,6 @@ black = Color 0 0 0 1
 
 type GermGradient = (Color, Color)
 
-data GermKind = Wobble Int -- number of wobbles
-              | Spiky  Int -- number of spikes
-              deriving Show
-
 -- point which lies inside a unit circle. Invariant: x*x + y*y < 1
 newtype NormalisedPoint = NormalisedPoint Point deriving Show
 
