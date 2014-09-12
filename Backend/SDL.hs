@@ -115,7 +115,7 @@ runFrameUpdate besRef = do
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
   screen <- S.getVideoSurface
-  C.renderWith (besCairoSurface bes) $ renderOnWhite w h $ gsRender gs sinceStart
+  C.renderWith (besCairoSurface bes) $ gsRender gs sinceStart
   _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
   S.flip screen
   writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
@@ -185,17 +185,22 @@ mainLoop besRef handleEvent = loop $ do
   runFrameUpdate       besRef
   runInputEventHandler besRef handleEvent
   runPhysicsEventHandler besRef handleEvent
+  logFrameRate besRef
   where
     loop :: IO () -> IO ()
     loop io = io >> loop io
 --    let duration   = toDouble $ diffUTCTime t (besLastTime bes)
 --        sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-     --logFrameRate = do
-     --      let n = besFrames bes
-     --          t = besStartTime bes
-     --      when (n `mod` 30 == 29) $ do
-     --        t' <- getCurrentTime
-     --        let d = diffUTCTime t' t
-     --        printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
-     --        return ()
+
+
+logFrameRate :: IORef BackendState -> IO ()
+logFrameRate besRef = do
+      bes <- readIORef besRef
+      let n = besFrames bes
+          t = besStartTime bes
+      when (n `mod` 30 == 29) $ do
+        t' <- getCurrentTime
+        let d = diffUTCTime t' t
+        printf "Framerate = %.2f frames/s\n" (fromIntegral n / (toDouble d) :: Double)
+        return ()
 

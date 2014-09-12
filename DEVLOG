@@ -89,3 +89,39 @@ Okay, it's getting a bit ridiculous that I still haven't implemented the
 state machine data structure, so I'm going to implement that right now. Then
 I will come back to the issue of avoiding "death spirals" in rendering.
 
+---------------
+Thu 11 Sep 2014
+---------------
+
+Today I finished writing the FSM module but then deleted it, realising it
+was clunky and didn't actually simplify anything. The problem was
+that the finite state machine had states with associated data.
+e.g. [FSMLevel Int] is on of the variants.
+
+My FSM module essentially created an association list between FSM states
+and transition functions which conditionally took us to a new FSM state.
+However, what you really want to do is a pattern match against the FSM state.
+e.g. case fsmState of
+       FSMLevel i -> ... some code ...
+
+Thinking about how I would rewrite my module I realised I didn't even need it.
+
+---------------
+Fri 12 Sep 2014
+---------------
+
+I'm back to animating germs. Up until now I've been returning a bunch
+of higher order functions to animate various things about the germs but now
+I realise that it's all going to have to be data driven if I want to
+mutate the germs properly. You can't inspect functions!
+
+I've decided that there are three inheritable characteristics of a germ
+- number of spikes
+- body gradient
+- nucleus gradient
+
+but I will also pre-calculate collections of so-called "moving points".
+The moving points are polar points where each component also as a list of
+"periodic functions" associated with it. However, these periodic functions
+are represented as data. Each periodic function has amplitude, period and
+phase.

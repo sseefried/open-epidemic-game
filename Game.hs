@@ -17,7 +17,6 @@ import qualified Data.Map as M
 
 -- friends
 import Graphics
-import FSM
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -44,13 +43,6 @@ import FSM
 -- The game monad
 type GameM a = StateT GameState (Rand StdGen) a
 
-type GameFSM = FSM (StateT GameState (Rand StdGen)) Event FSMState
--- ^ I want to write:
---     type GameFSM = FSM GameM Event FSMState
--- but I need to fully expand the type synonym for GameM Otherwise we can an annoying GHC error:
---     Type synonym ‘GameM’ should have 1 argument, but has been given none
---       In the type declaration for ‘GameFSM’
-
 
 
 ----------------------------------------------------------------------------------------------------
@@ -62,9 +54,11 @@ data FSMState = FSMLevel Int -- level number
               | FSMLevelComplete
               | FSMGameOver
               deriving (Show, Eq, Ord)
+
 ----------------------------------------------------------------------------------------------------
 data GameState = GameState { gsRender    :: Anim
                            , gsBounds    :: (Int, Int)
+                           , gsGerms     :: [GermGfx]
                            }
 
 ----------------------------------------------------------------------------------------------------
@@ -82,44 +76,23 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
            deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
+data Germ = Germ { germPos  :: (Double, Double)
+                 , germSize :: Double }
+
+----------------------------------------------------------------------------------------------------
 --
 -- The sorts of events that can occur are dependent on the state of the FSM.
 --
-newGameState :: (Int,Int) -> IO GameState
+newGameState :: (Int, Int) -> IO GameState
 newGameState bounds = do
-  germAnim <- evalRandIO $ newSingleGermAnim bounds
-  return $ germAnimToNewGameState bounds germAnim
-
-germAnimToNewGameState :: (Int, Int) -> Anim -> GameState
-germAnimToNewGameState bounds germAnim = GameState germAnim bounds
-
+  g <- evalRandIO randomGermGfx
+  return $ GameState (const $ return ()) bounds [g]
 
 resetGameState :: GameM ()
 resetGameState = do
   gs <- get
-  germAnim <- lift $ newSingleGermAnim (gsBounds gs)
-  put $ germAnimToNewGameState (gsBounds gs) germAnim
-
-----------------------------------------------------------------------------------------------------
-gameFSM :: GameFSM
-gameFSM = FSM {
-    fsmAnyStateTransitions =
-      M.fromList [(Reset,
-                   FSMTransitions
-                     { fsmUnconditionals = []
-                     , fsmConditionals = [condTransReset] }
-                  )]
-  , fsmDependentTransitions =
-      M.fromList []
-  }
-
-----------------------------------------------------------------------------------------------------
-condTransReset = FSMCondTrans { fsmCondTrans    = transitionReset
-                              , fsmNextState    = FSMLevel 1 }
-----------------------------------------------------------------------------------------------------
-transitionReset :: GameM Bool
-transitionReset = resetGameState >> return True
-
+  g <- lift $ randomGermGfx
+  put $ GameState (const $ return ()) (gsBounds gs) [g]
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -140,12 +113,22 @@ handleEvent fsmState ev = do
   where
     fsmLevel i = case ev of
       Tap (x,y)        -> error "This is where you kill a germ"
-      Physics duration -> return fsmState
+      Physics duration -> physics  >> return fsmState
       _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
     fsmLevelComplete      = error "fsmLevelComplete not implemented"
     fsmGameOver           = error "fsmGameOver not implemented"
 
+----------------------------------------------------------------------------------------------------
+--
+-- Physics is reponsible for updating the [gsRender] field of the GameState.
+--
+physics :: GameM ()
+physics = do
+  gs <- get
+  let bounds = gsBounds gs
+  let render = \t -> mapM_ (\g -> drawGerm g bounds (R2 50 100) 100 t) (gsGerms gs)
+  put $ gs { gsRender = render}
 
 ----------------------------------------------------------------------------------------------------
 runGameM :: GameM a -> GameState  -> IO (a, GameState)
