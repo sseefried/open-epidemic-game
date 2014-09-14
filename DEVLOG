@@ -125,3 +125,15 @@ The moving points are polar points where each component also as a list of
 "periodic functions" associated with it. However, these periodic functions
 are represented as data. Each periodic function has amplitude, period and
 phase.
+
+------------------
+Sunday 14 Sep 2014
+------------------
+
+Small germs need to animate faster to look like they are moving at all.
+It's much more noticeable when a big germ is moving. To simulate this
+I've added an extra field to the Germ data type call germCumulativeTime.
+Each frame we add the duration of the frame to this cumulative time, but we
+also scale it by a factor inversely proportional to the size of the germ.
+In fact its proportional to 1/sqrt size. For some reason this just looks right
+visually.

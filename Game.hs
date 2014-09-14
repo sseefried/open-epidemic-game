@@ -20,6 +20,98 @@ import Graphics
 
 ----------------------------------------------------------------------------------------------------
 --
+-- Game constants
+--
+worldWidth, worldHeight, worldMajor :: Double
+worldWidth  = 100
+worldHeight = 100
+worldMajor = max worldWidth worldHeight
+
+initialGermSize :: Double
+initialGermSize = worldMajor / 50
+
+doublingPeriod :: Double
+doublingPeriod = 3
+
+doublingPeriodVariance :: Double
+doublingPeriodVariance = 0.5
+
+resistanceIncrease :: Double
+resistanceIncrease = 1.1
+
+
+
+----------------------------------------------------------------------------------------------------
+--
+-- World co-ordinates vs. canvas co-ordinates
+--
+-- People may play this game at a variety of different resolutions. The co-ordinate system
+-- this is in is known as the canvas co-ordinates. For the purposes of the physics the
+-- co-ordindate system will remain fixed.
+--
+-- exported
+data R2 = R2 Double Double
+
+--
+-- The canvas might not have the same aspect ratio as the world, in which case
+-- we ensure there will be some portions of the canvas that won't be drawn to.
+--
+
+data WorldToCanvas = WorldToCanvas { worldPtToCanvasPt :: R2 -> CairoPoint
+                                   , worldLenToCanvasLen :: Double -> Double}
+
+--
+-- Let aspect ratio be width/height. Let aspect ration of the world be W and the aspect ratio of
+-- the  canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
+-- to.  If W < C then there will be margins on the left and right that will not be drawn to.
+--
+worldToCanvas :: (Int, Int) -> WorldToCanvas
+worldToCanvas (w,h) =
+  WorldToCanvas { worldPtToCanvasPt   = \(R2 x y) -> (w'/2 + scale*x, h'/2 - scale*y)
+                , worldLenToCanvasLen = \len -> scale * len  }
+  where
+    w' = fromIntegral w
+    h' = fromIntegral h
+    minor = min w' h'
+    scale = minor / worldMajor
+
+----------------------------------------------------------------------------------------------------
+--
+--
+-- The [germCumulativeTime] field is used in animating the germs. This is the value
+-- that is passed to the [drawGerm] function in the Graphics module.
+-- This value grows inversely proportional to the size of the germ because I've found
+-- that small germs need to animate quicker to look like they are moving at all. See function
+-- [growGerm].
+--
+
+data Germ = Germ { germMultiplyAt     :: Time
+                 , germGrowthRate     :: Double
+                 , germSize           :: Double
+                 , germPos            :: R2
+                 , germGfx            :: GermGfx
+                 , germCumulativeTime :: Time
+                 }
+
+
+growthRateForSteps :: Int -> Double
+growthRateForSteps n = 2**(1/fromIntegral n)
+
+-- TODO: Remove magic numbers
+createGerm :: RandomGen g => R2 -> Rand g Germ
+createGerm pos = do
+  gfx <- randomGermGfx
+  return $ Germ { germMultiplyAt        = 3
+                , germGrowthRate        = growthRateForSteps (3 * 30)
+                , germSize              = initialGermSize
+                , germPos               = pos
+                , germGfx               = gfx
+                , germCumulativeTime    = 0
+                }
+
+
+----------------------------------------------------------------------------------------------------
+--
 -- Events
 -- ~~~~~~
 --
@@ -28,7 +120,7 @@ import Graphics
 -- would be for the game logic to understand the basic concepts of 'keypress', 'mouse click',
 -- 'touch event', etc, but a more abstract way to do things is simply to have a notion of
 -- "game events" such as "germ squash", "quit", "continue to next level", etc.
--- It is then the backend's job to correctly translate to these events.
+-- It is then the backend's job to correctly translate its events to these game events.
 --
 -- This actually saves me a lot of work. For instance, were we to have a notion of 'keypress'
 -- in the game logic then you would have to account for every different kind of key that could
@@ -38,12 +130,9 @@ import Graphics
 --
 
 
-
 ----------------------------------------------------------------------------------------------------
 -- The game monad
 type GameM a = StateT GameState (Rand StdGen) a
-
-
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -56,9 +145,10 @@ data FSMState = FSMLevel Int -- level number
               deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
-data GameState = GameState { gsRender    :: Anim
-                           , gsBounds    :: (Int, Int)
-                           , gsGerms     :: [GermGfx]
+data GameState = GameState { gsRender        :: Render ()
+                           , gsBounds        :: (Int, Int)
+                           , gsGerms         :: [Germ]
+                           , gsWorldToCanvas :: WorldToCanvas
                            }
 
 ----------------------------------------------------------------------------------------------------
@@ -76,23 +166,22 @@ data Event = Tap (Double, Double) -- location at which tap occurred.
            deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
-data Germ = Germ { germPos  :: (Double, Double)
-                 , germSize :: Double }
-
-----------------------------------------------------------------------------------------------------
 --
 -- The sorts of events that can occur are dependent on the state of the FSM.
 --
 newGameState :: (Int, Int) -> IO GameState
 newGameState bounds = do
-  g <- evalRandIO randomGermGfx
-  return $ GameState (const $ return ()) bounds [g]
+  g <- evalRandIO $ createGerm (R2 0 0)
+  return $ initGameState bounds [g]
 
 resetGameState :: GameM ()
 resetGameState = do
   gs <- get
-  g <- lift $ randomGermGfx
-  put $ GameState (const $ return ()) (gsBounds gs) [g]
+  g  <- lift $ createGerm (R2 0 0)
+  put $ initGameState (gsBounds gs) [g]
+
+initGameState :: (Int,Int) -> [Germ] -> GameState
+initGameState bounds germs = GameState (return ()) bounds germs (worldToCanvas bounds)
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -113,7 +202,7 @@ handleEvent fsmState ev = do
   where
     fsmLevel i = case ev of
       Tap (x,y)        -> error "This is where you kill a germ"
-      Physics duration -> physics  >> return fsmState
+      Physics duration -> physics duration >> return fsmState
       _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
     fsmLevelComplete      = error "fsmLevelComplete not implemented"
@@ -121,14 +210,39 @@ handleEvent fsmState ev = do
 
 ----------------------------------------------------------------------------------------------------
 --
+-- As mentioned above, the [germCumulativeTime] grows inversely proportional to
+-- the size of the germ. I found that visually it works better if it grows as (1 / sqrt size)
+-- but I have yet to determine why this looks so natural.
+--
+
+growGerm :: Time -> Germ -> Germ
+growGerm duration g =
+  let size = germSize g
+      t    = germCumulativeTime g
+  in g { germSize = size * germGrowthRate g
+       , germCumulativeTime = (sqrt (worldMajor / size) * duration) + t}
+
+----------------------------------------------------------------------------------------------------
+--
 -- Physics is reponsible for updating the [gsRender] field of the GameState.
 --
-physics :: GameM ()
-physics = do
+physics :: Time -> GameM ()
+physics duration = do
   gs <- get
   let bounds = gsBounds gs
-  let render = \t -> mapM_ (\g -> drawGerm g bounds (R2 50 100) 100 t) (gsGerms gs)
-  put $ gs { gsRender = render}
+      w2c = gsWorldToCanvas gs
+  let germs = map (growGerm duration) (gsGerms gs)
+  let drawOneGerm :: Germ -> Render ()
+      drawOneGerm g = drawGerm
+                         (germGfx g)
+                         bounds
+                         (worldPtToCanvasPt w2c $ germPos g)
+                         (worldLenToCanvasLen w2c $ germSize g)
+                         (germFooTime g)
+  let render = mapM_ drawOneGerm germs
+  put $ gs { gsRender = render, gsGerms = germs}
+  where
+
 
 ----------------------------------------------------------------------------------------------------
 runGameM :: GameM a -> GameState  -> IO (a, GameState)

@@ -14,8 +14,8 @@ foreign export ccall "haskell_mainSDL" mainSDL :: IO ()
 #endif
 
 screenWidth, screenHeight :: Int
-screenWidth = 512
-screenHeight = 512
+screenWidth  = 800
+screenHeight = 800
 
 w, h :: Double
 w = fromIntegral screenWidth

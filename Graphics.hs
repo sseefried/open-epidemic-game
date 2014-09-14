@@ -1,6 +1,6 @@
 module Graphics (
   -- types
-  Anim, GermGfx(..), Time, Color, GermGradient, Point(..),
+  Anim, GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
   -- functions
   randomGermGfx, drawGerm
 ) where
@@ -61,6 +61,15 @@ spikyInnerRadius, spikyOuterRadius :: Double
 spikyInnerRadius = 0.5
 spikyOuterRadius = 1
 
+--
+-- Small germs need to have their animation speed sped up because otherwise
+-- it doesn't look like they are moving. If m = min w h where (w,h) is the bounds
+-- of the canvas then the scale time, and r is the radius of the germ then
+-- time is scaled by m/r * germAnimTimeScale
+--
+germAnimTimeScale :: Double
+germAnimTimeScale = 1
+
 ----------------------------------------------------------------------------------------------------
 --
 -- Co-ordinate systems
@@ -69,10 +78,6 @@ spikyOuterRadius = 1
 -- Internally we use type [CairoPoint]. This uses Cairo's co-ordinate system which has the origin
 -- in the top-left corner, x axis goes left to right and y axis goes to bottom.
 --
--- However we export a function [drawGerm] which uses the [Point] data type. THis co-ordinate
--- system is Cartesian. The origin is in the centre, the x axis goes left to right and the
--- y axis from bottom to top.
---
 type Time = Double
 type Anim = Time -> Render ()
 
@@ -80,8 +85,6 @@ data Color = Color Double Double Double Double deriving Show
 
 type CairoPoint = (Double, Double)
 
--- exported
-data Point = R2 Double Double
 
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
@@ -127,8 +130,8 @@ data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 -- your functions and makes them easier to understand.
 --
 sinU, cosU :: Floating a => a -> a
-sinU = sin . (2*pi*)
-cosU = cos . (2*pi*)
+sinU   = sin . (2*pi*)
+cosU   = cos . (2*pi*)
 tanU a = sinU a / cosU a
 
 
@@ -152,33 +155,25 @@ sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
         n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
-renderOnWhite :: Int -> Int -> Render () -> Render ()
-renderOnWhite w h drawing = do
-  setAntialias AntialiasSubpixel
-  drawBackground
-  asGroup drawing
-  where
-    drawBackground = do
-      setColor white
-      rectangle 0 0 (fromIntegral w) (fromIntegral h)
-      fill
-----------------------------------------------------------------------------------------------------
 --
 -- Draws a germ of radius [r] centred at [(x,y)]
 --
-drawGerm :: GermGfx -> (Int, Int) -> Point -> Double -> Anim
-drawGerm gg (w,h) (R2 x y) r t = do
-  renderCenter w' h' $ do
-    translate x (-y)
+--
+-- The animation speed is dependent on the size of the germ. Smaller germs don't look
+-- like they're moving at all unless their animation speed is increased.
+--
+drawGerm :: GermGfx -> (Int,Int) -> CairoPoint -> Double -> Anim
+drawGerm gg bounds@(w,h) (x,y) r t = do
+  renderOnWhite bounds $ do
+    translate x y
     scale r r
     withGermGradient (germGfxBodyGrad gg) 1 $ do
       blob . map (movingPtToPt t) . germGfxBody $ gg
     withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
       blob . map (movingPtToPt t) . germGfxNucleus $ gg
     -- scale to radius [r]
-  where
-    w' = fromIntegral w
-    h' = fromIntegral h
+    where
+      m = fromIntegral (min w h) / 2
 
 ----------------------------------------------------------------------------------------------------
 withGermGradient :: GermGradient -> Double -> Render () -> Render ()
@@ -337,18 +332,16 @@ quadraticCurveTo (cx,cy) (ex,ey) = do
      f a b = 1.0/3.0 * a + 2.0/3.0 * b
 
 ----------------------------------------------------------------------------------------------------
-renderCenter :: Double -> Double -> Render () -> Render ()
-renderCenter w h drawing = do
+renderOnWhite :: (Int, Int) -> Render () -> Render ()
+renderOnWhite (w, h) drawing = do
   setAntialias AntialiasSubpixel
   drawBackground
-  translate (w/2) (h/2)
   asGroup drawing
   where
     drawBackground = do
       setColor white
-      rectangle 0 0 w h
+      rectangle 0 0 (fromIntegral w) (fromIntegral h)
       fill
-
 ----------------------------------------------------------------------------------------------------
 -- Randomness
 
@@ -440,7 +433,7 @@ tiledGerms n w h = do
   let germsAndCentres = zip germs centres
   return $ \t -> do
     forM_ germsAndCentres $ \(g, (x,y)) -> do
-      drawGerm g (w,h) (R2 x y) r t
+      drawGerm g (w,h) (x, y) r t
 
   where
     n'      = fromIntegral n
@@ -457,14 +450,14 @@ asGroup r = do
   paint
 
 ----------------------------------------------------------------------------------------------------
-newSingleGermAnim :: RandomGen g => (Int, Int) -> Rand g Anim
-newSingleGermAnim (screenWidth, screenHeight) = do
-  let w = fromIntegral screenWidth
-      h = fromIntegral screenHeight
-      r = (min w h) / 2 :: Double
-  g <- randomGermGfx
-  return $ \t -> do
-    renderCenter w h  $ drawGerm g (screenWidth,screenHeight) (R2 0 0) r t
+--newSingleGermAnim :: RandomGen g => (Int, Int) -> Rand g Anim
+--newSingleGermAnim (screenWidth, screenHeight) = do
+--  let w = fromIntegral screenWidth
+--      h = fromIntegral screenHeight
+--      r = (min w h) / 2 :: Double
+--  g <- randomGermGfx
+--  return $ \t -> do
+--    renderOnWhite $ drawGerm g (screenWidth,screenHeight) (0, 0) r t
 
 ----------------------------------------------------------------------------------------------------
 newGermAnim :: RandomGen g => (Int,Int) -> Rand g Anim
