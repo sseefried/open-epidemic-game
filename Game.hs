@@ -250,12 +250,30 @@ handleEvent fsmState ev = do
       return $ FSMPlayingLevel
 
     fsmPlayingLevel = case ev of
-      Tap (R2 x y)        -> error $ "This is where you kill a germ" ++ show (x,y)
+      Tap p     -> killGerm p
       Physics duration -> physics duration >> return fsmState
       _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
     fsmLevelComplete      = error "fsmLevelComplete not implemented"
     fsmGameOver           = error "fsmGameOver not implemented"
+
+--
+-- FIXME: Make this more efficient. Brute force searches through germs to kill them.
+--
+killGerm :: R2 -> GameM FSMState
+killGerm p = do
+  gs <- get
+  let germsToKill = M.toList $ M.filter (tapCollides p) (gsGerms gs)
+  let kkk (germId, germ) = do
+        runOnHipState $ removeHipCirc (germHipCirc germ)
+        modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs) }
+  mapM_ kkk germsToKill
+  return $ FSMPlayingLevel
+  where
+    tapCollides :: R2 -> Germ -> Bool
+    tapCollides (R2 x y) g = let sz       = germSizeFun g (germCumulativeTime g)
+                                 R2 x' y' = germPos g
+                             in (x' - x)**2 + (y' - y)**2 < sz*sz
 
 
 --
