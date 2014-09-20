@@ -2,7 +2,7 @@ module Graphics (
   -- types
   Anim, GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
   -- functions
-  randomGermGfx, drawGerm
+  randomGermGfx, drawGerm, drawBackground
 ) where
 
 import Graphics.Rendering.Cairo
@@ -164,7 +164,7 @@ sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
 --
 drawGerm :: GermGfx -> (Int,Int) -> CairoPoint -> Double -> Anim
 drawGerm gg bounds@(w,h) (x,y) r t = do
-  renderOnWhite bounds $ do
+  asGroup $ do
     translate x y
     scale r r
     withGermGradient (germGfxBodyGrad gg) 1 $ do
@@ -332,11 +332,10 @@ quadraticCurveTo (cx,cy) (ex,ey) = do
      f a b = 1.0/3.0 * a + 2.0/3.0 * b
 
 ----------------------------------------------------------------------------------------------------
-renderOnWhite :: (Int, Int) -> Render () -> Render ()
-renderOnWhite (w, h) drawing = do
+drawBackground :: (Int, Int) -> Render ()
+drawBackground (w, h)  = do
   setAntialias AntialiasSubpixel
   drawBackground
-  asGroup drawing
   where
     drawBackground = do
       setColor white
@@ -434,7 +433,6 @@ tiledGerms n w h = do
   return $ \t -> do
     forM_ germsAndCentres $ \(g, (x,y)) -> do
       drawGerm g (w,h) (x, y) r t
-
   where
     n'      = fromIntegral n
     r       = fromIntegral (min w h) / (n'*2)

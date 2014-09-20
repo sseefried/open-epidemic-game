@@ -13,27 +13,40 @@ import           Foreign.Ptr
 import           System.Exit
 import           Data.Maybe (catMaybes)
 import           Control.Applicative
+import           GHC.Word
 
 -- friends
 import Game
 import Graphics
 
 {-
-
 All backends must render from C.Render () to the backend's screen somehow.
-
 -}
 
 ----------------------------------------------------------------------------------------------------
-data BackendState = BackendState { besStartTime    :: UTCTime
-                                 , besLastTime     :: UTCTime
-                                 , besSurface      :: S.Surface
-                                 , besCairoSurface :: C.Surface
-                                 , besGameState    :: GameState
-                                 , besDimensions   :: (Int,Int)
-                                 , besFrames       :: Integer
-                                 , besFSMState     :: FSMState
+data BackendState = BackendState { besStartTime      :: UTCTime
+                                 , besLastTime       :: UTCTime
+                                 , besSurface        :: S.Surface
+                                 , besCairoSurface   :: C.Surface
+                                 , besGameState      :: GameState
+                                 , besDimensions     :: (Int,Int)
+                                 , besBackendToWorld :: BackendToWorld
+                                 , besFrames         :: Integer
+                                 , besFSMState       :: FSMState
                                  }
+
+data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Word16,Word16) -> R2 }
+
+backendToWorld ::  (Int, Int) -> BackendToWorld
+backendToWorld (w,h) =
+  BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x - w'/2)  * scale)
+                                                      ((h'/2 - fromIntegral y) * scale) }
+  where
+    minor = min w' h'
+    scale = worldMajor / minor
+    w' = fromIntegral w
+    h' = fromIntegral h
+
 
 ----------------------------------------------------------------------------------------------------
 bitsPerPixel, bytesPerPixel :: Int
@@ -54,7 +67,8 @@ initialize title screenWidth screenHeight gs = do
   pixels <- fmap castPtr $ S.surfaceGetPixels surf
   csurf  <- C.createImageSurfaceForData pixels C.FormatRGB24 screenWidth screenHeight
              (screenWidth * bytesPerPixel)
-  newIORef $ BackendState t t surf csurf gs (screenWidth, screenHeight) 0 (FSMLevel 1)
+  let dims = (screenWidth, screenHeight)
+  newIORef $ BackendState t t surf csurf gs dims (backendToWorld dims) 0 (FSMLevel 1)
 
 debugPrintKey sdlEvent = case sdlEvent of
   S.KeyDown (S.Keysym key mods unicode) ->
@@ -65,13 +79,18 @@ debugPrintKey sdlEvent = case sdlEvent of
 --
 -- Returns Nothing if the SDL event is not understood by the game in this FSMState.
 --
-sdlEventToEvent :: FSMState -> S.Event -> Maybe Event
-sdlEventToEvent fsmState sdlEvent =
+sdlEventToEvent :: BackendToWorld -> FSMState -> S.Event -> Maybe Event
+sdlEventToEvent b2w fsmState sdlEvent =
   -- events that can occur in any FSM State
   case sdlEvent of
     S.KeyDown _ -> Just Reset
     _           -> (case fsmState of -- events that occur in specific FSM states
-                      _ -> Nothing)
+                      FSMPlayingLevel -> playingLevel sdlEvent
+                      _               -> Nothing)
+  where
+    playingLevel e = case e of
+      S.MouseButtonDown x y _ -> Just $ Tap (backendPtToWorldPt b2w (x,y))
+      _                       -> Nothing
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -102,7 +121,6 @@ runAndTime besRef upd io = do
   return result
   where
 
-
 toDouble :: Real a => a -> Double
 toDouble = fromRational . toRational
 
@@ -130,7 +148,7 @@ runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let gs       = besGameState bes
       fsmState = besFSMState bes
-  mbEvent <- getEvent fsmState
+  mbEvent <- getEvent (besBackendToWorld bes) fsmState
   case mbEvent of
     Left ()         -> exitWith ExitSuccess
     Right Nothing   -> return () -- do nothing
@@ -147,7 +165,6 @@ runPhysicsEventHandler besRef handleEvent = do
   let gs = besGameState bes
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
-  printf "%.2f\n" duration
   (fsmState', gs') <- runGameM (handleEvent fsmState (Physics duration)) gs
   writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFSMState = fsmState' }
 
@@ -161,15 +178,15 @@ runPhysicsEventHandler besRef handleEvent = do
 -- Left ()        = SDL quit event occurred
 -- Right Nothing  = no game event
 -- Right ev       = event [ev] returned
-getEvent :: FSMState -> IO (Either () (Maybe Event))
-getEvent fsmState = do
+getEvent :: BackendToWorld -> FSMState -> IO (Either () (Maybe Event))
+getEvent b2w fsmState = do
   sdlEvent <- S.pollEvent
   case checkForQuit sdlEvent of
     True -> return $ Left ()
     False -> (case sdlEvent of
                 S.NoEvent -> return $ Right Nothing
-                _ -> (case sdlEventToEvent fsmState sdlEvent of
-                        Nothing -> getEvent fsmState -- keep polling
+                _ -> (case sdlEventToEvent b2w fsmState sdlEvent of
+                        Nothing -> getEvent b2w fsmState -- keep polling
                         Just ev -> return $ Right $ Just ev))
   where
     -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
@@ -190,9 +207,6 @@ mainLoop besRef handleEvent = loop $ do
   where
     loop :: IO () -> IO ()
     loop io = io >> loop io
---    let duration   = toDouble $ diffUTCTime t (besLastTime bes)
---        sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-
 
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
