@@ -147,7 +147,6 @@ runPhysicsEventHandler besRef handleEvent = do
   let gs = besGameState bes
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
-  printf "%.2f\n" duration
   (fsmState', gs') <- runGameM (handleEvent fsmState (Physics duration)) gs
   writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFSMState = fsmState' }
 

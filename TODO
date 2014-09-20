@@ -1,8 +1,7 @@
 TODO
 
-[ ] Handle the "Physics" event
-[ ] Write documentation for the FSM
-- Make germs the right radius
+[ ] Upgrade to SDL2
+[ ] Make germs the right radius
 
 -------------------------------
 
