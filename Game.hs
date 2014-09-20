@@ -58,7 +58,7 @@ resistanceIncrease = 1.1
 -- co-ordindate system will remain fixed.
 --
 -- exported
-data R2 = R2 Double Double
+data R2 = R2 Double Double deriving (Show, Eq, Ord)
 
 --
 -- The canvas might not have the same aspect ratio as the world, in which case
@@ -66,7 +66,10 @@ data R2 = R2 Double Double
 --
 
 data WorldToCanvas = WorldToCanvas { worldPtToCanvasPt :: R2 -> CairoPoint
-                                   , worldLenToCanvasLen :: Double -> Double}
+                                   , worldLenToCanvasLen :: Double -> Double }
+
+
+
 
 --
 -- Let aspect ratio be width/height. Let aspect ration of the world be W and the aspect ratio of
@@ -82,6 +85,8 @@ worldToCanvas (w,h) =
     h' = fromIntegral h
     minor = min w' h'
     scale = minor / worldMajor
+
+
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -182,7 +187,7 @@ data type with each constructor of the FSM. As it stands I could easily make a m
 code and have backend code that returned an event that wasn't handled by a particular FSM
 state. At this point these errors can only be caught at run-time.
 -}
-data Event = Tap (Double, Double) -- location at which tap occurred.
+data Event = Tap R2 -- location at which tap occurred.
            | TapAnywhere          -- tap occurred but anywhere.
            | NextFrame
            | Reset
@@ -245,7 +250,7 @@ handleEvent fsmState ev = do
       return $ FSMPlayingLevel
 
     fsmPlayingLevel = case ev of
-      Tap (x,y)        -> error "This is where you kill a germ"
+      Tap (R2 x y)        -> error $ "This is where you kill a germ" ++ show (x,y)
       Physics duration -> physics duration >> return fsmState
       _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
@@ -334,14 +339,12 @@ physics duration = do
   modify $ \gs -> let render = drawBackground (gsBounds gs) >> mapM_ drawOneGerm (M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 
-
-
 ----------------------------------------------------------------------------------------------------
 runGameM :: GameM a -> GameState  -> IO (a, GameState)
 runGameM gameM gs = evalRandIO $ runStateT gameM gs
 
 
----------------------------------------------------------------------------
+----------------------------------------------------------------------------------------------------
 -- TODO: Factor out
 
 -- A small _pure_ wrapper for Hipmunk
