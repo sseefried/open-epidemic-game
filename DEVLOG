@@ -1,24 +1,104 @@
 ---------------
-Mon 08 Sep 2014
+Sat 20 Sep 2014
 ---------------
 
-At the moment I'm checking for events (such as keypresses/mouseclicks)
-on every frame. This is not really the way I should be doing it. I should
-be handling the events asynchronously in a separate thread. In order not to
-have a race conditions when updating the state of the game I'm going to need
-to use MVars or some such mechanism.
+I've become quite obsessed with keeping the GameM monad pure. The problem
+is that I'm using the Hipmunk library (a Haskell binding to the Chipmunk
+physics engine) and it's firmly stuck in the IO monad. I've been doing a lot
+of thinking about how to resolve this issue and I've come up with two solutions,
+the second one thanks to a discussion with Lyndon. (The second one involves
+using a free monad if that whets your appetite.)
 
-However, I'll do this later. I've put it in the TODO file.
+Let's talk about the architecture. Currently we have a mainloop, written
+in SDL and running inside the IO monad. This loop takes a "game" function
+which has type signature FSMState -> Event -> GameM FSMState.
+
+The GameM monad is a state monad with random number generation
+("StateT GameState (Rand StdGen) a"). I wanted very much to keep this
+monad pure but I run into the snag that I want to store the current
+physics engine state inside the GameState data structure. Sure, I can *store*
+an IO value inside the monad, but I certainly can't evaluate it inside
+the GameM monad.
+
+My first solution to this problem is to create a pure wrapper for Hipmunk.
+I've prototyped this solution, and although it uses unsafePerformIO liberally,
+it works. In order to ensure that the IO actions occur in the right order
+we thread a dummy state through the functions that I defined in the API
+to this pure wrapper.
+
+The second solution would be to create a giant "super monad" for the entire
+game to be in -- a free monad based on a Game DSL I define. Then I'm free
+to evaluate whatever the hell I want in the IO monad but without the problem
+that if I *were* just in the IO monad *anything* could be happening inside it
+at any point. With the Game DSL free monad I know exactly what the actions
+that can be performed inside it are.
+
+The more I think about it the more appealing a Game DSL free monad is.
+This will necessitate yet another rewrite... do I go ahead with it?
+
+I know what I'll do. I'll try both solutions in different branches of
+the git repository. I'll try the pure Hipmunk solution first.
 
 
-Things I learned today:
+---------------
+Tue 16 Sep 2014
+---------------
 
-It is good to log information such as framerate. There was a point where
-I was doing what I thought was a blocking call to wait for an SDL event
-but in fact it was repeatedly polling and eating up valuable CPU cycles.
-The game looked just the same to me but my logging told me differently.
-It reminds me of the phenomenon pilots go through when their eyes are telling
-them something different to their instruments.
+I'm trying to think of a good data structure for storing germs. At the moment
+I've just got a list of germs. It might be okay to add new germs to the
+beginning of the list, which can be done in constant time, but what about
+deleting them? If I use Data.Map I'm going to need a notion of germId which
+seems cumbersome. I do probably want a k-d tree or BSP tree to reduce the number
+of objects I need to check for collisions with taps. Do these need an ID?
+
+------------------
+Sunday 14 Sep 2014
+------------------
+
+Small germs need to animate faster to look like they are moving at all.
+It's much more noticeable when a big germ is moving. To simulate this
+I've added an extra field to the Germ data type call germCumulativeTime.
+Each frame we add the duration of the frame to this cumulative time, but we
+also scale it by a factor inversely proportional to the size of the germ.
+In fact, it's proportional to 1/sqrt size. For some reason this just looks
+right visually.
+
+---------------
+Fri 12 Sep 2014
+---------------
+
+I'm back to animating germs. Up until now I've been returning a bunch
+of higher order functions to animate various things about the germs but now
+I realise that it's all going to have to be data driven if I want to
+mutate the germs properly. You can't inspect functions!
+
+I've decided that there are three inheritable characteristics of a germ
+- number of spikes
+- body gradient
+- nucleus gradient
+
+but I will also pre-calculate collections of so-called "moving points".
+The moving points are polar points where each component also as a list of
+"periodic functions" associated with it. However, these periodic functions
+are represented as data. Each periodic function has amplitude, period and
+phase.
+
+---------------
+Thu 11 Sep 2014
+---------------
+
+Today I finished writing the FSM module but then deleted it, realising it
+was clunky and didn't actually simplify anything. The problem was
+that the finite state machine had states with associated data.
+e.g. [FSMLevel Int] is on of the variants.
+
+My FSM module essentially created an association list between FSM states
+and transition functions which conditionally took us to a new FSM state.
+However, what you really want to do is a pattern match against the FSM state.
+e.g. case fsmState of
+       FSMLevel i -> ... some code ...
+
+Thinking about how I would rewrite my module I realised I didn't even need it.
 
 ---------------
 Wed 10 Sep 2014
@@ -90,50 +170,23 @@ state machine data structure, so I'm going to implement that right now. Then
 I will come back to the issue of avoiding "death spirals" in rendering.
 
 ---------------
-Thu 11 Sep 2014
+Mon 08 Sep 2014
 ---------------
 
-Today I finished writing the FSM module but then deleted it, realising it
-was clunky and didn't actually simplify anything. The problem was
-that the finite state machine had states with associated data.
-e.g. [FSMLevel Int] is on of the variants.
+At the moment I'm checking for events (such as keypresses/mouseclicks)
+on every frame. This is not really the way I should be doing it. I should
+be handling the events asynchronously in a separate thread. In order not to
+have a race conditions when updating the state of the game I'm going to need
+to use MVars or some such mechanism.
 
-My FSM module essentially created an association list between FSM states
-and transition functions which conditionally took us to a new FSM state.
-However, what you really want to do is a pattern match against the FSM state.
-e.g. case fsmState of
-       FSMLevel i -> ... some code ...
+However, I'll do this later. I've put it in the TODO file.
 
-Thinking about how I would rewrite my module I realised I didn't even need it.
 
----------------
-Fri 12 Sep 2014
----------------
+Things I learned today:
 
-I'm back to animating germs. Up until now I've been returning a bunch
-of higher order functions to animate various things about the germs but now
-I realise that it's all going to have to be data driven if I want to
-mutate the germs properly. You can't inspect functions!
-
-I've decided that there are three inheritable characteristics of a germ
-- number of spikes
-- body gradient
-- nucleus gradient
-
-but I will also pre-calculate collections of so-called "moving points".
-The moving points are polar points where each component also as a list of
-"periodic functions" associated with it. However, these periodic functions
-are represented as data. Each periodic function has amplitude, period and
-phase.
-
-------------------
-Sunday 14 Sep 2014
-------------------
-
-Small germs need to animate faster to look like they are moving at all.
-It's much more noticeable when a big germ is moving. To simulate this
-I've added an extra field to the Germ data type call germCumulativeTime.
-Each frame we add the duration of the frame to this cumulative time, but we
-also scale it by a factor inversely proportional to the size of the germ.
-In fact its proportional to 1/sqrt size. For some reason this just looks right
-visually.
+It is good to log information such as framerate. There was a point where
+I was doing what I thought was a blocking call to wait for an SDL event
+but in fact it was repeatedly polling and eating up valuable CPU cycles.
+The game looked just the same to me but my logging told me differently.
+It reminds me of the phenomenon pilots go through when their eyes are telling
+them something different to their instruments.
