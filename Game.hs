@@ -187,9 +187,8 @@ data type with each constructor of the FSM. As it stands I could easily make a m
 code and have backend code that returned an event that wasn't handled by a particular FSM
 state. At this point these errors can only be caught at run-time.
 -}
-data Event = Tap R2 -- location at which tap occurred.
-           | TapAnywhere          -- tap occurred but anywhere.
-           | NextFrame
+data Event = Tap R2       -- location at which tap occurred.
+           | TapAnywhere  -- tap occurred but anywhere.
            | Reset
            | Physics Time -- how much time the last frame took
            deriving (Show, Eq, Ord)

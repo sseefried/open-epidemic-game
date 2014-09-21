@@ -9,11 +9,17 @@ import           Data.IORef
 import           Data.Time
 import           Text.Printf
 import           Control.Monad
+import           GHC.Int
+import           Foreign.C.String (withCAString)
 import           Foreign.Ptr
+import           Foreign.Storable (peek)
+import           Foreign.Marshal (alloca)
 import           System.Exit
 import           Data.Maybe (catMaybes)
 import           Control.Applicative
 import           GHC.Word
+import           System.Endian (fromBE32)
+import           Data.Bits
 
 -- friends
 import Game
@@ -26,8 +32,7 @@ All backends must render from C.Render () to the backend's screen somehow.
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besLastTime       :: UTCTime
-                                 , besSurface        :: S.Surface
-                                 , besCairoSurface   :: C.Surface
+                                 , besSDLRenderer    :: S.Renderer
                                  , besGameState      :: GameState
                                  , besDimensions     :: (Int,Int)
                                  , besBackendToWorld :: BackendToWorld
@@ -35,7 +40,7 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besFSMState       :: FSMState
                                  }
 
-data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Word16,Word16) -> R2 }
+data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int32, Int32) -> R2 }
 
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
@@ -55,26 +60,22 @@ bytesPerPixel = bitsPerPixel `div` 8
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
-initialize title screenWidth screenHeight gs = do
-  _ <- S.setVideoMode screenWidth screenHeight bitsPerPixel
-              [S.HWSurface, S.DoubleBuf]
-  S.setCaption title ""
-  S.enableUnicode True
-
+initialize title screenWidth screenHeight gs = withCAString title $ \ctitle -> do
+  window <- S.createWindow ctitle 0 0 w h wflags
+  renderer <- S.createRenderer window (-1) rflags
   t    <- getCurrentTime
-  surf <- S.createRGBSurface [S.HWSurface] screenWidth screenHeight bitsPerPixel
-                             0x00FF0000 0x0000FF00 0x000000FF 0
-  pixels <- fmap castPtr $ S.surfaceGetPixels surf
-  csurf  <- C.createImageSurfaceForData pixels C.FormatRGB24 screenWidth screenHeight
-             (screenWidth * bytesPerPixel)
   let dims = (screenWidth, screenHeight)
-  newIORef $ BackendState t t surf csurf gs dims (backendToWorld dims) 0 (FSMLevel 1)
+  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1)
+  where
+    wflags = S.windowFlagShown
+    rflags = {-S.rendererFlagPresentVSync .|.-} S.rendererFlagAccelerated
+    w = fromIntegral screenWidth
+    h = fromIntegral screenHeight
 
-debugPrintKey sdlEvent = case sdlEvent of
-  S.KeyDown (S.Keysym key mods unicode) ->
-    printf "Key: %s %s %s\n" (show key) (show mods) (show unicode)
-  _ -> return ()
-
+--debugPrintKey sdlEvent = case sdlEvent of
+--  S.KeyboardEvent (S.Keysym key mods unicode) ->
+--    printf "Key: %s %s %s\n" (show key) (show mods) (show unicode)
+--  _ -> return ()
 ----------------------------------------------------------------------------------------------------
 --
 -- Returns Nothing if the SDL event is not understood by the game in this FSMState.
@@ -83,14 +84,25 @@ sdlEventToEvent :: BackendToWorld -> FSMState -> S.Event -> Maybe Event
 sdlEventToEvent b2w fsmState sdlEvent =
   -- events that can occur in any FSM State
   case sdlEvent of
-    S.KeyDown _ -> Just Reset
+--    S.KeyDown _ -> Just Reset
     _           -> (case fsmState of -- events that occur in specific FSM states
                       FSMPlayingLevel -> playingLevel sdlEvent
                       _               -> Nothing)
   where
     playingLevel e = case e of
-      S.MouseButtonDown x y _ -> Just $ Tap (backendPtToWorldPt b2w (x,y))
+      _ | Just (x,y) <- isMouseDown e -> Just $ Tap (backendPtToWorldPt b2w (x,y))
       _                       -> Nothing
+
+--
+-- True if any mouse button is down
+--
+isMouseDown :: S.Event -> Maybe (Int32, Int32)
+isMouseDown e = case e of
+  (S.MouseButtonEvent _ _ _ _ _ s _ _ _) | s == 1 ->
+    Just (S.mouseButtonEventX e, S.mouseButtonEventY e)
+  _                                               -> Nothing
+
+
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -132,10 +144,29 @@ runFrameUpdate besRef = do
   let (w,h)      = besDimensions bes
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-  screen <- S.getVideoSurface
-  C.renderWith (besCairoSurface bes) $ gsRender gs
-  _ <- S.blitSurface (besSurface bes) Nothing screen (Just (S.Rect 0 0 0 0))
-  S.flip screen
+      renderer   = besSDLRenderer bes
+
+  --
+  -- I'm not 100% sure why yet but you need to create a new texture each time around
+  -- in order to prevent very bad flickering.
+  --
+  format <- S.masksToPixelFormatEnum (fromIntegral bitsPerPixel)
+               (fromBE32 0x0000ff00) (fromBE32 0x00ff0000)
+               (fromBE32 0xff000000) (fromBE32 0x000000ff)
+  texture <- S.createTexture renderer format S.textureAccessStreaming
+                 (fromIntegral w) (fromIntegral h)
+
+  alloca $ \pixelsptr -> alloca $ \pitchptr -> do
+    S.lockTexture texture nullPtr pixelsptr pitchptr
+    pixels <- peek pixelsptr
+    pitch <- fromIntegral <$> peek pitchptr
+    res <- C.withImageSurfaceForData (castPtr pixels) C.FormatARGB32 w h pitch $ \surface ->
+      C.renderWith surface $ gsRender gs
+    S.unlockTexture texture
+  S.renderClear renderer
+  S.renderCopy renderer texture nullPtr nullPtr
+  S.destroyTexture texture
+  S.renderPresent renderer
   writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
 
 ----------------------------------------------------------------------------------------------------
@@ -180,20 +211,39 @@ runPhysicsEventHandler besRef handleEvent = do
 -- Right ev       = event [ev] returned
 getEvent :: BackendToWorld -> FSMState -> IO (Either () (Maybe Event))
 getEvent b2w fsmState = do
-  sdlEvent <- S.pollEvent
-  case checkForQuit sdlEvent of
-    True -> return $ Left ()
-    False -> (case sdlEvent of
-                S.NoEvent -> return $ Right Nothing
+  mbSDLEvent <- pollEvent
+  case mbSDLEvent of
+    Just sdlEvent -> do
+      case checkForQuit sdlEvent of
+        True -> return $ Left ()
+        False -> (case sdlEvent of
                 _ -> (case sdlEventToEvent b2w fsmState sdlEvent of
                         Nothing -> getEvent b2w fsmState -- keep polling
                         Just ev -> return $ Right $ Just ev))
+    Nothing -> return $ Right Nothing
   where
     -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
     checkForQuit e = case e of
-      S.Quit                            -> True
-      S.KeyDown (S.Keysym S.SDLK_q _ _) -> True
-      _                                 -> False
+      S.QuitEvent _ _           -> True
+      _ | b <- isKeyDown e qKey -> b
+
+qKey :: S.Keycode
+qKey = 113
+
+isKeyDown :: S.Event -> S.Keycode -> Bool
+isKeyDown e code = case e of
+  S.KeyboardEvent _ _ _ keyState _ (S.Keysym _ code' _) -> keyState == 1 && code == code'
+  _ -> False
+
+
+pollEvent = alloca $ \eventptr -> do
+  status <- S.pollEvent eventptr
+  if status == 1 then do
+    event <- peek eventptr
+    return $ Just event
+  else
+    return Nothing
+
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
