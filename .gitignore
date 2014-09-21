@@ -6,3 +6,4 @@ cabal.sandbox.config
 epidemic
 *.trace
 Main
+dist/
