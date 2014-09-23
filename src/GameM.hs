@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs, RankNTypes #-}
+{-# OPTIONS_GHC -Wall #-}
 module GameM (
   -- opaque types
-  GameM, HipM,
+  GameM, HipM, HipSpace,
   -- functions
   -- GameM smart constructors
   getRandom,
@@ -9,6 +10,8 @@ module GameM (
   get,
   modify,
   put,
+  printStr,
+  printStrLn,
   newHipSpace,
   runHipM,
   -- HipM smart constructors
@@ -44,19 +47,43 @@ data GameScript next =
   | forall a.             EvalRand     (Rand StdGen a) (a -> next)
   |                       Get          (GameState -> next)
   |                       Modify       (GameState -> GameState) next
-  |                       Put          GameState next
-  |                       NewHipSpace  (H.Space -> next)
-  | forall a.             RunHipM      H.Space (HipM a) (a -> next)
+  |                       Put          !GameState next
+  |                       PrintStr     !String next
+  |                       NewHipSpace  (HipSpace -> next)
+  | forall a.             RunHipM      !HipSpace (HipM a) (a -> next)
 
 data HipScript next =
-    HipStep          Double next
-  | AddHipCirc       Double R2 (HipCirc -> next)
-  | GetHipCircPos    HipCirc (R2 -> next)
-  | SetHipCircRadius HipCirc Double next
-  | RemoveHipCirc    HipCirc next
+    HipStep          !Double next
+  | AddHipCirc       !Double !R2 (HipCirc -> next)
+  | GetHipCircPos    !HipCirc (R2 -> next)
+  | SetHipCircRadius !HipCirc !Double next
+  | RemoveHipCirc    !HipCirc next
 
 type GameM = Free GameScript
 type HipM = Free HipScript
+
+----------------------------------------------------------------------------------------------------
+-- Functor instances. I wish I didn't have to write these manually but the
+-- existential types get in the way.
+
+instance Functor GameScript where
+  fmap f _gs = case _gs of
+    GetRandom a g -> GetRandom a (f . g)
+    EvalRand a g  -> EvalRand a (f . g)
+    Get g         -> Get (f . g)
+    Modify a gs'  -> Modify a (f gs')
+    Put a gs'     -> Put a (f gs')
+    PrintStr a gs' -> PrintStr a (f gs')
+    NewHipSpace g -> NewHipSpace (f . g)
+    RunHipM a b g -> RunHipM a b (f . g)
+
+instance Functor HipScript where
+  fmap f _hs = case _hs of
+    HipStep dt hs           -> HipStep dt (f hs)
+    AddHipCirc a b g        -> AddHipCirc a b (f . g)
+    GetHipCircPos a g       -> GetHipCircPos a (f . g)
+    SetHipCircRadius a b hs -> SetHipCircRadius a b (f hs)
+    RemoveHipCirc a hs      -> RemoveHipCirc a (f hs)
 
 
 ----------------------------------------------------------------------------------------------------
@@ -77,10 +104,16 @@ modify f = Impure (Modify f (Pure ()))
 put :: GameState -> GameM ()
 put gs = Impure (Put gs (Pure ()))
 
-newHipSpace :: GameM H.Space
+printStr :: String -> GameM ()
+printStr s = Impure (PrintStr s (Pure ()))
+
+printStrLn :: String -> GameM ()
+printStrLn s = Impure (PrintStr (s++"\n") (Pure ()))
+
+newHipSpace :: GameM HipSpace
 newHipSpace = Impure (NewHipSpace Pure)
 
-runHipM :: H.Space -> HipM a -> GameM a
+runHipM :: HipSpace -> HipM a -> GameM a
 runHipM space hipM = Impure (RunHipM space hipM Pure)
 
 ----------------------------------------------------------------------------------------------------
@@ -103,42 +136,41 @@ removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 ----------------------------------------------------------------------------------------------------
 
 
-
 runGameM :: GameState -> GameM a -> IO (a, GameState)
 runGameM = runGameMGen runHipMIO
 
-runGameMGen ::(forall a. H.Space -> HipM a -> IO a) -> GameState -> GameM a -> IO (a, GameState)
+runGameMGen ::(forall a. HipSpace -> HipM a -> IO a) -> GameState -> GameM b -> IO (b, GameState)
 runGameMGen hipI gs gameM = do
   gsRef <- newIORef gs
   a <- go gsRef gameM
   gs' <- readIORef gsRef
   return (a, gs')
-
   where
     go :: IORef GameState -> GameM a -> IO a
-    go gsRef p = do
+    go gsRef _p = do
       let go' = go gsRef
-      case p of
+      case _p of
         (Impure (GetRandom bds f))      -> R.randomRIO bds >>= go' . f
         (Impure (EvalRand rand f))      -> R.evalRandIO rand >>= go' . f
         (Impure (Get f))                -> readIORef gsRef >>= go' . f
-        (Impure (Modify f p'))          -> modifyIORef gsRef f >> go' p'
-        (Impure (Put gs p'))            -> writeIORef gsRef gs >> go' p'
-        (Impure (NewHipSpace f))        -> H.newSpace >>= go' . f
+        (Impure (Modify f p))           -> modifyIORef gsRef f >> go' p
+        (Impure (Put gs' p))            -> writeIORef gsRef gs' >> go' p
+        (Impure (PrintStr s p))         -> putStr s >> go' p
+        (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> hipI space hipM >>= go' . f
         (Pure x)                        -> return x
 
-runHipMIO :: H.Space -> HipM a -> IO a
+runHipMIO :: HipSpace -> HipM a -> IO a
 runHipMIO space = go
   where
     go :: HipM a -> IO a
-    go p = case p of
-      (Impure (HipStep dt p'))                 -> H.step space dt >> go p
-      (Impure (AddHipCirc r pos f))            -> runAddHipCirc r pos >>= go . f
-      (Impure (GetHipCircPos hipCirc f))       -> runGetHipCircPos hipCirc >>= go . f
-      (Impure (SetHipCircRadius hipCirc r p')) -> runSetHipCircRadius hipCirc r >> go p'
-      (Impure (RemoveHipCirc hipCirc p'))      -> runRemoveHipCirc hipCirc >> go p'
-      Pure x                                   -> return x
+    go _p = case _p of
+      (Impure (HipStep dt p))                 -> H.step space dt >> go p
+      (Impure (AddHipCirc r pos f))           -> runAddHipCirc r pos >>= go . f
+      (Impure (GetHipCircPos hipCirc f))      -> runGetHipCircPos hipCirc >>= go . f
+      (Impure (SetHipCircRadius hipCirc r p)) -> runSetHipCircRadius hipCirc r >> go p
+      (Impure (RemoveHipCirc hipCirc p))      -> runRemoveHipCirc hipCirc >> go p
+      Pure x                                  -> return x
 
     runAddHipCirc :: Double -> R2 -> IO HipCirc
     runAddHipCirc r (R2 x y) = do

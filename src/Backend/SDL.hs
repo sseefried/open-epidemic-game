@@ -24,6 +24,7 @@ import           Data.Bits
 -- friends
 import Types
 import Game
+import GameM
 import Graphics
 
 {-
@@ -112,12 +113,12 @@ isMouseDown e = case e of
 --
 runOnGameState :: (a -> BackendState -> BackendState)
                -> IORef BackendState
-               -> GameM' a
+               -> GameM a
                -> (GameState -> IO ())
                -> IO ()
 runOnGameState upd besRef gameM cont  = do
   bes     <- readIORef besRef
-  (a, gs) <- runGameM' gameM (besGameState bes)
+  (a, gs) <- runGameM (besGameState bes) gameM
   writeIORef besRef $ upd a $ bes { besGameState = gs }
   cont gs
 
@@ -175,7 +176,7 @@ runFrameUpdate besRef = do
 -- [runInputEventHandler] tries to retrieve a game event. If it finds one then
 -- [handleEvent] is called on this event and the FSMState in the BackEndState is updated.
 --
-runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM' FSMState) -> IO ()
+runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let gs       = besGameState bes
@@ -190,14 +191,14 @@ runInputEventHandler besRef handleEvent = do
     updFSMState fsmState bes = bes { besFSMState = fsmState }
 
 ----------------------------------------------------------------------------------------------------
-runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM' FSMState) -> IO ()
+runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runPhysicsEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   t <- getCurrentTime
   let gs = besGameState bes
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
-  (fsmState', gs') <- runGameM' (handleEvent fsmState (Physics duration)) gs
+  (fsmState', gs') <- runGameM gs (handleEvent fsmState (Physics duration))
   writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFSMState = fsmState' }
 
 ----------------------------------------------------------------------------------------------------
@@ -248,7 +249,7 @@ pollEvent = alloca $ \eventptr -> do
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
-         -> (FSMState -> Event -> GameM' FSMState) -- event handler
+         -> (FSMState -> Event -> GameM FSMState) -- event handler
          -> IO ()
 mainLoop besRef handleEvent = loop $ do
   runFrameUpdate       besRef

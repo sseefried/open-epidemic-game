@@ -86,7 +86,6 @@ data Germ = Germ { germMultiplyAt     :: Time
 
 ----------------------------------------------------------------------------------------------------
 
-data HipState = HipState H.Space
 data HipCirc  = HipCirc  { _hipCircShape  :: H.Shape }
 
 ----------------------------------------------------------------------------------------------------
@@ -100,6 +99,7 @@ data HipCirc  = HipCirc  { _hipCircShape  :: H.Shape }
 data WorldToCanvas = WorldToCanvas { worldPtToCanvasPt :: R2 -> CairoPoint
                                    , worldLenToCanvasLen :: Double -> Double }
 
+type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
 
@@ -108,5 +108,5 @@ data GameState = GameState { gsRender        :: Render ()
                            , gsGerms         :: Map GermId Germ
                            , gsWorldToCanvas :: WorldToCanvas
                            , gsNextGermId    :: GermId
-                           , gsHipState      :: HipState
+                           , gsHipState      :: HipSpace
                            }
