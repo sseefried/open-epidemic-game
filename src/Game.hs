@@ -24,6 +24,8 @@ import           Data.Functor.Identity
 import           System.IO.Unsafe -- for pure Hipmunk... see below
 
 -- friends
+import Types
+-- import GameM
 import Graphics
 
 ----------------------------------------------------------------------------------------------------
@@ -49,24 +51,6 @@ doublingPeriodVariance = 0.5
 
 resistanceIncrease :: Double
 resistanceIncrease = 1.1
-----------------------------------------------------------------------------------------------------
---
--- World co-ordinates vs. canvas co-ordinates
---
--- People may play this game at a variety of different resolutions. The co-ordinate system
--- this is in is known as the canvas co-ordinates. For the purposes of the physics the
--- co-ordindate system will remain fixed.
---
--- exported
-data R2 = R2 Double Double deriving (Show, Eq, Ord)
-
---
--- The canvas might not have the same aspect ratio as the world, in which case
--- we ensure there will be some portions of the canvas that won't be drawn to.
---
-
-data WorldToCanvas = WorldToCanvas { worldPtToCanvasPt :: R2 -> CairoPoint
-                                   , worldLenToCanvasLen :: Double -> Double }
 
 
 
@@ -89,22 +73,7 @@ worldToCanvas (w,h) =
 
 
 ----------------------------------------------------------------------------------------------------
---
---
--- The [germCumulativeTime] field is used in animating the germs. This is the value
--- that is passed to the [drawGerm] function in the Graphics module.
--- This value grows inversely proportional to the size of the germ because I've found
--- that small germs need to animate quicker to look like they are moving at all. See function
--- [growGerm].
---
-data Germ = Germ { germMultiplyAt     :: Time
-                 , germSizeFun        :: Time -> Double
-                 , germHipCirc        :: HipCirc
-                 , germPos            :: R2 -- cached pos
-                 , germGfx            :: GermGfx
-                 , germCumulativeTime :: Time
-                 , germAnimTime       :: Time
-                 }
+
 
 
 --
@@ -156,7 +125,7 @@ randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
 
 ----------------------------------------------------------------------------------------------------
 -- The game monad
-type GameM a = StateT GameState (Rand StdGen) a
+type GameM' a = StateT GameState (Rand StdGen) a
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -169,16 +138,6 @@ data FSMState = FSMLevel Int -- level number
               | FSMGameOver
               deriving (Show, Eq, Ord)
 
-type GermId = Int
-
-----------------------------------------------------------------------------------------------------
-data GameState = GameState { gsRender        :: Render ()
-                           , gsBounds        :: (Int, Int)
-                           , gsGerms         :: Map GermId Germ
-                           , gsWorldToCanvas :: WorldToCanvas
-                           , gsNextGermId    :: GermId
-                           , gsHipState      :: HipState
-                           }
 
 ----------------------------------------------------------------------------------------------------
 {-
@@ -201,7 +160,7 @@ newGameState :: (Int, Int) -> IO GameState
 newGameState bounds = do
   return $ initGameState bounds []
 
-resetGameState :: GameM ()
+resetGameState :: GameM' ()
 resetGameState = do
   gs <- get
   put $ initGameState (gsBounds gs) []
@@ -221,7 +180,7 @@ initGameState bounds germs =
 --
 -- The game as a Finite State Machine
 --
-handleEvent :: FSMState -> Event -> GameM FSMState
+handleEvent :: FSMState -> Event -> GameM' FSMState
 handleEvent fsmState ev = do
   -- events that can occur in any FSM State
   gs <- get
@@ -259,7 +218,7 @@ handleEvent fsmState ev = do
 --
 -- FIXME: Make this more efficient. Brute force searches through germs to kill them.
 --
-killGerm :: R2 -> GameM FSMState
+killGerm :: R2 -> GameM' FSMState
 killGerm p = do
   gs <- get
   let germsToKill = M.toList $ M.filter (tapCollides p) (gsGerms gs)
@@ -278,7 +237,7 @@ killGerm p = do
 --
 -- Runs in the HipM monad. Gets the new state. Sets it.
 --
-runOnHipState :: HipM a -> GameM a
+runOnHipState :: HipM' a -> GameM' a
 runOnHipState hipM = do
   gs <- get
   let (a, hs) = runState hipM (gsHipState gs)
@@ -292,7 +251,7 @@ runOnHipState hipM = do
 -- the size of the germ. I found that visually it works better if it grows as (1 / sqrt size)
 -- but I have yet to determine why this looks so natural.
 --
-growGerm :: Time -> GermId -> GameM ()
+growGerm :: Time -> GermId -> GameM' ()
 growGerm duration germId = do
   whenGerm germId $ \gs g -> do
     let animT  = germAnimTime g
@@ -325,21 +284,21 @@ growGerm duration germId = do
       insertGerm germId g'
 
 ----------------------------------------------------------------------------------------------------
-whenGerm :: GermId -> (GameState -> Germ -> GameM ()) -> GameM ()
+whenGerm :: GermId -> (GameState -> Germ -> GameM' ()) -> GameM' ()
 whenGerm germId f = do
   gs <- get
   case M.lookup germId (gsGerms gs) of
     Just germ -> f gs germ
     Nothing   -> return ()
 
-insertGerm :: GermId -> Germ -> GameM ()
+insertGerm :: GermId -> Germ -> GameM' ()
 insertGerm germId germ = modify $ \gs -> gs { gsGerms = M.insert germId germ (gsGerms gs) }
 
 ----------------------------------------------------------------------------------------------------
 --
 -- Physics is reponsible for updating the [gsRender] field of the GameState.
 --
-physics :: Time -> GameM ()
+physics :: Time -> GameM' ()
 physics duration = do
   gs <- get
   let bounds = gsBounds gs
@@ -357,8 +316,8 @@ physics duration = do
                   in  gs { gsRender = render }
 
 ----------------------------------------------------------------------------------------------------
-runGameM :: GameM a -> GameState  -> IO (a, GameState)
-runGameM gameM gs = evalRandIO $ runStateT gameM gs
+runGameM' :: GameM' a -> GameState  -> IO (a, GameState)
+runGameM' gameM gs = evalRandIO $ runStateT gameM gs
 
 
 ----------------------------------------------------------------------------------------------------
@@ -366,22 +325,20 @@ runGameM gameM gs = evalRandIO $ runStateT gameM gs
 
 -- A small _pure_ wrapper for Hipmunk
 
-data HipCirc  = HipCirc  { _hipCircShape  :: H.Shape }
-data HipState = HipState H.Space
-type HipM a   = State HipState a
+type HipM' a   = State HipState a
 
-toHipM :: (H.Space -> IO a) -> HipM a
+toHipM :: (H.Space -> IO a) -> HipM' a
 toHipM f = StateT $ \hs@(HipState space) ->
                   let v = unsafePerformIO $ f space
                   in  v `seq` (Identity (v,hs)) -- use of 'seq' here very important
 
-hipStep :: Double -> HipM ()
+hipStep :: Double -> HipM' ()
 hipStep dt = toHipM $ \space -> H.step space dt
 
 newHipState :: () -> HipState
 newHipState () = HipState (unsafePerformIO $ H.initChipmunk >> H.newSpace)
 
-addHipCirc :: Double -> (Double, Double) -> HipM HipCirc
+addHipCirc :: Double -> (Double, Double) -> HipM' HipCirc
 addHipCirc r (x,y) = toHipM $ \space -> do
   let pos = H.Vector x y
   b <- H.newBody 1 H.infinity
@@ -391,16 +348,16 @@ addHipCirc r (x,y) = toHipM $ \space -> do
   H.spaceAdd space s
   return $ HipCirc s
 
-getHipCircPos :: HipCirc -> HipM (Double, Double)
+getHipCircPos :: HipCirc -> HipM' (Double, Double)
 getHipCircPos (HipCirc s) = toHipM $ \space -> do
   H.Vector x y <- H.get $ H.position $ H.body s
   return (x,y)
 
-setHipCircRadius :: HipCirc -> Double -> HipM ()
+setHipCircRadius :: HipCirc -> Double -> HipM' ()
 setHipCircRadius (HipCirc s) r = toHipM $ \_ -> do
   H.unsafeShapeRedefine s (H.Circle r) (H.Vector 0 0) -- (0,0) offset
 
-removeHipCirc :: HipCirc -> HipM ()
+removeHipCirc :: HipCirc -> HipM' ()
 removeHipCirc (HipCirc s) = toHipM $ \space -> do
   H.spaceRemove space (H.body s)
   H.spaceRemove space s

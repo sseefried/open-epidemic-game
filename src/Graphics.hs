@@ -13,6 +13,9 @@ import Debug.Trace
 -- import GameMonad
 -- import Data.Foldable
 
+-- friends
+import Types
+
 {-
 
 TODO: There is a question of whether everything is normalised or not.
@@ -70,56 +73,6 @@ spikyOuterRadius = 1
 germAnimTimeScale :: Double
 germAnimTimeScale = 1
 
-----------------------------------------------------------------------------------------------------
---
--- Co-ordinate systems
--- ~~~~~~~~~~~~~~~~~~~~
---
--- Internally we use type [CairoPoint]. This uses Cairo's co-ordinate system which has the origin
--- in the top-left corner, x axis goes left to right and y axis goes to bottom.
---
-type Time = Double
-type Anim = Time -> Render ()
-
-data Color = Color Double Double Double Double deriving Show
-
-type CairoPoint = (Double, Double)
-
-
-white = Color 1 1 1 1
-blue  = Color 0 0 1 1
-green = Color 0 1 0 1
-black = Color 0 0 0 1
-
-type GermGradient = (Color, Color)
-
--- polar point (r,a) that lies inside a unit circle. Invariant: r < 1, 0 <= a < 1
-data PolarPoint = P2 Double Double -- radius and angle
-
-data GermGfx =
-  GermGfx { germGfxBodyGrad    :: GermGradient
-          , germGfxNucleusGrad :: GermGradient
-          , germGfxBody        :: [MovingPoint]
-          , germGfxNucleus     :: [MovingPoint]
-          , germGfxSpikes      :: Int
-          }
---
--- Represents a periodic function as data.
--- \t -> pfAmp * sinU ((t + pfPhase)/pfPeriod)
---
-data PeriodicFun =
-  PeriodicFun { pfAmp    :: Double
-              , pfPeriod :: Double
-              , pfPhase  :: Double
-              }
-
---
--- A [MovingPoint] is a polar point but each component 'r' and 'a' has been
--- annotated with a list of [PeriodicFun]s.
--- The final point at a time 't' is determined by summing the value of
--- the periodic functions at 't' and adding that to the component.
---
-data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 
 ----------------------------------------------------------------------------------------------------
 --
