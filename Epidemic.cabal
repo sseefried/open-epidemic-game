@@ -50,6 +50,7 @@ executable         Epidemic
                  , profunctors == 4.0.4
                  , random == 1.0.1.1
                  , SDL2
+                 , sdl2-mixer
                  , semigroupoids == 4.0.4
                  , semigroups == 0.15.2
                  , tagged == 0.7.2

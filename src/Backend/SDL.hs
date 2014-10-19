@@ -5,6 +5,8 @@ module Backend.SDL (
 
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Keycode  as SK
+import qualified Graphics.UI.SDL.Mixer    as M
+import qualified Graphics.UI.SDL.Mixer.Types as M
 import qualified Graphics.Rendering.Cairo as C
 
 import           Data.IORef
@@ -36,6 +38,7 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
                                  , besWindow         :: S.Window
+                                 , besMusic          :: M.Music
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int, Int) -> R2 }
@@ -53,15 +56,21 @@ backendToWorld (w,h) =
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
 initialize title screenWidth screenHeight gs = do
-  S.init [S.InitVideo]
+  S.init [S.InitVideo, S.InitAudio]
   window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   renderer <- S.createRenderer window S.FirstSupported rflags
+
+  M.openAudio 44100 S.AudioS16Sys 1 1024
+  sound <- M.loadMUS "/Users/sseefried/tmp/crystal-harmony.wav"
+  M.playMusic sound 5
+
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
-  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
+  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window sound
 
   where
     wflags = [S.WindowShown]
+    -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
     rflags = [S.Accelerated, S.PresentVSync]
     w = fromIntegral screenWidth
     h = fromIntegral screenHeight
