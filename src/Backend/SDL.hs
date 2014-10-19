@@ -4,28 +4,21 @@ module Backend.SDL (
 ) where
 
 import qualified Graphics.UI.SDL          as S
+import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.Rendering.Cairo as C
+
 import           Data.IORef
 import           Data.Time
 import           Text.Printf
 import           Control.Monad
-import           GHC.Int
-import           Foreign.C.String (withCAString)
-import           Foreign.Ptr
-import           Foreign.Storable (peek)
-import           Foreign.Marshal (alloca)
 import           System.Exit
-import           Data.Maybe (catMaybes)
-import           Control.Applicative
-import           GHC.Word
-import           System.Endian (fromBE32)
-import           Data.Bits
+import           Foreign.Ptr (castPtr)
 
 -- friends
 import Types
 import Game
 import GameM
-import Graphics
+import Graphics()
 
 {-
 All backends must render from C.Render () to the backend's screen somehow.
@@ -40,9 +33,12 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besBackendToWorld :: BackendToWorld
                                  , besFrames         :: Integer
                                  , besFSMState       :: FSMState
+                                 -- must keep a handle on the window otherwise it gets
+                                 -- garbage collected and hence disappears.
+                                 , besWindow         :: S.Window
                                  }
 
-data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int32, Int32) -> R2 }
+data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int, Int) -> R2 }
 
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
@@ -54,23 +50,19 @@ backendToWorld (w,h) =
     w' = fromIntegral w
     h' = fromIntegral h
 
-
-----------------------------------------------------------------------------------------------------
-bitsPerPixel, bytesPerPixel :: Int
-bitsPerPixel  = 32
-bytesPerPixel = bitsPerPixel `div` 8
-
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
-initialize title screenWidth screenHeight gs = withCAString title $ \ctitle -> do
-  window <- S.createWindow ctitle 0 0 w h wflags
-  renderer <- S.createRenderer window (-1) rflags
-  t    <- getCurrentTime
+initialize title screenWidth screenHeight gs = do
+  S.init [S.InitVideo]
+  window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
+  renderer <- S.createRenderer window S.FirstSupported rflags
+  t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
-  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1)
+  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
+
   where
-    wflags = S.windowFlagShown
-    rflags = {-S.rendererFlagPresentVSync .|.-} S.rendererFlagAccelerated
+    wflags = [S.WindowShown]
+    rflags = [S.Accelerated, S.PresentVSync]
     w = fromIntegral screenWidth
     h = fromIntegral screenHeight
 
@@ -98,10 +90,10 @@ sdlEventToEvent b2w fsmState sdlEvent =
 --
 -- True if any mouse button is down
 --
-isMouseDown :: S.Event -> Maybe (Int32, Int32)
-isMouseDown e = case e of
-  (S.MouseButtonEvent _ _ _ _ _ s _ _ _) | s == 1 ->
-    Just (S.mouseButtonEventX e, S.mouseButtonEventY e)
+isMouseDown :: S.Event -> Maybe (Int, Int)
+isMouseDown e = case S.eventData e of
+  S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
+    Just (S.positionX p, S.positionY p)
   _                                               -> Nothing
 
 
@@ -152,21 +144,15 @@ runFrameUpdate besRef = do
   -- I'm not 100% sure why yet but you need to create a new texture each time around
   -- in order to prevent very bad flickering.
   --
-  format <- S.masksToPixelFormatEnum (fromIntegral bitsPerPixel)
-               (fromBE32 0x0000ff00) (fromBE32 0x00ff0000)
-               (fromBE32 0xff000000) (fromBE32 0x000000ff)
-  texture <- S.createTexture renderer format S.textureAccessStreaming
+  texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
                  (fromIntegral w) (fromIntegral h)
 
-  alloca $ \pixelsptr -> alloca $ \pitchptr -> do
-    S.lockTexture texture nullPtr pixelsptr pitchptr
-    pixels <- peek pixelsptr
-    pitch <- fromIntegral <$> peek pitchptr
+  S.lockTexture texture Nothing $ \(pixels, pitch) -> do
     res <- C.withImageSurfaceForData (castPtr pixels) C.FormatARGB32 w h pitch $ \surface ->
       C.renderWith surface $ gsRender gs
     S.unlockTexture texture
   S.renderClear renderer
-  S.renderCopy renderer texture nullPtr nullPtr
+  S.renderCopy renderer texture Nothing Nothing
   S.destroyTexture texture
   S.renderPresent renderer
   writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
@@ -179,8 +165,7 @@ runFrameUpdate besRef = do
 runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
-  let gs       = besGameState bes
-      fsmState = besFSMState bes
+  let fsmState = besFSMState bes
   mbEvent <- getEvent (besBackendToWorld bes) fsmState
   case mbEvent of
     Left ()         -> exitWith ExitSuccess
@@ -213,7 +198,7 @@ runPhysicsEventHandler besRef handleEvent = do
 -- Right ev       = event [ev] returned
 getEvent :: BackendToWorld -> FSMState -> IO (Either () (Maybe Event))
 getEvent b2w fsmState = do
-  mbSDLEvent <- pollEvent
+  mbSDLEvent <- S.pollEvent
   case mbSDLEvent of
     Just sdlEvent -> do
       case checkForQuit sdlEvent of
@@ -225,26 +210,17 @@ getEvent b2w fsmState = do
     Nothing -> return $ Right Nothing
   where
     -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
-    checkForQuit e = case e of
-      S.QuitEvent _ _           -> True
+    checkForQuit e = case S.eventData e of
+      S.Quit                    -> True
       _ | b <- isKeyDown e qKey -> b
 
-qKey :: S.Keycode
-qKey = 113
+qKey :: SK.Keycode
+qKey = SK.Q
 
-isKeyDown :: S.Event -> S.Keycode -> Bool
-isKeyDown e code = case e of
-  S.KeyboardEvent _ _ _ keyState _ (S.Keysym _ code' _) -> keyState == 1 && code == code'
+isKeyDown :: S.Event -> SK.Keycode -> Bool
+isKeyDown e code = case S.eventData e of
+  S.Keyboard {  S.keyMovement = S.KeyDown, S.keySym = S.Keysym _ code' _ } -> code == code'
   _ -> False
-
-
-pollEvent = alloca $ \eventptr -> do
-  status <- S.pollEvent eventptr
-  if status == 1 then do
-    event <- peek eventptr
-    return $ Just event
-  else
-    return Nothing
 
 
 ----------------------------------------------------------------------------------------------------

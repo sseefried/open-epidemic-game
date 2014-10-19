@@ -1,4 +1,108 @@
 ---------------
+Fri 17 Oct 2014
+---------------
+
+[09:30]
+
+I'd now like to work out what is remaining on the game.
+
+1. I need to get the radii of the germs right, which I think is going
+   to be a bit of a chore. The problem is that the edges of the germs are
+   Bezier curves where the control points lie outside the actual
+   physical edge of the curve. (The control points lie on what I'll dub the
+   "notional radius" of the germs.) Unless I calculate what the outermost point
+   of the germs are using Bezier maths I can't really know what the *true*
+   radius of the germs is. Since the notional radius is used for collision
+   detection it looks like the germs are colliding when their edges aren't
+   touching. Perhaps this isn't a problem, and I can live with it. It's
+   not like the collisions where ever going to be "pixel perfect".
+
+2. I'd like to add a blur effect to the game to make it truly look like
+   a petrie dish. It's going to be hard to get the performance acceptable.
+   After just a little preliminary reading I don't think I just want to do
+   a Guassian blur but rather to use a more sophisticated depth of field
+   effect or "bokeh" effect.
+
+3. I need to create a playground in which Rauri can make the germs look
+   better.
+      - Docker
+      - blog posts to teach him about Haskell
+      - crib the Cairo wrapper from Helm.
+
+4. I want the antibiotics to be dragged and dropped on top of the germs
+   and to have an area of effect that is not the complete screen. As the
+   antibiotics get less potent they fade in colour until they become
+   clear eventually.
+
+5. I want to add squish sound effects.
+
+6. I want to add the "Crystal Harmony" music in the background. Eventually
+   I will have to get some custom music made. The piece is way too good
+   for this game and goes places emotionally that don't really fit with the
+   mood of the game.
+
+[08:50]
+
+I tried both solutions. Of course the pure Hipmunk solution worked but
+ultimately I was unhappy with it. It took me a long time to get right
+because I had to ensure that actions evaluated with 'unsafePerformIO'
+happened in the right order. It just felt ugly.
+
+So I decided to go with the free monad approach. I didn't write about this
+before but one thing that concerned me is that I didn't just want to shove
+the entire Hipmunk interface into this monad. What I really wanted was
+to be able to evaluate another, smaller, Hipmunk free monad inside the
+Game free monad. I didn't know this was possible before I started but
+thankfully it was!
+
+It turns out that you need to enable GADTs (or at least ExistentialTypes)
+in order to have operations in your free monad that are polymorphic.
+I wanted to have an operation:
+
+runHipM :: HipSpace -> HipM a -> GameM a
+
+I'm lying a little about the type. In the end both the GameM monad
+and the HipM monad are run inside the IO monad, but the basic idea is there.
+
+Two data types, GameScript and HipScript are defined that are then turned
+into free monads by application of the Free type constructor.
+
+type GameM = Free GameScript
+type HipM  = Free HipScript
+
+The GameScript type looked a little like this:
+
+data GameScript next =
+    Get     (GameState -> next)
+  | Put     GameState next
+  | forall a. RunHipM HipSpace HipM a (a -> next)
+
+See how I needed to introduce an existential type? It turns out you'd need
+it for even more mundane situations. What if you wanted to put the "read"
+operation in GameScript (corresponding to read :: Read a => String -> a).
+This would be encoded as:
+
+  | forall a. Read a => Read String (a -> next)
+
+(the first occurrence of Read is a type class name, whereas the second is
+a constructor name)
+
+Anyway, back to the matter at hand, how do we evaluation one free monad
+inside another? Really it's quite easy! You just need to make sure
+that the target monad of both free monad interpreters is the same.
+In my case that was IO.
+
+runGameM :: GameState -> GameM a -> (IO a, GameState)
+runHipM :: HipSpace -> HipM a -> IO a
+
+Then you implement the RunHipM case as:
+
+  case gameM of
+    (Impure (RunHipM space hipM cont)) ->
+      do a <- runHipM space hipM
+         runGameM <current state> (cont a)
+
+---------------
 Sat 20 Sep 2014
 ---------------
 

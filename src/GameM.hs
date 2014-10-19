@@ -41,7 +41,6 @@ import           Data.IORef
 -- friends
 import Types
 
-
 data GameScript next =
     forall a. Random a => GetRandom    (a,a) (a -> next)
   | forall a.             EvalRand     (Rand StdGen a) (a -> next)
@@ -135,12 +134,8 @@ removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
 ----------------------------------------------------------------------------------------------------
 
-
-runGameM :: GameState -> GameM a -> IO (a, GameState)
-runGameM = runGameMGen runHipMIO
-
-runGameMGen ::(forall a. HipSpace -> HipM a -> IO a) -> GameState -> GameM b -> IO (b, GameState)
-runGameMGen hipI gs gameM = do
+runGameM ::GameState -> GameM b -> IO (b, GameState)
+runGameM gs gameM = do
   gsRef <- newIORef gs
   a <- go gsRef gameM
   gs' <- readIORef gsRef
@@ -157,7 +152,7 @@ runGameMGen hipI gs gameM = do
         (Impure (Put gs' p))            -> writeIORef gsRef gs' >> go' p
         (Impure (PrintStr s p))         -> putStr s >> go' p
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
-        (Impure (RunHipM space hipM f)) -> hipI space hipM >>= go' . f
+        (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
         (Pure x)                        -> return x
 
 runHipMIO :: HipSpace -> HipM a -> IO a
