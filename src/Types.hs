@@ -109,4 +109,8 @@ data GameState = GameState { gsRender        :: Render ()
                            , gsWorldToCanvas :: WorldToCanvas
                            , gsNextGermId    :: GermId
                            , gsHipState      :: HipSpace
+                           , gsSoundQueue    :: [GameSound]
                            }
+
+data GameSound = GameSoundLevelMusic
+               | GameSoundSquish

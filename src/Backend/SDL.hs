@@ -38,7 +38,8 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
                                  , besWindow         :: S.Window
-                                 , besMusic          :: M.Music
+                                 , besLevelMusic     :: M.Music
+                                 , besSquishSound    :: M.Chunk
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int, Int) -> R2 }
@@ -61,12 +62,15 @@ initialize title screenWidth screenHeight gs = do
   renderer <- S.createRenderer window S.FirstSupported rflags
 
   M.openAudio 44100 S.AudioS16Sys 1 1024
-  sound <- M.loadMUS "/Users/sseefried/tmp/crystal-harmony.wav"
-  M.playMusic sound 5
+  M.allocateChannels 10
+  levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
+  rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
+  squishSound <- M.loadWAVRW rwOps False
 
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
-  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window sound
+  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
+                levelMusic squishSound
 
   where
     wflags = [S.WindowShown]
@@ -148,7 +152,6 @@ runFrameUpdate besRef = do
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
       renderer   = besSDLRenderer bes
-
   --
   -- I'm not 100% sure why yet but you need to create a new texture each time around
   -- in order to prevent very bad flickering.
@@ -193,7 +196,19 @@ runPhysicsEventHandler besRef handleEvent = do
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
   (fsmState', gs') <- runGameM gs (handleEvent fsmState (Physics duration))
-  writeIORef besRef $ bes { besGameState = gs', besLastTime = t, besFSMState = fsmState' }
+  -- If there are any queued sounds play them now
+  playSoundQueue bes (gsSoundQueue gs')
+  writeIORef besRef $ bes { besGameState = gs' { gsSoundQueue = [] }
+                          , besLastTime = t, besFSMState = fsmState' }
+
+----------------------------------------------------------------------------------------------------
+playSoundQueue :: BackendState -> [GameSound] -> IO ()
+playSoundQueue bes = mapM_ playSound
+  where
+    playSound :: GameSound -> IO ()
+    playSound s = case s of
+      GameSoundLevelMusic -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
+      GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------
 --

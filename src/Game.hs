@@ -44,8 +44,7 @@ resistanceIncrease :: Double
 resistanceIncrease = 1.1
 
 
-
-
+----------------------------------------------------------------------------------------------------
 --
 -- Let aspect ratio be width/height. Let aspect ration of the world be W and the aspect ratio of
 -- the  canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
@@ -64,9 +63,6 @@ worldToCanvas (w,h) =
 
 
 ----------------------------------------------------------------------------------------------------
-
-
-
 --
 -- Given an initial size [initSize] and a time that the germ should multiply at [multiplyAt]
 -- (now being twice its original size) returns a function that given a time [t] returns
@@ -163,6 +159,7 @@ initGameState bounds hipSpace germs =
     (worldToCanvas bounds)
     (length germs)
     hipSpace
+    []
   where
     germMapList = M.fromList $ zip [0..] germs
 ----------------------------------------------------------------------------------------------------
@@ -194,7 +191,8 @@ handleEvent fsmState ev = do
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
                  evalRand $ createGerm initSize (R2 x y) hc
-      put $ gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs }
+      put $ gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
+               , gsSoundQueue = [GameSoundLevelMusic]}
       return $ FSMPlayingLevel
 
     fsmPlayingLevel = case ev of
@@ -214,7 +212,8 @@ killGerm p = do
   let germsToKill = M.toList $ M.filter (tapCollides p) (gsGerms gs)
   let kkk (germId, germ) = do
         runOnHipState $ removeHipCirc (germHipCirc germ)
-        modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs) }
+        modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
+                           , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
   mapM_ kkk germsToKill
   return $ FSMPlayingLevel
   where
