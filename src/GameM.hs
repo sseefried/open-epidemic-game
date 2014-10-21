@@ -19,6 +19,7 @@ module GameM (
   addHipCirc,
   getHipCircPos,
   setHipCircRadius,
+  addHipStaticPoly,
   removeHipCirc,
   -- to run the GameM monad
   runGameM
@@ -56,6 +57,7 @@ data HipScript next =
   | AddHipCirc       !Double !R2 (HipCirc -> next)
   | GetHipCircPos    !HipCirc (R2 -> next)
   | SetHipCircRadius !HipCirc !Double next
+  | AddHipStaticPoly ![R2] next
   | RemoveHipCirc    !HipCirc next
 
 type GameM = Free GameScript
@@ -82,6 +84,7 @@ instance Functor HipScript where
     AddHipCirc a b g        -> AddHipCirc a b (f . g)
     GetHipCircPos a g       -> GetHipCircPos a (f . g)
     SetHipCircRadius a b hs -> SetHipCircRadius a b (f hs)
+    AddHipStaticPoly a hs   -> AddHipStaticPoly a (f hs)
     RemoveHipCirc a hs      -> RemoveHipCirc a (f hs)
 
 
@@ -129,6 +132,9 @@ getHipCircPos c = Impure (GetHipCircPos c Pure)
 setHipCircRadius :: HipCirc -> Double -> HipM ()
 setHipCircRadius c r = Impure (SetHipCircRadius c r (Pure ()))
 
+addHipStaticPoly :: [R2] -> HipM ()
+addHipStaticPoly pts = Impure (AddHipStaticPoly pts (Pure ()))
+
 removeHipCirc :: HipCirc -> HipM ()
 removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
@@ -164,6 +170,7 @@ runHipMIO space = go
       (Impure (AddHipCirc r pos f))           -> runAddHipCirc r pos >>= go . f
       (Impure (GetHipCircPos hipCirc f))      -> runGetHipCircPos hipCirc >>= go . f
       (Impure (SetHipCircRadius hipCirc r p)) -> runSetHipCircRadius hipCirc r >> go p
+      (Impure (AddHipStaticPoly pts p))       -> runAddHipStaticPoly pts >> go p
       (Impure (RemoveHipCirc hipCirc p))      -> runRemoveHipCirc hipCirc >> go p
       Pure x                                  -> return x
 
@@ -185,6 +192,20 @@ runHipMIO space = go
     runSetHipCircRadius :: HipCirc -> Double -> IO ()
     runSetHipCircRadius (HipCirc s) r = do
       H.unsafeShapeRedefine s (H.Circle r) (H.Vector 0 0) -- (0,0) offset
+
+    runAddHipStaticPoly :: [R2] -> IO ()
+    runAddHipStaticPoly pts = do
+      b <- H.newBody H.infinity H.infinity
+      -- Don't add the body to the space. It's static.
+      let pts' = map r2ToPos pts
+      s <- H.newShape b (H.Polygon pts') (H.Vector 0 0)
+      when (not (H.isClockwise pts')) $ do
+        error "Points aren't clockwise!"
+      H.spaceAdd space (H.Static s)
+      return ()
+      where
+        r2ToPos :: R2 -> H.Vector
+        r2ToPos (R2 x y) = H.Vector x y
 
     runRemoveHipCirc :: HipCirc -> IO ()
     runRemoveHipCirc (HipCirc s) = do

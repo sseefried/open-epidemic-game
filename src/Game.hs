@@ -148,7 +148,23 @@ resetGameState :: GameM ()
 resetGameState = do
   gs <- get
   hipSpace <- newHipSpace
+  addBoundsToHipSpace hipSpace
   put $ initGameState (gsBounds gs) hipSpace []
+
+addBoundsToHipSpace :: HipSpace -> GameM ()
+addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
+  -- bottom
+  addHipStaticPoly [R2 (-w) (-h), R2 w (-h), R2 w (-h - d), R2 (-w) (-h - d)]
+  -- top
+  addHipStaticPoly [R2 (-w) (h+d), R2 w (h+d), R2 w h, R2 (-w) h]
+  -- left
+  addHipStaticPoly [R2 (-w-d) (-h), R2 (-w-d) h, R2 (-w) h, R2 (-w) (-h)]
+  -- right
+  addHipStaticPoly [R2 (w) (-h), R2 (w) h, R2 (w+d) h, R2 (w+d) (-h)]
+  where
+    w = worldWidth/2
+    h = worldHeight/2
+    d  = 0.2 * w
 
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
