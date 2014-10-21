@@ -1,6 +1,33 @@
 TODO
 
-[ ] Make germs the right radius
+[ ] Build and deploy to Android. Have a look at this:
+     https://github.com/neurocyte/ghc-android
 
--------------------------------
+[ ] I need to get the radii of the germs right, which I think is going
+   to be a bit of a chore. The problem is that the edges of the germs are
+   Bezier curves where the control points lie outside the actual
+   physical edge of the curve. (The control points lie on what I'll dub the
+   "notional radius" of the germs.) Unless I calculate what the outermost point
+   of the germs are using Bezier maths I can't really know what the *true*
+   radius of the germs is. Since the notional radius is used for collision
+   detection it looks like the germs are colliding when their edges aren't
+   touching. Perhaps this isn't a problem, and I can live with it. It's
+   not like the collisions where ever going to be "pixel perfect".
+
+[ ] I'd like to add a blur effect to the game to make it truly look like
+   a petrie dish. It's going to be hard to get the performance acceptable.
+   After just a little preliminary reading I don't think I just want to do
+   a Guassian blur but rather to use a more sophisticated depth of field
+   effect or "bokeh" effect.
+
+[ ] I need to create a playground in which Rauri can make the germs look
+   better.
+      - Docker
+      - blog posts to teach him about Haskell
+      - crib the Cairo wrapper from Helm.
+
+[ ] I want the antibiotics to be dragged and dropped on top of the germs
+   and to have an area of effect that is not the complete screen. As the
+   antibiotics get less potent they fade in colour until they become
+   clear eventually.
 
