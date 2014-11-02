@@ -1,4 +1,60 @@
 ---------------
+Sat 01 Nov 2014
+---------------
+
+[15:54]
+
+So I've decided to create a number of "third party" repos (which I will
+host on GitHub). In these I will check out a particular version of a C
+library that I require on Android and port it to build on Android.
+I've become a little obsessed with being able to match the files I check in
+against a very particular version of the library. I thought that I might
+be able to do this by creating a script the re-tars all the files at a
+specific git commit hash and then checks the SHA1 hash of this tarball against
+the original. This didn't work because tar keeps a whole lot of extra
+information around than just the file contents such as file permissions,
+time stamps and user/group information. *Sigh*. Annoying.
+
+However, there is another way that we can check. We do keep around the SHA1
+hash and the git commit hash in a file in the repo. Then you can download
+that file for yourself, untar it into the repo over the top of the files
+and see if there is any difference. Then you will know that everything is okay.
+
+-------
+
+I've started trying to build the game on Android and this has been a deep,
+dark pit of despair so far. I tried following some instructions I found on the
+Haskell wiki on building a GHC Arm cross compiler. These did not work too
+well for me so I wrote some emails to people who had succeeded before. Ivan
+Perez from Keera Studios was very helpful and pointed me to a fork with
+which I was able to build a cross compiler successfully.
+
+But there are more issues. In order to build Haskell bindings to Cairo, SDL2,
+SDL2_mixer and Chipmunk you first need to be able to build the requisite C
+libraries. This has been quite annoying so far and I can see it's going to take
+me at least a week or two.
+
+What I've decided to do is what the Chromium project supposedly does and
+that is to create one giant repo which contains all the source code I need.
+I'm not sure about the best way to go about this. Should I pull in the
+source repos, not change them, and then apply patches during the build process
+or is it okay for me make changes to specific sub-repos? What is better in the
+long run?
+
+Having a read about how Chromium does things
+(http://www.chromium.org/developers/adding-3rd-party-libraries) I note the
+following interesting features:
+
+- they store the SHA512 hash of the tar ball they got the source from. For git
+  it's not clear what they do but a hash of the source tree and the commit
+  hash would probably be enough to uniquely identify it.
+
+- they update the code when something is fixed upstream.
+
+- they do license file checks.
+
+
+---------------
 Fri 17 Oct 2014
 ---------------
 
@@ -15,7 +71,7 @@ I'd now like to work out what is remaining on the game.
    radius of the germs is. Since the notional radius is used for collision
    detection it looks like the germs are colliding when their edges aren't
    touching. Perhaps this isn't a problem, and I can live with it. It's
-   not like the collisions where ever going to be "pixel perfect".
+   not like the collisions were ever going to be "pixel perfect".
 
 2. I'd like to add a blur effect to the game to make it truly look like
    a petrie dish. It's going to be hard to get the performance acceptable.

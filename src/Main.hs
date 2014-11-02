@@ -8,7 +8,7 @@ import Game
 import Backend.SDL as B
 
 screenWidth, screenHeight :: Int
-screenWidth  = 400
+screenWidth  = 800
 screenHeight = 800
 
 w, h :: Double
