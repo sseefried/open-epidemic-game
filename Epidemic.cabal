@@ -17,48 +17,28 @@ build-depends: base
 executable         Epidemic
     hs-source-dirs : src
     default-language:  Haskell2010
-    ghc-options: -Wall -threaded -O2 -hide-package free
+    ghc-options: -Wall -threaded -O2
 
 
     main-is:       Main.hs
     hs-source-dirs: .
 
-    build-depends: base == 4.6.0.1
+    build-depends: Hipmunk == 5.2.0.16
+                 , MonadRandom ==0.3
+                 , SDL2 == 0.1.0
+                 , sdl2-mixer == 0.1.0.0
+                 , cairo == 0.12.5.3
                  , control-monad-free == 0.5.3
+                 -- everything below this line is a dependency of above
+                 -- the line. We fix to specific versions
+                 , base == 4.6.0.1
                  , containers == 0.5.0.0
                  , time == 1.4.0.1
-                 , FontyFruity == 0.3
-                 , Hipmunk == 5.2.0.16
-                 , JuicyPixels == 3.1.5.2
-                 , MonadRandom == 0.1.13
-                 , Rasterific == 0.3
                  , StateVar == 1.0.0.0
-                 , bifunctors == 4.1.1.1
-                 , cairo == 0.12.5.3
-                 , comonad == 4.2.2
-                 , contravariant == 1.0
-                 , cpu == 0.1.2
-                 , distributive == 0.4.4
-                 , dlist == 0.7.1
-                 , free == 4.9
-                 , hashable == 1.2.2.0
                  , mtl == 2.2.1
-                 , mwc-random == 0.13.1.2
-                 , nats == 0.2
-                 , prelude-extras == 0.4
-                 , primitive == 0.5.3.0
-                 , profunctors == 4.0.4
-                 , random == 1.0.1.1
-                 , SDL2
-                 , sdl2-mixer
-                 , semigroupoids == 4.0.4
-                 , semigroups == 0.15.2
-                 , tagged == 0.7.2
-                 , text == 1.1.1.3
+                 , primitive == 0.5.4.0
+                 , random == 1.1
+                 , text == 1.2.0.0
                  , transformers == 0.4.1.0
-                 , transformers-compat == 0.3.3.4
-                 , unordered-containers == 0.2.5.0
                  , utf8-string == 0.3.8
-                 , vector == 0.10.11.0
-                 , vector-algorithms == 0.6.0.3
-                 , zlib == 0.5.4.1
+                 , vector == 0.10.12.1
