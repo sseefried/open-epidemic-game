@@ -1,4 +1,3 @@
-{-# LANGUAGE ForeignFunctionInterface, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 module Main where
 
