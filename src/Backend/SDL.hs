@@ -63,14 +63,14 @@ initialize title screenWidth screenHeight gs = do
 
   M.openAudio 44100 S.AudioS16Sys 1 1024
   M.allocateChannels 10
-  levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
-  rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
-  squishSound <- M.loadWAVRW rwOps False
+--  levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
+--  rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
+--  squishSound <- M.loadWAVRW rwOps False
 
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
-                levelMusic squishSound
+                undefined undefined
 
   where
     wflags = [S.WindowShown]
@@ -206,9 +206,9 @@ playSoundQueue :: BackendState -> [GameSound] -> IO ()
 playSoundQueue bes = mapM_ playSound
   where
     playSound :: GameSound -> IO ()
-    playSound s = case s of
-      GameSoundLevelMusic -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
-      GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
+    playSound s = return ()
+--      GameSoundLevelMusic -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
+--      GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -268,6 +268,6 @@ logFrameRate besRef = do
       when (n `mod` 30 == 29) $ do
         t' <- getCurrentTime
         let d = toDouble $ diffUTCTime t' t
-        printf "Framerate = %.2f frames/s\n" (fromIntegral n / d :: Double)
+--        printf "Framerate = %.2f frames/s\n" (fromIntegral n / d :: Double)
         return ()
 
