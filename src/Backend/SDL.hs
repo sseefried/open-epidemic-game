@@ -5,8 +5,6 @@ module Backend.SDL (
 
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Keycode  as SK
-import qualified Graphics.UI.SDL.Mixer    as M
-import qualified Graphics.UI.SDL.Mixer.Types as M
 import qualified Graphics.Rendering.Cairo as C
 
 import           Data.IORef
@@ -38,8 +36,6 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
                                  , besWindow         :: S.Window
-                                 , besLevelMusic     :: M.Music
-                                 , besSquishSound    :: M.Chunk
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int, Int) -> R2 }
@@ -60,17 +56,9 @@ initialize title screenWidth screenHeight gs = do
   S.init [S.InitVideo, S.InitAudio]
   window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   renderer <- S.createRenderer window S.FirstSupported rflags
-
-  M.openAudio 44100 S.AudioS16Sys 1 1024
-  M.allocateChannels 10
---  levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
---  rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
---  squishSound <- M.loadWAVRW rwOps False
-
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
-                undefined undefined
 
   where
     wflags = [S.WindowShown]
