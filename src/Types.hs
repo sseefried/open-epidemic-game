@@ -112,5 +112,6 @@ data GameState = GameState { gsRender        :: Render ()
                            , gsSoundQueue    :: [GameSound]
                            }
 
-data GameSound = GameSoundLevelMusic
+data GameSound = GameSoundLevelMusicStart -- start level music
+               | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish

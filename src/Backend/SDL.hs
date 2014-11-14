@@ -93,13 +93,17 @@ sdlEventToEvent b2w fsmState sdlEvent =
   case sdlEvent of
 --    S.KeyDown _ -> Just Reset
     _           -> (case fsmState of -- events that occur in specific FSM states
-                      FSMPlayingLevel -> playingLevel sdlEvent
-                      _               -> Nothing)
+                      FSMPlayingLevel _ -> playingLevel sdlEvent
+                      FSMGameOver       -> gameOver sdlEvent
+                      _                 -> Nothing)
   where
     playingLevel e = case e of
       _ | Just (x,y) <- isMouseDown e -> Just $ Tap (backendPtToWorldPt b2w (x,y))
       _                       -> Nothing
-
+    ---------------------------------------
+    gameOver e = case e of
+      _ | Just (x,y) <- isMouseDown e -> Just TapAnywhere
+      _                               -> Nothing
 --
 -- True if any mouse button is down
 --
@@ -207,7 +211,8 @@ playSoundQueue bes = mapM_ playSound
   where
     playSound :: GameSound -> IO ()
     playSound s = case s of
-      GameSoundLevelMusic -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
+      GameSoundLevelMusicStart -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
+      GameSoundLevelMusicStop  -> M.haltMusic
       GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------

@@ -18,7 +18,6 @@ import qualified Data.Map as M
 import Types
 import GameM
 import Graphics
-
 ----------------------------------------------------------------------------------------------------
 --
 -- Game constants
@@ -43,24 +42,25 @@ doublingPeriodVariance = 0.5
 resistanceIncrease :: Double
 resistanceIncrease = 1.1
 
+-- Maximum number of germs before you are "infected"
+maxGerms :: Int
+maxGerms = 30
 
 ----------------------------------------------------------------------------------------------------
 --
--- Let aspect ratio be width/height. Let aspect ration of the world be W and the aspect ratio of
--- the  canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
--- to.  If W < C then there will be margins on the left and right that will not be drawn to.
+-- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
+-- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
+-- to. If W < C then there will be margins on the left and right that will not be drawn to.
 --
 worldToCanvas :: (Int, Int) -> WorldToCanvas
 worldToCanvas (w,h) =
   WorldToCanvas { worldPtToCanvasPt   = \(R2 x y) -> (w'/2 + scale*x, h'/2 - scale*y)
-                , worldLenToCanvasLen = \len -> scale * len  }
+                , worldLenToCanvasLen = (scale*)  }
   where
     w' = fromIntegral w
     h' = fromIntegral h
     minor = min w' h'
     scale = minor / worldMajor
-
-
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -90,6 +90,20 @@ createGerm initSize pos hipCirc = do
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
 randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
 
+
+----------------------------------------------------------------------------------------------------
+--
+-- Finite State Machine states for this game.
+--
+data FSMState = FSMLevel Int -- level number
+              | FSMPlayingLevel Int -- level number
+              | FSMAntibioticUnlocked
+              | FSMLevelComplete
+              | FSMGameOver
+              deriving (Show, Eq, Ord)
+
+
+----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 --
 -- Events
@@ -109,19 +123,6 @@ randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
 -- would have them. I'd have to choose a subset that worked for all of them, etc.)
 --
 
-----------------------------------------------------------------------------------------------------
---
--- Finite State Machine states for this game.
---
-data FSMState = FSMLevel Int -- level number
-              | FSMPlayingLevel
-              | FSMAntibioticUnlocked
-              | FSMLevelComplete
-              | FSMGameOver
-              deriving (Show, Eq, Ord)
-
-
-----------------------------------------------------------------------------------------------------
 {-
 TODO: I would really like it if there was some (fairly easy) way of associating a particular
 data type with each constructor of the FSM. As it stands I could easily make a mistake in my
@@ -190,7 +191,7 @@ handleEvent fsmState ev = do
     Reset   -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
             FSMLevel i            -> fsmLevel i
-            FSMPlayingLevel       -> fsmPlayingLevel
+            FSMPlayingLevel i     -> fsmPlayingLevel i
             FSMAntibioticUnlocked -> fsmAntibioticUnlocked
             FSMLevelComplete      -> fsmLevelComplete
             FSMGameOver           -> fsmGameOver
@@ -208,21 +209,52 @@ handleEvent fsmState ev = do
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
                  evalRand $ createGerm initSize (R2 x y) hc
       put $ gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
-               , gsSoundQueue = [GameSoundLevelMusic]}
-      return $ FSMPlayingLevel
-
-    fsmPlayingLevel = case ev of
-      Tap p     -> killGerm p
-      Physics duration -> physics duration >> return fsmState
-      _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
+               , gsSoundQueue = [GameSoundLevelMusicStart]}
+      return $ FSMPlayingLevel i
+    --------------------------------------
+    fsmPlayingLevel i = do
+      gs <- get
+      if M.size (gsGerms gs) > maxGerms
+       then return $ FSMGameOver
+       else do
+        case ev of
+          Tap p            -> playingLevelTap i p
+          Physics duration -> physics duration >> return fsmState
+          _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
+    --------------------------------------
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
+    --------------------------------------
     fsmLevelComplete      = error "fsmLevelComplete not implemented"
-    fsmGameOver           = error "fsmGameOver not implemented"
+    --------------------------------------
+    fsmGameOver           = do
+      case ev of
+        TapAnywhere -> return $ FSMLevel 1
+        _ -> do
+          modify $ \gs -> gs { gsRender = do
+                             let w2c = gsWorldToCanvas gs
+                             gsRender gs -- draw what we had before
+                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
+                                      "INFECTED!"
+                             drawText w2c (Color 0 0 0 1) (R2 (-worldWidth/8) (-worldHeight/4))
+                                      (worldWidth/4) "Tap to continue"
+                             , gsSoundQueue = [GameSoundLevelMusicStop]
+                             }
+          return FSMGameOver
 
+----------------------------------------------------------------------------------------------------
+playingLevelTap :: Int -> R2 -> GameM FSMState
+playingLevelTap level p = do
+  killGerm p
+  gs <- get
+  return $ case M.size (gsGerms gs) of
+    0 -> FSMLevel (level +1)
+    _ -> FSMPlayingLevel level
+
+----------------------------------------------------------------------------------------------------
 --
 -- FIXME: Make this more efficient. Brute force searches through germs to kill them.
 --
-killGerm :: R2 -> GameM FSMState
+killGerm :: R2 -> GameM ()
 killGerm p = do
   gs <- get
   let germsToKill = M.toList $ M.filter (tapCollides p) (gsGerms gs)
@@ -231,7 +263,6 @@ killGerm p = do
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
                            , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
   mapM_ kkk germsToKill
-  return $ FSMPlayingLevel
   where
     tapCollides :: R2 -> Germ -> Bool
     tapCollides (R2 x y) g = let sz       = germSizeFun g (germCumulativeTime g)
@@ -287,6 +318,9 @@ growGerm duration germId = do
       insertGerm germId g'
 
 ----------------------------------------------------------------------------------------------------
+--
+-- [whenGerm] applies [f] if germ with [germId] exists in the [GameState]
+--
 whenGerm :: GermId -> (GameState -> Germ -> GameM ()) -> GameM ()
 whenGerm germId f = do
   gs <- get
@@ -315,6 +349,15 @@ physics duration = do
                          (worldPtToCanvasPt w2c $ germPos g)
                          (worldLenToCanvasLen w2c $ germSizeFun g (germCumulativeTime g))
                          (germAnimTime g)
-  modify $ \gs -> let render = drawBackground (gsBounds gs) >> mapM_ drawOneGerm (M.elems $ gsGerms gs)
+  modify $ \gs -> let render = do
+                        drawBackground (gsBounds gs)
+                        mapM_ drawOneGerm (M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 
+----------------------------------------------------------------------------------------------------
+
+drawText :: WorldToCanvas -> Color -> R2 -> Double -> String -> Render ()
+drawText w2c c pos w s = do
+  let wl2cl = worldLenToCanvasLen w2c
+      wp2cp = worldPtToCanvasPt w2c
+  text "Helvetica" c (wp2cp pos) (wl2cl w) s

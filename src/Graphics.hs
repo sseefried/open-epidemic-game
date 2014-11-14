@@ -2,7 +2,7 @@ module Graphics (
   -- types
   Anim, GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
   -- functions
-  randomGermGfx, drawGerm, drawBackground
+  randomGermGfx, drawGerm, drawBackground, text
 ) where
 
 import Graphics.Rendering.Cairo
@@ -374,10 +374,9 @@ changeAlpha a' (Color r g b a) = Color r g b a'
 pmap :: (a -> b) -> (a,a) -> (b,b)
 pmap f (a,b) = (f a, f b)
 
-
 ----------------------------------------------------------------------------------------------------
 --
--- Produces n*n germs on a wxh screen
+-- Produces n*n germs on a w x h screen
 --
 tiledGerms :: RandomGen g => Int -> Int -> Int -> Rand g Anim
 tiledGerms n w h = do
@@ -401,16 +400,31 @@ asGroup r = do
   paint
 
 ----------------------------------------------------------------------------------------------------
---newSingleGermAnim :: RandomGen g => (Int, Int) -> Rand g Anim
---newSingleGermAnim (screenWidth, screenHeight) = do
---  let w = fromIntegral screenWidth
---      h = fromIntegral screenHeight
---      r = (min w h) / 2 :: Double
---  g <- randomGermGfx
---  return $ \t -> do
---    renderOnWhite $ drawGerm g (screenWidth,screenHeight) (0, 0) r t
-
-----------------------------------------------------------------------------------------------------
 newGermAnim :: RandomGen g => (Int,Int) -> Rand g Anim
 newGermAnim (screenWidth, screenHeight) =
   tiledGerms tileGermsPerRow screenWidth screenHeight
+
+----------------------------------------------------------------------------------------------------
+
+--
+-- [text fontFamily c (x,y) w  s] renders the text [s] at location [(x,y)] with width [w].
+-- The bottom left hand corner of the text is at [(x,y)] and the height of the text
+-- depends on the [fontFamily].
+--
+text :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+text fontFamily c (x,y) w s = do
+  setColor c
+  setFontSize 1
+  selectFontFace fontFamily FontSlantNormal FontWeightNormal
+  te@(TextExtents bx _ tw _ _ _) <- textExtents s
+  let scale = w/tw
+  setFontSize scale
+  moveTo (-bx*scale + x) y
+  showText s
+
+----------------------------------------------------------------------------------------------------
+--
+-- Use [consoleLog] to print out values to the console inside the [Render] monad.
+--
+consoleLog :: String -> Render ()
+consoleLog s = trace s $ return ()

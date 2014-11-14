@@ -1,7 +1,10 @@
 TODO
 
-[ ] Build and deploy to Android. Have a look at this:
+[X] Build and deploy to Android. Have a look at this:
      https://github.com/neurocyte/ghc-android
+    (Took approximately a week of hell. Perhaps 70+ hours)
+
+[ ] Speed up the algorithm to search and kill germs
 
 [ ] I need to get the radii of the germs right, which I think is going
    to be a bit of a chore. The problem is that the edges of the germs are
