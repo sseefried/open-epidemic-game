@@ -68,11 +68,12 @@ initialize title screenWidth screenHeight gs = do
   window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   renderer <- S.createRenderer window S.FirstSupported rflags
 
-  M.openAudio 44100 S.AudioS16Sys 1 1024
-  M.allocateChannels 10
+
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
     _       -> do
+     M.openAudio 44100 S.AudioS16Sys 1 1024
+     M.allocateChannels 10
      levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
      rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
      squishSound <- M.loadWAVRW rwOps False

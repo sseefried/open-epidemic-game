@@ -19,11 +19,11 @@ Flag android
   Default: False
 
 library
-    hs-source-dirs : src
+    hs-source-dirs : src src/Backend
     default-language:  Haskell2010
     ghc-options: -O2 -static
-    hs-source-dirs: .
-    exposed-modules: MainLib
+    Exposed-Modules: MainLib, Backend.SDL, Game, GameM, Types, Platform
+                   , Graphics
     exposed: True
 
     build-depends: Hipmunk == 5.2.0.16
