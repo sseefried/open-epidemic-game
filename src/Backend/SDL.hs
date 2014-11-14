@@ -15,12 +15,14 @@ import           Text.Printf
 import           Control.Monad
 import           System.Exit
 import           Foreign.Ptr (castPtr)
+import           Foreign.C.Types (CFloat)
 
 -- friends
 import Types
 import Game
 import GameM
 import Graphics()
+import Platform
 
 {-
 All backends must render from C.Render () to the backend's screen somehow.
@@ -42,17 +44,22 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besSquishSound    :: M.Chunk
                                  }
 
-data BackendToWorld = BackendToWorld { backendPtToWorldPt :: (Int, Int) -> R2 }
+data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
+                                     , backendNormPtToWorldPt :: (CFloat, CFloat) -> R2 }
 
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
   BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x - w'/2)  * scale)
-                                                      ((h'/2 - fromIntegral y) * scale) }
+                                                      ((h'/2 - fromIntegral y) * scale)
+                 , backendNormPtToWorldPt = \(fx,fy) -> R2 (frac fx worldWidth)
+                                                           (frac fy worldHeight)
+                 }
   where
     minor = min w' h'
     scale = worldMajor / minor
     w' = fromIntegral w
     h' = fromIntegral h
+    frac f x = convertFloat f * x
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
@@ -63,10 +70,13 @@ initialize title screenWidth screenHeight gs = do
 
   M.openAudio 44100 S.AudioS16Sys 1 1024
   M.allocateChannels 10
-  levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
-  rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
-  squishSound <- M.loadWAVRW rwOps False
-
+  (levelMusic, squishSound) <- case platform of
+    Android -> return (error "levelMusic", error "squishSound")
+    _       -> do
+     levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
+     rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
+     squishSound <- M.loadWAVRW rwOps False
+     return (levelMusic, squishSound)
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
@@ -98,22 +108,22 @@ sdlEventToEvent b2w fsmState sdlEvent =
                       _                 -> Nothing)
   where
     playingLevel e = case e of
-      _ | Just (x,y) <- isMouseDown e -> Just $ Tap (backendPtToWorldPt b2w (x,y))
-      _                       -> Nothing
+      _ | Just pt <- isMouseOrTouchDown b2w e -> Just $ Tap pt
+      _                                       -> Nothing
     ---------------------------------------
     gameOver e = case e of
-      _ | Just (x,y) <- isMouseDown e -> Just TapAnywhere
-      _                               -> Nothing
+      _ | Just _ <- isMouseOrTouchDown b2w e -> Just TapAnywhere
+      _                                      -> Nothing
+
 --
--- True if any mouse button is down
+-- True if any mouse button is down.
 --
-isMouseDown :: S.Event -> Maybe (Int, Int)
-isMouseDown e = case S.eventData e of
+isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
+isMouseOrTouchDown b2w e = case S.eventData e of
   S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
-    Just (S.positionX p, S.positionY p)
-  _                                               -> Nothing
-
-
+    Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
+  S.TouchFinger { S.touchX = fx, S.touchY = fy } -> Just $ backendNormPtToWorldPt b2w (fx, fy)
+  _                                              -> Nothing
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -207,7 +217,9 @@ runPhysicsEventHandler besRef handleEvent = do
 
 ----------------------------------------------------------------------------------------------------
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
-playSoundQueue bes = mapM_ playSound
+playSoundQueue bes = case platform of
+  Android -> const $ return ()  -- don't play any sounds on android. FIXME: Change this
+  _       -> mapM_ playSound
   where
     playSound :: GameSound -> IO ()
     playSound s = case s of

@@ -115,3 +115,7 @@ data GameState = GameState { gsRender        :: Render ()
 data GameSound = GameSoundLevelMusicStart -- start level music
                | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish
+----------------------------------------------------------------------------------------------------
+
+convertFloat :: (RealFloat a, RealFloat b) => a -> b
+convertFloat = uncurry encodeFloat . decodeFloat
