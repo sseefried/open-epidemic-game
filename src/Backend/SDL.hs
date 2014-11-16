@@ -23,6 +23,7 @@ import Game
 import GameM
 import Graphics()
 import Platform
+import CUtil
 
 {-
 All backends must render from C.Render () to the backend's screen somehow.
@@ -51,15 +52,15 @@ backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
   BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x - w'/2)  * scale)
                                                       ((h'/2 - fromIntegral y) * scale)
-                 , backendNormPtToWorldPt = \(fx,fy) -> R2 (frac fx worldWidth)
-                                                           (frac fy worldHeight)
+                 , backendNormPtToWorldPt = \(fx,fy) -> R2 (frac (fx - 0.5) (w' * scale))
+                                                           (frac (0.5 - fy) (h' * scale))
                  }
   where
     minor = min w' h'
     scale = worldMajor / minor
     w' = fromIntegral w
     h' = fromIntegral h
-    frac f x = convertFloat f * x
+    frac f x = cFloatToDouble f * x
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
@@ -123,7 +124,8 @@ isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
 isMouseOrTouchDown b2w e = case S.eventData e of
   S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
     Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
-  S.TouchFinger { S.touchX = fx, S.touchY = fy } -> Just $ backendNormPtToWorldPt b2w (fx, fy)
+  S.TouchFinger { S.touchX = fx, S.touchY = fy } -> 
+    Just $ backendNormPtToWorldPt b2w (fx, fy)
   _                                              -> Nothing
 
 ----------------------------------------------------------------------------------------------------

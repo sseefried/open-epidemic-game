@@ -13,7 +13,7 @@ import           Data.Map (Map)
 -- co-ordindate system will remain fixed.
 --
 -- exported
-data R2 = R2 Double Double deriving (Show, Eq, Ord)
+data R2 = R2 !Double !Double deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -27,7 +27,7 @@ type Time = Double
 
 type Anim = Time -> Render ()
 
-data Color = Color Double Double Double Double deriving Show
+data Color = Color !Double !Double !Double !Double deriving Show
 
 type CairoPoint = (Double, Double)
 
@@ -86,7 +86,7 @@ data Germ = Germ { germMultiplyAt     :: Time
 
 ----------------------------------------------------------------------------------------------------
 
-data HipCirc  = HipCirc  { _hipCircShape  :: H.Shape }
+data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
 
 ----------------------------------------------------------------------------------------------------
 
@@ -103,19 +103,16 @@ type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
 
-data GameState = GameState { gsRender        :: Render ()
-                           , gsBounds        :: (Int, Int)
-                           , gsGerms         :: Map GermId Germ
-                           , gsWorldToCanvas :: WorldToCanvas
-                           , gsNextGermId    :: GermId
+data GameState = GameState { gsRender        :: !(Render ())
+                           , gsBounds        :: !(Int, Int)
+                           , gsGerms         :: !(Map GermId Germ)
+                           , gsWorldToCanvas :: !WorldToCanvas
+                           , gsNextGermId    :: !GermId
                            , gsHipState      :: HipSpace
-                           , gsSoundQueue    :: [GameSound]
+                           , gsSoundQueue    :: ![GameSound]
                            }
 
 data GameSound = GameSoundLevelMusicStart -- start level music
                | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish
 ----------------------------------------------------------------------------------------------------
-
-convertFloat :: (RealFloat a, RealFloat b) => a -> b
-convertFloat = uncurry encodeFloat . decodeFloat

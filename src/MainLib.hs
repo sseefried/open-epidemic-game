@@ -5,13 +5,15 @@
 --
 module MainLib where
 
+import System.IO
+
 -- friends
 import Game
 import Backend.SDL as B
 
 screenWidth, screenHeight :: Int
-screenWidth  = 400
-screenHeight = 240
+screenWidth  = 800
+screenHeight = 480
 
 w, h :: Double
 w = fromIntegral screenWidth
