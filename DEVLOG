@@ -1,4 +1,30 @@
 ---------------
+Fri 14 Nov 2014
+---------------
+
+I finished the Android build on Mon 03 Nov 2014. I'm amazed it worked the
+first time because just today I tried to build again and deploy. I discovered
+that you get no information on what went wrong when your program
+crashes because the stdio and stderr are redirected to /dev/null.
+
+You can get set a property to redirect to the log
+
+$ adb shell stop
+$ adb shell setprop log.redirect-stdio true
+$ adb shell start
+
+Once you've done this you can
+
+$ adb logcat | grep 'I/stdout'
+
+or
+
+$ adb logcat | grep 'I/stderr'
+
+to see output from the program
+
+
+---------------
 Sat 01 Nov 2014
 ---------------
 
