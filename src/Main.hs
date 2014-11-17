@@ -8,8 +8,8 @@ import Game
 import Backend.SDL as B
 
 screenWidth, screenHeight :: Int
-screenWidth  = 800
-screenHeight = 800
+screenWidth  = 1280
+screenHeight = 720
 
 w, h :: Double
 w = fromIntegral screenWidth

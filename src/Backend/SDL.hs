@@ -43,6 +43,7 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besWindow         :: S.Window
                                  , besLevelMusic     :: M.Music
                                  , besSquishSound    :: M.Chunk
+                                 , besTexture        :: S.Texture
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
@@ -81,13 +82,15 @@ initialize title screenWidth screenHeight gs = do
      return (levelMusic, squishSound)
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
+  texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
+                 (fromIntegral w) (fromIntegral h)
   newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
-                levelMusic squishSound
+                levelMusic squishSound texture
 
   where
     wflags = [S.WindowShown]
     -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
-    rflags = [S.Accelerated, S.PresentVSync]
+    rflags = [S.Accelerated] -- , S.PresentVSync]
     w = fromIntegral screenWidth
     h = fromIntegral screenHeight
 
@@ -124,7 +127,7 @@ isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
 isMouseOrTouchDown b2w e = case S.eventData e of
   S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
     Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
-  S.TouchFinger { S.touchX = fx, S.touchY = fy } -> 
+  S.TouchFinger { S.touchX = fx, S.touchY = fy } ->
     Just $ backendNormPtToWorldPt b2w (fx, fy)
   _                                              -> Nothing
 
@@ -169,20 +172,13 @@ runFrameUpdate besRef = do
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
       renderer   = besSDLRenderer bes
-  --
-  -- I'm not 100% sure why yet but you need to create a new texture each time around
-  -- in order to prevent very bad flickering.
-  --
-  texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
-                 (fromIntegral w) (fromIntegral h)
-
+      texture    = besTexture bes
   S.lockTexture texture Nothing $ \(pixels, pitch) -> do
-    res <- C.withImageSurfaceForData (castPtr pixels) C.FormatARGB32 w h pitch $ \surface ->
-      C.renderWith surface $ gsRender gs
-    S.unlockTexture texture
+                       res <- C.withImageSurfaceForData (castPtr pixels) C.FormatARGB32 w h pitch $ \surface ->
+                         C.renderWith surface $ gsRender gs
+                       S.unlockTexture texture
   S.renderClear renderer
   S.renderCopy renderer texture Nothing Nothing
-  S.destroyTexture texture
   S.renderPresent renderer
   writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
 
