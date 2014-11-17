@@ -5,4 +5,4 @@ rm -rf .cabal-sandbox
 cabal sandbox init
 cabal sandbox add-source /Users/sseefried/code/forked-git/hs-sdl2-mixer
 cabal sandbox add-source /Users/sseefried/code/forked-git/hsSDL2
-cabal install -j8
+cabal install -p --enable-executable-profiling -j8
