@@ -8,3 +8,7 @@ epidemic
 Main
 dist/
 *~
+*.aux
+*.hp
+*.prof
+*.ps
