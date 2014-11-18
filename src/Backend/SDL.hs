@@ -24,6 +24,7 @@ import GameM
 import Graphics()
 import Platform
 import CUtil
+import FrameRateBuffer
 
 {-
 All backends must render from C.Render () to the backend's screen somehow.
@@ -37,6 +38,7 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besDimensions     :: (Int,Int)
                                  , besBackendToWorld :: BackendToWorld
                                  , besFrames         :: Integer
+                                 , besFRBuf          :: FRBuf
                                  , besFSMState       :: FSMState
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
@@ -84,7 +86,8 @@ initialize title screenWidth screenHeight gs = do
   let dims = (screenWidth, screenHeight)
   texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
                  (fromIntegral w) (fromIntegral h)
-  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 (FSMLevel 1) window
+  frBuf <- initFRBuf
+  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1) window
                 levelMusic squishSound texture
 
   where
@@ -180,7 +183,6 @@ runFrameUpdate besRef = do
   S.renderClear renderer
   S.renderCopy renderer texture Nothing Nothing
   S.renderPresent renderer
-  writeIORef besRef $ bes { besFrames = besFrames bes + 1 }
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -209,10 +211,15 @@ runPhysicsEventHandler besRef handleEvent = do
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
   (fsmState', gs') <- runGameM gs (handleEvent fsmState (Physics duration))
-  -- If there are any queued sounds play them now
-  playSoundQueue bes (gsSoundQueue gs')
-  writeIORef besRef $ bes { besGameState = gs' { gsSoundQueue = [] }
-                          , besLastTime = t, besFSMState = fsmState' }
+  case fsmState' of
+    FSMPlayingLevel _ -> do
+      -- If there are any queued sounds play them now
+      playSoundQueue bes (gsSoundQueue gs')
+      addTick (besFRBuf bes) duration
+      writeIORef besRef $ bes { besGameState = gs' { gsSoundQueue = [] }
+                              , besLastTime = t, besFSMState = fsmState'
+                              , besFrames = besFrames bes + 1 }
+    _ -> return ()
 
 ----------------------------------------------------------------------------------------------------
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
@@ -278,12 +285,11 @@ mainLoop besRef handleEvent = loop $ do
 
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
-      bes <- readIORef besRef
-      let n = besFrames bes
-          t = besStartTime bes
-      when (n `mod` 30 == 29) $ do
-        t' <- getCurrentTime
-        let d = toDouble $ diffUTCTime t' t
-        printf "Framerate = %.2f frames/s\n" (fromIntegral n / d :: Double)
-        return ()
+  bes <- readIORef besRef
+  when (besFrames bes `mod` 30 == 0) $ do
+    avTick <- averageTick (besFRBuf bes)
+    printf "Framerate = %.2f frames/s\n" (1/avTick)
+
+
+
 

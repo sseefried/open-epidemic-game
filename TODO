@@ -6,6 +6,8 @@ TODO
 
 [ ] Speed up the algorithm to search and kill germs
 
+[ ] Switch to using sdlUpdateTexture instead of lock/unlock texture
+
 [ ] I need to get the radii of the germs right, which I think is going
    to be a bit of a chore. The problem is that the edges of the germs are
    Bezier curves where the control points lie outside the actual

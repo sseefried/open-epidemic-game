@@ -23,7 +23,7 @@ library
     default-language: Haskell2010
     ghc-options: -O2 -static
     Exposed-Modules: MainLib, Backend.SDL, Game, GameM, Types, Platform
-                   , Graphics, CUtil
+                   , Graphics, CUtil, FrameRateBuffer
     exposed: True
     if flag(android)
       cpp-options: -DANDROID
@@ -75,6 +75,7 @@ executable         Epidemic
                  -- everything below this line is a dependency of above
                  -- the line. We fix to specific versions
                  , base >= 4.7.0.0
+                 , array == 0.5.0.0
                  , containers == 0.5.5.1
                  , time == 1.4.2
                  , StateVar == 1.0.0.0
