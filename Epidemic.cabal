@@ -70,6 +70,9 @@ executable         Epidemic
     if flag(android)
       cpp-options: -DANDROID
 
+    if flag(nosound)
+      cpp-options: -DNOSOUND
+
     build-depends: Hipmunk == 5.2.0.16
                  , MonadRandom ==0.3
                  , SDL2 == 0.1.0
