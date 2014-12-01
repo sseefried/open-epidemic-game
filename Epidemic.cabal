@@ -18,6 +18,10 @@ Flag android
   Description: Build for Android
   Default: False
 
+Flag nosound
+  Description: No sound
+  Default: False
+
 library
     hs-source-dirs:   src
     default-language: Haskell2010
@@ -102,6 +106,9 @@ executable         GenerateIcons
 
     if flag(android)
       cpp-options: -DANDROID
+
+    if flag(nosound)
+      cpp-options: -DNOSOUND
 
     build-depends: Hipmunk == 5.2.0.16
                  , MonadRandom ==0.3

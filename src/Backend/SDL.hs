@@ -75,6 +75,7 @@ initialize title screenWidth screenHeight gs = do
 
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
+    NoSound -> return (error "levelMusic", error "squishSound")
     _       -> do
      M.openAudio 44100 S.AudioS16Sys 1 1024
      M.allocateChannels 10
@@ -225,6 +226,7 @@ runPhysicsEventHandler besRef handleEvent = do
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
 playSoundQueue bes = case platform of
   Android -> const $ return ()  -- don't play any sounds on android. FIXME: Change this
+  NoSound -> const $ return ()  -- don't play any sounds with NoSound
   _       -> mapM_ playSound
   where
     playSound :: GameSound -> IO ()

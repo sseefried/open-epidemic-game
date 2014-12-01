@@ -1,4 +1,23 @@
 ---------------
+Sat 29 Nov 2014
+---------------
+
+I finally thought of a more "strategic" redesign of the game. Here are some
+ideas:
+
+1. The germs don't have to be killed with one tap. The "cell wall" can get
+   thinner and thinner until they "pop".
+2. There can be different types of germs.
+   a) ones that inhibit the growth of others
+   b) ones that multiply very fast.
+   c) one that actually kill others that they are in contact with
+
+3. You can pick up and drag a germ?
+
+4. Antibiotics are dragged and dropped. Then a new vial or beaker appears.
+   As they get more and more ineffective their colour fades.
+
+---------------
 Fri 14 Nov 2014
 ---------------
 
