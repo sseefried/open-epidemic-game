@@ -32,7 +32,11 @@ library
     if flag(android)
       cpp-options: -DANDROID
 
-    build-depends: Hipmunk == 5.2.0.16
+    c-sources: src/util.c
+
+    if flag(android)
+      Buildable: True
+      build-depends: Hipmunk == 5.2.0.16
                  , MonadRandom ==0.3
                  , SDL2 == 0.1.0
                  , sdl2-mixer == 0.1.0.0
@@ -51,10 +55,7 @@ library
                  , transformers == 0.4.1.0
                  , utf8-string == 0.3.8
                  , vector == 0.10.12.1
-    c-sources: src/util.c
 
-    if flag(android)
-      Buildable: True
     else
       Buildable: False
 
@@ -73,26 +74,26 @@ executable         Epidemic
     if flag(nosound)
       cpp-options: -DNOSOUND
 
-    build-depends: Hipmunk == 5.2.0.16
-                 , MonadRandom ==0.3
-                 , SDL2 == 0.1.0
-                 , sdl2-mixer == 0.1.0.0
-                 , cairo == 0.12.5.3
-                 , control-monad-free == 0.5.3
+    build-depends: Hipmunk
+                 , MonadRandom
+                 , SDL2
+                 , sdl2-mixer
+                 , cairo
+                 , control-monad-free
                  -- everything below this line is a dependency of above
                  -- the line. We fix to specific versions
-                 , base >= 4.7.0.0
-                 , array == 0.5.0.0
-                 , containers == 0.5.5.1
-                 , time == 1.4.2
-                 , StateVar == 1.0.0.0
-                 , mtl == 2.2.1
-                 , primitive == 0.5.4.0
-                 , random == 1.1
-                 , text == 1.2.0.0
-                 , transformers == 0.4.1.0
-                 , utf8-string == 0.3.8
-                 , vector == 0.10.12.1
+                 , base
+                 , array
+                 , containers
+                 , time
+                 , StateVar
+                 , mtl
+                 , primitive
+                 , random
+                 , text
+                 , transformers
+                 , utf8-string
+                 , vector
     c-sources: src/util.c
     if flag(android)
       Buildable: False
@@ -113,21 +114,21 @@ executable         GenerateIcons
     if flag(nosound)
       cpp-options: -DNOSOUND
 
-    build-depends: Hipmunk == 5.2.0.16
-                 , MonadRandom ==0.3
-                 , cairo == 0.12.5.3
+    build-depends: Hipmunk
+                 , MonadRandom
+                 , cairo
                  -- everything below this line is a dependency of above
                  -- the line. We fix to specific versions
-                 , base >= 4.7.0.0
-                 , containers == 0.5.5.1
-                 , time == 1.4.2
-                 , StateVar == 1.0.0.0
-                 , mtl == 2.2.1
-                 , primitive == 0.5.4.0
-                 , random == 1.1
-                 , text == 1.2.0.0
-                 , transformers == 0.4.1.0
-                 , utf8-string == 0.3.8
+                 , base
+                 , containers
+                 , time
+                 , StateVar
+                 , mtl
+                 , primitive
+                 , random
+                 , text
+                 , transformers
+                 , utf8-string
     if flag(android)
       Buildable: False
     else
