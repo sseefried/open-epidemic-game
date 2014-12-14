@@ -263,6 +263,9 @@ getEvent b2w fsmState = do
       S.Quit                    -> True
       _ | b <- isKeyDown e qKey -> b
 
+
+
+
 qKey :: SK.Keycode
 qKey = SK.Q
 

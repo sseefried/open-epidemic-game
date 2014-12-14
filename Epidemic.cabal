@@ -22,19 +22,26 @@ Flag nosound
   Description: No sound
   Default: False
 
+Flag ios
+  Description: Build for iOS
+  Default: False
+
 library
     hs-source-dirs:   src
     default-language: Haskell2010
-    ghc-options: -O2 -static
+
     Exposed-Modules: MainLib, Backend.SDL, Game, GameM, Types, Platform
                    , Graphics, CUtil, FrameRateBuffer
     exposed: True
     if flag(android)
       cpp-options: -DANDROID
+    if flag(ios)
+      cpp-options: -DIOS
 
     c-sources: src/util.c
 
     if flag(android)
+      ghc-options: -O2 -static
       Buildable: True
       build-depends: Hipmunk == 5.2.0.16
                  , MonadRandom ==0.3
@@ -56,24 +63,17 @@ library
                  , utf8-string == 0.3.8
                  , vector == 0.10.12.1
                  , array == 0.5.0.0
-
     else
       Buildable: False
 
-executable         Epidemic
+executable         EpidemicStaticLib
     hs-source-dirs : src
     default-language:  Haskell2010
-    ghc-options: -Wall -threaded -O2
-    ghc-prof-options: -prof -auto-all
+    ghc-options: -Wall -threaded -O2 -DIOS -staticlib
 
-    main-is:       Main.hs
-    hs-source-dirs: .
+    main-is:       MainLib.hs
 
-    if flag(android)
-      cpp-options: -DANDROID
-
-    if flag(nosound)
-      cpp-options: -DNOSOUND
+    c-sources: src/util.c
 
     build-depends: Hipmunk
                  , MonadRandom
@@ -96,7 +96,50 @@ executable         Epidemic
                  , utf8-string
                  , vector
     c-sources: src/util.c
-    if flag(android)
+    if flag(ios)
+      Buildable: True
+    else
+      Buildable: False
+
+
+
+executable         Epidemic
+    hs-source-dirs : src
+    default-language:  Haskell2010
+    ghc-options: -Wall -threaded -O2
+    ghc-prof-options: -prof -auto-all
+
+    main-is:       Main.hs
+    hs-source-dirs: .
+
+    if flag(nosound)
+      cpp-options: -DNOSOUND
+
+    if flag(ios)
+      ghc-options: -staticlib
+
+    build-depends: Hipmunk
+                 , MonadRandom
+                 , SDL2
+                 , sdl2-mixer
+                 , cairo
+                 , control-monad-free
+                 -- everything below this line is a dependency of above
+                 -- the line. We fix to specific versions
+                 , base
+                 , array
+                 , containers
+                 , time
+                 , StateVar
+                 , mtl
+                 , primitive
+                 , random
+                 , text
+                 , transformers
+                 , utf8-string
+                 , vector
+    c-sources: src/util.c
+    if flag(android) || flag(ios)
       Buildable: False
     else
       Buildable: True
@@ -130,7 +173,7 @@ executable         GenerateIcons
                  , text
                  , transformers
                  , utf8-string
-    if flag(android)
+    if flag(android) || flag(ios)
       Buildable: False
     else
       Buildable: True

@@ -2,7 +2,7 @@
 module Platform where
 
 data Platform = MacOSX
-              | IOS
+              | IOSPlatform
               | Android
               | NoSound
 
@@ -10,7 +10,7 @@ data Platform = MacOSX
 platform = Android
 #else
 #ifdef IOS
-platform = IOS
+platform = IOSPlatform
 #else
 #ifdef NOSOUND
 platform = NoSound
