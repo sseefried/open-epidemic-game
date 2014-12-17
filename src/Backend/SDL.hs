@@ -4,6 +4,7 @@ module Backend.SDL (
 ) where
 
 import qualified Graphics.UI.SDL          as S
+import qualified Graphics.UI.SDL.Surface  as S
 import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
@@ -14,7 +15,9 @@ import           Data.Time
 import           Text.Printf
 import           Control.Monad
 import           System.Exit
-import           Foreign.Ptr (castPtr)
+import           Foreign.C.Types (CUChar)
+import           Foreign.Marshal.Alloc (mallocBytes)
+import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.C.Types (CFloat)
 
 -- friends
@@ -45,6 +48,7 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besWindow         :: S.Window
                                  , besLevelMusic     :: M.Music
                                  , besSquishSound    :: M.Chunk
+                                 , besBuffer         :: Ptr CUChar
                                  , besTexture        :: S.Texture
                                  }
 
@@ -88,8 +92,9 @@ initialize title screenWidth screenHeight gs = do
   texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
                  (fromIntegral w) (fromIntegral h)
   frBuf <- initFRBuf
+  buffer <- mallocBytes (screenWidth * screenHeight * 4)
   newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1) window
-                levelMusic squishSound texture
+                levelMusic squishSound buffer texture
 
   where
     wflags = [S.WindowShown]
@@ -124,6 +129,9 @@ sdlEventToEvent b2w fsmState sdlEvent =
       _ | Just _ <- isMouseOrTouchDown b2w e -> Just TapAnywhere
       _                                      -> Nothing
 
+
+isMobile = platform `elem` [IOSPlatform, Android]
+
 --
 -- True if any mouse button is down.
 --
@@ -131,7 +139,7 @@ isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
 isMouseOrTouchDown b2w e = case S.eventData e of
   S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
     Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
-  S.TouchFinger { S.touchX = fx, S.touchY = fy } ->
+  S.TouchFinger { S.touchX = fx, S.touchY = fy } | isMobile ->
     Just $ backendNormPtToWorldPt b2w (fx, fy)
   _                                              -> Nothing
 
@@ -176,14 +184,18 @@ runFrameUpdate besRef = do
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
       renderer   = besSDLRenderer bes
+      buffer     = besBuffer bes
       texture    = besTexture bes
-  S.lockTexture texture Nothing $ \(pixels, pitch) -> do
-                       res <- C.withImageSurfaceForData (castPtr pixels) C.FormatARGB32 w h pitch $ \surface ->
-                         C.renderWith surface $ gsRender gs
-                       S.unlockTexture texture
+
+  C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*4) $ \surface ->
+     C.renderWith surface $ gsRender gs
+
+  S.updateTexture texture (S.Rect 0 0 w h) buffer (w*4)
+
   S.renderClear renderer
   S.renderCopy renderer texture Nothing Nothing
   S.renderPresent renderer
+
 
 ----------------------------------------------------------------------------------------------------
 --

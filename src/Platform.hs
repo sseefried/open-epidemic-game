@@ -4,7 +4,7 @@ module Platform where
 data Platform = MacOSX
               | IOSPlatform
               | Android
-              | NoSound
+              | NoSound deriving (Eq, Show)
 
 #ifdef ANDROID
 platform = Android
