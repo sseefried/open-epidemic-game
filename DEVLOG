@@ -1,4 +1,32 @@
 ---------------
+Wed 17 Dec 2014
+---------------
+
+So I was experiencing a lot of "tearing" when I was running the game
+on external monitor but not on my laptop alone.
+According to the SDL migration guide (https://wiki.libsdl.org/MigrationGuide)
+
+I was directly rendering into a texture, and then copying that to video
+memory using `renderCopy`.
+
+The recommended practise is to
+  - draw the entire frame to a buffer in RAM
+  - Copy that to the texture
+  - Use `renderCopy`
+
+I'm still trying to work out why this is fast at all. Wouldn't copying
+straight from a surface to video memory be the way to go? But looking
+at the SDL2 library it seems that textures are the *only* way to render
+to video memory. Either you copy into textures or you use
+`createSurfaceFromTexture`.
+
+---------------
+Sun 14 Dec 2014
+---------------
+
+Breakthrough. The game is now running on iOS simulator.
+
+---------------
 Sat 29 Nov 2014
 ---------------
 
