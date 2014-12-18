@@ -1,6 +1,5 @@
----------------
-Wed 17 Dec 2014
----------------
+# Wed 17 Dec 2014
+
 
 So I was experiencing a lot of "tearing" when I was running the game
 on external monitor but not on my laptop alone.
@@ -20,15 +19,15 @@ at the SDL2 library it seems that textures are the *only* way to render
 to video memory. Either you copy into textures or you use
 `createSurfaceFromTexture`.
 
----------------
-Sun 14 Dec 2014
----------------
+
+# Sun 14 Dec 2014
+
 
 Breakthrough. The game is now running on iOS simulator.
 
----------------
-Sat 29 Nov 2014
----------------
+
+# Sat 29 Nov 2014
+
 
 I finally thought of a more "strategic" redesign of the game. Here are some
 ideas:
@@ -45,9 +44,8 @@ ideas:
 4. Antibiotics are dragged and dropped. Then a new vial or beaker appears.
    As they get more and more ineffective their colour fades.
 
----------------
-Fri 14 Nov 2014
----------------
+
+# Fri 14 Nov 2014
 
 I finished the Android build on Mon 03 Nov 2014. I'm amazed it worked the
 first time because just today I tried to build again and deploy. I discovered
@@ -71,9 +69,9 @@ $ adb logcat | grep 'I/stderr'
 to see output from the program
 
 
----------------
-Sat 01 Nov 2014
----------------
+
+# Sat 01 Nov 2014
+
 
 [15:54]
 
@@ -126,10 +124,7 @@ following interesting features:
 
 - they do license file checks.
 
-
----------------
-Fri 17 Oct 2014
----------------
+# Fri 17 Oct 2014
 
 [09:30]
 
@@ -231,9 +226,8 @@ Then you implement the RunHipM case as:
       do a <- runHipM space hipM
          runGameM <current state> (cont a)
 
----------------
-Sat 20 Sep 2014
----------------
+# Sat 20 Sep 2014
+
 
 I've become quite obsessed with keeping the GameM monad pure. The problem
 is that I'm using the Hipmunk library (a Haskell binding to the Chipmunk
@@ -273,9 +267,8 @@ I know what I'll do. I'll try both solutions in different branches of
 the git repository. I'll try the pure Hipmunk solution first.
 
 
----------------
-Tue 16 Sep 2014
----------------
+# Tue 16 Sep 2014
+
 
 I'm trying to think of a good data structure for storing germs. At the moment
 I've just got a list of germs. It might be okay to add new germs to the
@@ -284,9 +277,8 @@ deleting them? If I use Data.Map I'm going to need a notion of germId which
 seems cumbersome. I do probably want a k-d tree or BSP tree to reduce the number
 of objects I need to check for collisions with taps. Do these need an ID?
 
-------------------
-Sunday 14 Sep 2014
-------------------
+# Sunday 14 Sep 2014
+
 
 Small germs need to animate faster to look like they are moving at all.
 It's much more noticeable when a big germ is moving. To simulate this
@@ -296,9 +288,8 @@ also scale it by a factor inversely proportional to the size of the germ.
 In fact, it's proportional to 1/sqrt size. For some reason this just looks
 right visually.
 
----------------
-Fri 12 Sep 2014
----------------
+# Fri 12 Sep 2014
+
 
 I'm back to animating germs. Up until now I've been returning a bunch
 of higher order functions to animate various things about the germs but now
@@ -316,9 +307,7 @@ The moving points are polar points where each component also as a list of
 are represented as data. Each periodic function has amplitude, period and
 phase.
 
----------------
-Thu 11 Sep 2014
----------------
+# Thu 11 Sep 2014
 
 Today I finished writing the FSM module but then deleted it, realising it
 was clunky and didn't actually simplify anything. The problem was
@@ -333,9 +322,7 @@ e.g. case fsmState of
 
 Thinking about how I would rewrite my module I realised I didn't even need it.
 
----------------
-Wed 10 Sep 2014
----------------
+# Wed 10 Sep 2014
 
 In the JavaScript version of the game I created a finite state machine
 that captured the essence of the game. I'd like to do that again but I want
@@ -380,8 +367,8 @@ You need to make sure that race conditions don't occur where both actors
 are manipulating shared memory at the same time. You cannot avoid this.
 As soon as you've put callbacks into place this is a real possibility!
 
--------
-14:44
+
+## 14:44
 
 I did a little bit of study into GLUT and discovered that the callbacks are
 all essentially called in sequence in a single thread. The "idle callback" is
@@ -395,16 +382,14 @@ This way we can dynamically update the rate at which the game displays. Even
 in completely pathological cases we can reduce the frame rate to once every
 few seconds if it starts taking forever to render.
 
--------
-16:28
+## 16:28
 
 Okay, it's getting a bit ridiculous that I still haven't implemented the
 state machine data structure, so I'm going to implement that right now. Then
 I will come back to the issue of avoiding "death spirals" in rendering.
 
----------------
-Mon 08 Sep 2014
----------------
+
+# Mon 08 Sep 2014
 
 At the moment I'm checking for events (such as keypresses/mouseclicks)
 on every frame. This is not really the way I should be doing it. I should
