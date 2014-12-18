@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface, CPP #-}
 {-# OPTIONS_GHC -Wall #-}
 --
--- This module is used in the Android build
+-- This module is used in the Android and iOS build
 --
 module Main where
 
