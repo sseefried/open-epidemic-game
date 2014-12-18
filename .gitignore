@@ -12,3 +12,5 @@ dist/
 *.hp
 *.prof
 *.ps
+run.sh
+sounds/
