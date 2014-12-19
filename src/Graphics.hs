@@ -117,16 +117,19 @@ sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
 --
 drawGerm :: GermGfx -> (Int,Int) -> CairoPoint -> Double -> Anim
 drawGerm gg bounds@(w,h) (x,y) r t = do
-  asGroup $ do
-    translate x y
-    scale r r
-    withGermGradient (germGfxBodyGrad gg) 1 $ do
-      blob . map (movingPtToPt t) . germGfxBody $ gg
-    withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
-      blob . map (movingPtToPt t) . germGfxNucleus $ gg
-    -- scale to radius [r]
-    where
-      m = fromIntegral (min w h) / 2
+  setSourceRGBA 0 0 0 1
+  circle (x,y) r
+  fill
+  -- asGroup $ do
+  --   translate x y
+  --   scale r r
+  --   withGermGradient (germGfxBodyGrad gg) 1 $ do
+  --     blob . map (movingPtToPt t) . germGfxBody $ gg
+  --   withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
+  --     blob . map (movingPtToPt t) . germGfxNucleus $ gg
+  --   -- scale to radius [r]
+  --   where
+  --     m = fromIntegral (min w h) / 2
 
 ----------------------------------------------------------------------------------------------------
 withGermGradient :: GermGradient -> Double -> Render () -> Render ()
