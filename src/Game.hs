@@ -44,7 +44,7 @@ resistanceIncrease = 1.1
 
 -- Maximum number of germs before you are "infected"
 maxGerms :: Int
-maxGerms = 30
+maxGerms = 100
 
 ----------------------------------------------------------------------------------------------------
 --
