@@ -1,3 +1,29 @@
+# Thu 18 Dec 2014
+
+Today I ran into two strange problems on Xcode which took me some to sort out.
+
+1. I tried to move the i386 libraries for the iOS Simulator into their own subdirectory.
+I did this because I also want to put the libraries for other architectures in their own
+subdirectories.
+
+But I started getting the
+
+    Application didn't initialize properly, did you include SDL_main.h in the file containing your
+    main() function?
+
+I could not find a better way to resolve this than to remove all the lib files and then add them
+again. Do things like resetting the iOS Simulator did not work.
+
+2. I discovered there was a problem with `HipMunk`. I used to define `__LP64__` to force it to
+use doubles instead of floats. I changed the project so that I just defined `CP_USE_DOUBLES` and
+this built a library which then built against Epidemic with type errors. But, it did not
+produce the right behaviour on the iOS Simulator! The germs moved around in very strange ways
+and the game quickly crashed. So, now I'm defining `__LP64__` even though I don't know why it
+works!
+
+It seems to me like it shouldn't since I'm building for the i386 architecture. How can saying
+that longs and pointers are 64 bits (which is what `__LP64__` does) work?
+
 # Wed 17 Dec 2014
 
 
@@ -54,17 +80,17 @@ crashes because the stdio and stderr are redirected to /dev/null.
 
 You can get set a property to redirect to the log
 
-$ adb shell stop
-$ adb shell setprop log.redirect-stdio true
-$ adb shell start
+    $ adb shell stop
+    $ adb shell setprop log.redirect-stdio true
+    $ adb shell start
 
 Once you've done this you can
 
-$ adb logcat | grep 'I/stdout'
+    $ adb logcat | grep 'I/stdout'
 
 or
 
-$ adb logcat | grep 'I/stderr'
+    $ adb logcat | grep 'I/stderr'
 
 to see output from the program
 
@@ -73,7 +99,7 @@ to see output from the program
 # Sat 01 Nov 2014
 
 
-[15:54]
+## 15:54
 
 So I've decided to create a number of "third party" repos (which I will
 host on GitHub). In these I will check out a particular version of a C
@@ -91,7 +117,7 @@ hash and the git commit hash in a file in the repo. Then you can download
 that file for yourself, untar it into the repo over the top of the files
 and see if there is any difference. Then you will know that everything is okay.
 
--------
+----
 
 I've started trying to build the game on Android and this has been a deep,
 dark pit of despair so far. I tried following some instructions I found on the
@@ -126,7 +152,7 @@ following interesting features:
 
 # Fri 17 Oct 2014
 
-[09:30]
+## 09:30
 
 I'd now like to work out what is remaining on the game.
 
@@ -165,7 +191,7 @@ I'd now like to work out what is remaining on the game.
    for this game and goes places emotionally that don't really fit with the
    mood of the game.
 
-[08:50]
+## 08:50
 
 I tried both solutions. Of course the pure Hipmunk solution worked but
 ultimately I was unhappy with it. It took me a long time to get right
@@ -183,7 +209,7 @@ It turns out that you need to enable GADTs (or at least ExistentialTypes)
 in order to have operations in your free monad that are polymorphic.
 I wanted to have an operation:
 
-runHipM :: HipSpace -> HipM a -> GameM a
+    runHipM :: HipSpace -> HipM a -> GameM a
 
 I'm lying a little about the type. In the end both the GameM monad
 and the HipM monad are run inside the IO monad, but the basic idea is there.
@@ -191,22 +217,22 @@ and the HipM monad are run inside the IO monad, but the basic idea is there.
 Two data types, GameScript and HipScript are defined that are then turned
 into free monads by application of the Free type constructor.
 
-type GameM = Free GameScript
-type HipM  = Free HipScript
+    type GameM = Free GameScript
+    type HipM  = Free HipScript
 
 The GameScript type looked a little like this:
 
-data GameScript next =
-    Get     (GameState -> next)
-  | Put     GameState next
-  | forall a. RunHipM HipSpace HipM a (a -> next)
+    data GameScript next =
+        Get     (GameState -> next)
+      | Put     GameState next
+      | forall a. RunHipM HipSpace HipM a (a -> next)
 
 See how I needed to introduce an existential type? It turns out you'd need
 it for even more mundane situations. What if you wanted to put the "read"
 operation in GameScript (corresponding to read :: Read a => String -> a).
 This would be encoded as:
 
-  | forall a. Read a => Read String (a -> next)
+    | forall a. Read a => Read String (a -> next)
 
 (the first occurrence of Read is a type class name, whereas the second is
 a constructor name)
@@ -216,8 +242,8 @@ inside another? Really it's quite easy! You just need to make sure
 that the target monad of both free monad interpreters is the same.
 In my case that was IO.
 
-runGameM :: GameState -> GameM a -> (IO a, GameState)
-runHipM :: HipSpace -> HipM a -> IO a
+    runGameM :: GameState -> GameM a -> (IO a, GameState)
+    runHipM :: HipSpace -> HipM a -> IO a
 
 Then you implement the RunHipM case as:
 
