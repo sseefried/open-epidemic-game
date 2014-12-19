@@ -3,15 +3,18 @@
 --
 -- This module is used in the Android and iOS build
 --
-module Main where
+module MainLib where
 
 -- friends
 import Game
 import Backend.SDL as B
+import Platform
 
 screenWidth, screenHeight :: Int
-screenWidth  = 640
-screenHeight = 960
+(screenWidth, screenHeight) = case platform of
+  Android -> (1280,720)
+  IOSPlatform -> (640, 960)
+  _ -> (1280,720)
 
 w, h :: Double
 w = fromIntegral screenWidth
