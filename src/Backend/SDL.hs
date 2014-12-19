@@ -75,8 +75,7 @@ initialize title screenWidth screenHeight gs = do
   S.init [S.InitVideo, S.InitAudio]
   window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   renderer <- S.createRenderer window S.FirstSupported rflags
-
-
+  S.setHint "SDL_RENDER_SCALE_QUALITY" "linear"
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
     NoSound -> return (error "levelMusic", error "squishSound")
@@ -189,9 +188,7 @@ runFrameUpdate besRef = do
 
   C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*4) $ \surface ->
      C.renderWith surface $ gsRender gs
-
   S.updateTexture texture (S.Rect 0 0 w h) buffer (w*4)
-
   S.renderClear renderer
   S.renderCopy renderer texture Nothing Nothing
   S.renderPresent renderer
@@ -275,9 +272,6 @@ getEvent b2w fsmState = do
       S.Quit                    -> True
       _ | b <- isKeyDown e qKey -> b
 
-
-
-
 qKey :: SK.Keycode
 qKey = SK.Q
 
@@ -306,7 +300,3 @@ logFrameRate besRef = do
   when (besFrames bes `mod` 30 == 0) $ do
     avTick <- averageTick (besFRBuf bes)
     printf "Framerate = %.2f frames/s\n" (1/avTick)
-
-
-
-
