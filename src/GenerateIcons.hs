@@ -15,7 +15,7 @@ generateIcons sizes = do
     let size' = fromIntegral size
         filePath = printf "icon_%dx%d.png" size size
     printf "Generating '%s'\n" filePath
-    let r = drawGerm gfx (size,size) (size'/2, size'/2) (size'/2) 0
+    let r = germGfxRenderGerm gfx (size'/2)
     surface <- createImageSurface FormatARGB32 size size
     renderWith surface r
     surfaceWriteToPNG surface filePath

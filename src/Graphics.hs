@@ -1,8 +1,9 @@
 module Graphics (
   -- types
-  Anim, GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
+  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
   -- functions
-  randomGermGfx, drawGerm, drawBackground, text
+  randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
+  movingPtToPt, movingPtToStaticPt
 ) where
 
 import Graphics.Rendering.Cairo
@@ -95,11 +96,15 @@ movingPtToPt t (MP2 (r, pfs) (a, pfs')) =
   where
     r' = r + sumPeriodics t pfs
     a' = a + sumPeriodics t pfs'
-
+----------------------------------------------------------------------------------------------------
+--
+-- [movingPtToStaticPt] throws away the perturbations.
+--
+movingPtToStaticPt :: MovingPoint -> CairoPoint
+movingPtToStaticPt (MP2 (r, _) (a, _)) = polarPtToPt (P2 r a)
 ----------------------------------------------------------------------------------------------------
 periodicValue :: Time -> PeriodicFun -> Double
 periodicValue t pf = pfAmp pf * sinU ((t + pfPhase pf)/(pfPeriod pf))
-
 
 ----------------------------------------------------------------------------------------------------
 sumPeriodics :: Time -> [PeriodicFun] -> Double
@@ -115,21 +120,28 @@ sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
 -- The animation speed is dependent on the size of the germ. Smaller germs don't look
 -- like they're moving at all unless their animation speed is increased.
 --
-drawGerm :: GermGfx -> (Int,Int) -> CairoPoint -> Double -> Anim
-drawGerm gg bounds@(w,h) (x,y) r t = do
-  setSourceRGBA 0 0 0 1
-  circle (x,y) r
-  fill
-  -- asGroup $ do
-  --   translate x y
-  --   scale r r
-  --   withGermGradient (germGfxBodyGrad gg) 1 $ do
-  --     blob . map (movingPtToPt t) . germGfxBody $ gg
-  --   withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
-  --     blob . map (movingPtToPt t) . germGfxNucleus $ gg
-  --   -- scale to radius [r]
-  --   where
-  --     m = fromIntegral (min w h) / 2
+germGfxRenderNucleus :: GermGfx -> Double -> Render ()
+germGfxRenderNucleus gg r = do
+   asGroup $ do
+     scale r r
+     translate 0.5 0.5
+     withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
+       blob . map movingPtToStaticPt . germGfxNucleus $ gg
+     -- scale to radius [r]
+
+----------------------------------------------------------------------------------------------------
+germGfxRenderBody :: GermGfx -> Double -> Render ()
+germGfxRenderBody gg r = do
+   asGroup $ do
+     scale r r
+     translate 1 1
+     withGermGradient (germGfxBodyGrad gg) 1 $ do
+       blob . map movingPtToStaticPt . germGfxBody $ gg
+     -- scale to radius [r]
+
+----------------------------------------------------------------------------------------------------
+germGfxRenderGerm :: GermGfx -> Double -> Render ()
+germGfxRenderGerm gg r = germGfxRenderBody gg r >> germGfxRenderNucleus gg r
 
 ----------------------------------------------------------------------------------------------------
 withGermGradient :: GermGradient -> Double -> Render () -> Render ()
@@ -199,7 +211,7 @@ polarPtToPt (P2 r ang) = (r*cosU ang, r*sinU ang)
 
 ----------------------------------------------------------------------------------------------------
 --
--- Given [n] the number of points in the star, and two value specifying
+-- Given [n] the number of points in the star, and two values specifying
 -- the inner and out radii, returns the points defining a star.
 -- The first "point" of the star points right.
 --
@@ -378,21 +390,21 @@ pmap :: (a -> b) -> (a,a) -> (b,b)
 pmap f (a,b) = (f a, f b)
 
 ----------------------------------------------------------------------------------------------------
---
--- Produces n*n germs on a w x h screen
---
-tiledGerms :: RandomGen g => Int -> Int -> Int -> Rand g Anim
-tiledGerms n w h = do
-  germs <- replicateM (n*n) randomGermGfx
-  let germsAndCentres = zip germs centres
-  return $ \t -> do
-    forM_ germsAndCentres $ \(g, (x,y)) -> do
-      drawGerm g (w,h) (x, y) r t
-  where
-    n'      = fromIntegral n
-    r       = fromIntegral (min w h) / (n'*2)
-    vs      = [r,3*r..n'*2*r-1]
-    centres = [ (x,y) | x <- vs, y <- vs]
+----
+---- Produces n*n germs on a w x h screen
+----
+--tiledGerms :: RandomGen g => Int -> Int -> Int -> Rand g Anim
+--tiledGerms n w h = do
+--  germs <- replicateM (n*n) randomGermGfx
+--  let germsAndCentres = zip germs centres
+--  return $ \t -> do
+--    forM_ germsAndCentres $ \(g, (x,y)) -> do
+--      germGfxToRender g (w,h) (x, y) r t
+--  where
+--    n'      = fromIntegral n
+--    r       = fromIntegral (min w h) / (n'*2)
+--    vs      = [r,3*r..n'*2*r-1]
+--    centres = [ (x,y) | x <- vs, y <- vs]
 
 ----------------------------------------------------------------------------------------------------
 asGroup :: Render () -> Render ()
@@ -403,9 +415,9 @@ asGroup r = do
   paint
 
 ----------------------------------------------------------------------------------------------------
-newGermAnim :: RandomGen g => (Int,Int) -> Rand g Anim
-newGermAnim (screenWidth, screenHeight) =
-  tiledGerms tileGermsPerRow screenWidth screenHeight
+--newGermAnim :: RandomGen g => (Int,Int) -> Rand g Anim
+--newGermAnim (screenWidth, screenHeight) =
+--  tiledGerms tileGermsPerRow screenWidth screenHeight
 
 ----------------------------------------------------------------------------------------------------
 

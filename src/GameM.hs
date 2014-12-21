@@ -21,8 +21,12 @@ module GameM (
   setHipCircRadius,
   addHipStaticPoly,
   removeHipCirc,
+  -- to run the GL monad
+  runGLM,
   -- to run the GameM monad
-  runGameM
+  runGameM,
+  --
+  runGLMIO -- required in SDL/OpenGL backend
 
 ) where
 
@@ -49,6 +53,7 @@ data GameScript next =
   |                       Modify       (GameState -> GameState) next
   |                       Put          !GameState next
   |                       PrintStr     !String next
+  | forall a.             RunGLM       (GLM a) (a -> next)
   |                       NewHipSpace  (HipSpace -> next)
   | forall a.             RunHipM      !HipSpace (HipM a) (a -> next)
 
@@ -60,23 +65,24 @@ data HipScript next =
   | AddHipStaticPoly ![R2] next
   | RemoveHipCirc    !HipCirc next
 
-type GameM = Free GameScript
-type HipM = Free HipScript
 
+type GameM = Free GameScript
+type HipM  = Free HipScript
 ----------------------------------------------------------------------------------------------------
 -- Functor instances. I wish I didn't have to write these manually but the
 -- existential types get in the way.
 
 instance Functor GameScript where
   fmap f _gs = case _gs of
-    GetRandom a g -> GetRandom a (f . g)
-    EvalRand a g  -> EvalRand a (f . g)
-    Get g         -> Get (f . g)
-    Modify a gs'  -> Modify a (f gs')
-    Put a gs'     -> Put a (f gs')
+    GetRandom a g  -> GetRandom a (f . g)
+    EvalRand a g   -> EvalRand a (f . g)
+    Get g          -> Get (f . g)
+    Modify a gs'   -> Modify a (f gs')
+    Put a gs'      -> Put a (f gs')
     PrintStr a gs' -> PrintStr a (f gs')
-    NewHipSpace g -> NewHipSpace (f . g)
-    RunHipM a b g -> RunHipM a b (f . g)
+    RunGLM a g     -> RunGLM a (f . g)
+    NewHipSpace g  -> NewHipSpace (f . g)
+    RunHipM a b g  -> RunHipM a b (f . g)
 
 instance Functor HipScript where
   fmap f _hs = case _hs of
@@ -114,6 +120,9 @@ printStrLn s = Impure (PrintStr (s++"\n") (Pure ()))
 
 newHipSpace :: GameM HipSpace
 newHipSpace = Impure (NewHipSpace Pure)
+
+runGLM :: GLM a -> GameM a
+runGLM glm = Impure (RunGLM glm Pure)
 
 runHipM :: HipSpace -> HipM a -> GameM a
 runHipM space hipM = Impure (RunHipM space hipM Pure)
@@ -159,8 +168,10 @@ runGameM gs gameM = do
         (Impure (PrintStr s p))         -> putStr s >> go' p
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
+        (Impure (RunGLM glm f))         -> runGLMIO glm >>= go' . f
         (Pure x)                        -> return x
 
+----------------------------------------------------------------------------------------------------
 runHipMIO :: HipSpace -> HipM a -> IO a
 runHipMIO space = go
   where
@@ -211,3 +222,7 @@ runHipMIO space = go
     runRemoveHipCirc (HipCirc s) = do
       H.spaceRemove space (H.body s)
       H.spaceRemove space s
+
+----------------------------------------------------------------------------------------------------
+runGLMIO :: GLM a -> IO a
+runGLMIO (GLM io) = io

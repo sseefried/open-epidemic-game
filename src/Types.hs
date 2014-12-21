@@ -1,8 +1,11 @@
 module Types where
 
 import           Graphics.Rendering.Cairo (Render(..))
+import           Graphics.Rendering.OpenGL(GLint, GLfloat, GLsizei)
+import qualified Graphics.Rendering.OpenGL as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
+import           Control.Applicative
 
 
 --
@@ -49,6 +52,10 @@ data GermGfx =
           , germGfxNucleus     :: [MovingPoint]
           , germGfxSpikes      :: Int
           }
+
+
+
+
 --
 -- Represents a periodic function as data.
 -- \t -> pfAmp * sinU ((t + pfPhase)/pfPeriod)
@@ -67,6 +74,8 @@ data PeriodicFun =
 --
 data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 
+type GermGLFun = R2 -> Time -> Double -> GLM ()
+
 --
 --
 -- The [germCumulativeTime] field is used in animating the germs. This is the value
@@ -75,17 +84,38 @@ data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 -- that small germs need to animate quicker to look like they are moving at all. See function
 -- [growGerm].
 --
+-- [germGL] is a closure which takes the germ position, its size, its [germGfx] and returns OpenGL
+-- commands for drawing it.
+--
 data Germ = Germ { germMultiplyAt     :: Time
                  , germSizeFun        :: Time -> Double
                  , germHipCirc        :: HipCirc
                  , germPos            :: R2 -- cached pos
                  , germGfx            :: GermGfx
+                 , germGL             :: GermGLFun
                  , germCumulativeTime :: Time
                  , germAnimTime       :: Time
                  }
+----------------------------------------------------------------------------------------------------
+--
+-- In a perfect world I would wrap OpenGL in a free monad (just like I did for Hipmunk)
+-- to hide the IO monad. I still might do that, but for now
+--
+--
+data GLM a = GLM {unGLM :: IO a }
+
+instance Functor GLM where
+  fmap f (GLM m) = GLM (fmap f m)
+
+instance Monad GLM where
+  return = GLM . return
+  (GLM m) >>= k = GLM $ m >>= unGLM . k
+
+instance Applicative GLM where
+  pure = return
+  (GLM m) <*> (GLM m') = GLM $ m <*> m'
 
 ----------------------------------------------------------------------------------------------------
-
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
 
 ----------------------------------------------------------------------------------------------------
@@ -103,7 +133,7 @@ type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
 
-data GameState = GameState { gsRender        :: !(Render ())
+data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
                            , gsWorldToCanvas :: !WorldToCanvas

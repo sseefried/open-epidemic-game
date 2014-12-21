@@ -1,3 +1,21 @@
+# Sun 21 Dec 2014
+
+I've now settled on a new solution for drawing germs. I'm no longer going to draw the germs "on
+the fly" using Cairo. It's simply too slow, especially on a mobile. What I'm going to do instead
+is used mipmapped textures in OpenGL and distort polygons to make the germs "wiggle".
+
+Mipmapping is a pretty wonderful techinique. You take a texture, and the draw it at various
+powers of two resolution. i.e.. 512x512, 256x256, 128x128 etc, all the way down to 1x1.
+You can then use trilinear filtering to smoothly scale the texture to any size in between.
+
+The problem for my game is that I wanted my germs to wiggle and move. Although theoretically
+not perfect, I have found that if I map the texture onto a polygon and then move the points
+of the polygon this is a pretty decent effect.
+
+A solution that was initially appealing but that I had to throw out, was to generate several
+seconds of a germ animation and mipmap each frame. This was far too expensive in terms of memory.
+For 5 seconds animation I needed 300 frames, and that is just for one germ.
+
 # Thu 18 Dec 2014
 
 Today I ran into two strange problems on Xcode which took me some to sort out.

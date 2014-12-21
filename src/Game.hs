@@ -17,7 +17,8 @@ import qualified Data.Map as M
 -- friends
 import Types
 import GameM
-import Graphics
+import Graphics   -- vector graphics
+import GraphicsGL -- GL graphics
 ----------------------------------------------------------------------------------------------------
 --
 -- Game constants
@@ -26,6 +27,7 @@ worldWidth, worldHeight, worldMajor :: Double
 worldWidth  = 100
 worldHeight = 100
 worldMajor = max worldWidth worldHeight
+worldMinor = min worldWidth worldHeight
 
 initialGermSize :: Double
 initialGermSize = worldMajor / 30
@@ -44,7 +46,7 @@ resistanceIncrease = 1.1
 
 -- Maximum number of germs before you are "infected"
 maxGerms :: Int
-maxGerms = 100
+maxGerms = 50
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -74,17 +76,19 @@ germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 
 -- TODO: Remove magic numbers
 -- precondition: position of HipCirc must be the same as [pos]
-createGerm :: RandomGen g => Double -> R2 -> HipCirc -> Rand g Germ
+createGerm :: Double -> R2 -> HipCirc -> GameM Germ
 createGerm initSize pos hipCirc = do
-  gfx        <- randomGermGfx
-  multiplyAt <- randomValWithVariance doublingPeriod  doublingPeriodVariance
-  return $ Germ { germMultiplyAt        = multiplyAt
-                , germSizeFun           = germSizeFunForParams initSize multiplyAt
-                , germHipCirc           = hipCirc
-                , germPos               = pos
-                , germGfx               = gfx
-                , germCumulativeTime    = 0
-                , germAnimTime          = 0
+  gfx        <- evalRand $ randomGermGfx
+  multiplyAt <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
+  glFun      <- runGLM $ germGfxToGLFun gfx
+  return $ Germ { germMultiplyAt     = multiplyAt
+                , germSizeFun        = germSizeFunForParams initSize multiplyAt
+                , germHipCirc        = hipCirc
+                , germPos            = pos
+                , germGfx            = gfx
+                , germGL             = glFun
+                , germCumulativeTime = 0
+                , germAnimTime       = 0
                 }
 
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
@@ -207,7 +211,7 @@ handleEvent fsmState ev = do
                  y <- getRandom (-worldHeight/8, worldHeight/8)
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
-                 evalRand $ createGerm initSize (R2 x y) hc
+                 createGerm initSize (R2 x y) hc
       put $ gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
                , gsSoundQueue = [GameSoundLevelMusicStart]}
       return $ FSMPlayingLevel i
@@ -233,10 +237,11 @@ handleEvent fsmState ev = do
           modify $ \gs -> gs { gsRender = do
                              let w2c = gsWorldToCanvas gs
                              gsRender gs -- draw what we had before
-                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
-                                      "INFECTED!"
-                             drawText w2c (Color 0 0 0 1) (R2 (-worldWidth/8) (-worldHeight/4))
-                                      (worldWidth/4) "Tap to continue"
+-- FIXME: Draw text
+--                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
+--                                      "INFECTED!"
+--                             drawText w2c (Color 0 0 0 1) (R2 (-worldWidth/8) (-worldHeight/4))
+--                                      (worldWidth/4) "Tap to continue"
                              , gsSoundQueue = [GameSoundLevelMusicStop]
                              }
           return FSMGameOver
@@ -305,7 +310,7 @@ growGerm duration germId = do
       hc' <- runOnHipState $ do
         setHipCircRadius hc (sz/2)
         addHipCirc (sz/2) (R2 x' y')
-      ng <- evalRand $ createGerm (sz/2) (R2 x' y') hc'
+      ng <- createGerm (sz/2) (R2 x' y') hc'
       insertGerm i ng -- insert new germ
       -- update first germ
       insertGerm germId $ g { germCumulativeTime = 0, germPos = R2 x y }
@@ -342,16 +347,10 @@ physics duration = do
       w2c = gsWorldToCanvas gs
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
-  let drawOneGerm :: Germ -> Render ()
-      drawOneGerm g = drawGerm
-                         (germGfx g)
-                         bounds
-                         (worldPtToCanvasPt w2c $ germPos g)
-                         (worldLenToCanvasLen w2c $ germSizeFun g (germCumulativeTime g))
-                         (germAnimTime g)
-  modify $ \gs -> let render = do
-                        drawBackground (gsBounds gs)
-                        mapM_ drawOneGerm (M.elems $ gsGerms gs)
+  let drawOneGerm :: Germ -> GLM ()
+      drawOneGerm g = do
+        (germGL g) (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
+  modify $ \gs -> let render = mapM_ drawOneGerm (M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 
 ----------------------------------------------------------------------------------------------------

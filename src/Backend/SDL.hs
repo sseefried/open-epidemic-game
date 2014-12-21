@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Backend.SDL (
   initialize,
   mainLoop
@@ -8,16 +9,19 @@ import qualified Graphics.UI.SDL.Surface  as S
 import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
-import qualified Graphics.Rendering.Cairo as C
+import           Graphics.Rendering.OpenGL (GLint, GLdouble, GLsizei, GLmatrix, ($=))
+import qualified Graphics.Rendering.OpenGL as GL
+
+
 
 import           Data.IORef
 import           Data.Time
 import           Text.Printf
 import           Control.Monad
 import           System.Exit
-import           Foreign.C.Types (CUChar)
-import           Foreign.Marshal.Alloc (mallocBytes)
-import           Foreign.Ptr (Ptr, castPtr)
+-- import           Foreign.C.Types (CUChar)
+--import           Foreign.Marshal.Alloc (mallocBytes)
+--import           Foreign.Ptr (Ptr, castPtr)
 import           Foreign.C.Types (CFloat)
 
 -- friends
@@ -29,14 +33,10 @@ import Platform
 import CUtil
 import FrameRateBuffer
 
-{-
-All backends must render from C.Render () to the backend's screen somehow.
--}
-
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besLastTime       :: UTCTime
-                                 , besSDLRenderer    :: S.Renderer
+                                 , besGLContext      :: S.GLContext
                                  , besGameState      :: GameState
                                  , besDimensions     :: (Int,Int)
                                  , besBackendToWorld :: BackendToWorld
@@ -48,8 +48,6 @@ data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besWindow         :: S.Window
                                  , besLevelMusic     :: M.Music
                                  , besSquishSound    :: M.Chunk
-                                 , besBuffer         :: Ptr CUChar
-                                 , besTexture        :: S.Texture
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
@@ -70,31 +68,92 @@ backendToWorld (w,h) =
     frac f x = cFloatToDouble f * x
 
 ----------------------------------------------------------------------------------------------------
+initOpenGL :: S.Window -> (Int, Int) -> IO S.GLContext
+initOpenGL window (w,h) = do
+  context <- S.glCreateContext window
+  mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
+  --S.glSetSwapInterval S.SynchronizedUpdates
+  S.glSetSwapInterval S.ImmediateUpdates
+  GL.texture GL.Texture2D $= GL.Enabled -- enable textures
+  GL.blend $= GL.Enabled -- enable blending
+  GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
+  GL.depthFunc  $= Just GL.Less
+  GL.shadeModel $= GL.Flat
+  GL.viewport   $= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+  --
+  -- The co-ordinates are set to be the world co-ordinate system. This saves us
+  -- converting for OpenGL calls
+  --
+  ortho2D (-w2) w2 (-h2) h2
+  GL.matrixMode $= GL.Modelview 0
+  GL.loadIdentity
+  return context
+  where
+    --
+    -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
+    -- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
+    -- to. If W < C then there will be margins on the left and right that will not be drawn to.
+    --
+    minor = min w h
+    scale = realToFrac $ worldMajor / fromIntegral minor
+    w2    = (fromIntegral w) * scale / 2
+    h2    = (fromIntegral h) * scale / 2
+
+
+--
+-- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
+-- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
+-- to. If W < C then there will be margins on the left and right that will not be drawn to.
+--
+--worldToCanvas :: (Int, Int) -> WorldToCanvas
+--worldToCanvas (w,h) =
+--  WorldToCanvas { worldPtToCanvasPt   = \(R2 x y) -> (w'/2 + scale*x, h'/2 - scale*y)
+--                , worldLenToCanvasLen = (scale*)  }
+--  where
+--    w' = fromIntegral w
+--    h' = fromIntegral h
+--    minor = min w' h'
+--    scale = minor / worldMajor
+
+
+----------------------------------------------------------------------------------------------------
+ortho2D :: GLdouble -> GLdouble -> GLdouble -> GLdouble -> IO ()
+ortho2D left right bottom top = do
+  GL.matrixMode $= GL.Projection
+  GL.loadIdentity
+  (mat :: GLmatrix GLdouble) <- GL.newMatrix GL.RowMajor [a, 0, 0, tx, 0, b, 0, ty, 0, 0, c, tz, 0,0,0,1]
+  GL.multMatrix mat
+  where
+    near = -1
+    far = 1
+    a  = 2 / (right - left)
+    b  = 2 / (top - bottom)
+    c  = -2.0 / (far - near)
+    tx = - (right + left)/(right - left)
+    ty = - (top + bottom)/(top - bottom)
+    tz = - (far + near)/(far - near)
+
+----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
 initialize title screenWidth screenHeight gs = do
   S.init [S.InitVideo, S.InitAudio]
-  window   <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
-  renderer <- S.createRenderer window S.FirstSupported rflags
-  S.setHint "SDL_RENDER_SCALE_QUALITY" "linear"
+  window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
+  context <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
     NoSound -> return (error "levelMusic", error "squishSound")
     _       -> do
-     M.openAudio 44100 S.AudioS16Sys 1 1024
-     M.allocateChannels 10
-     levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
-     rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
-     squishSound <- M.loadWAVRW rwOps False
-     return (levelMusic, squishSound)
+      M.openAudio 44100 S.AudioS16Sys 1 1024
+      M.allocateChannels 10
+      levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
+      rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
+      squishSound <- M.loadWAVRW rwOps False
+      return (levelMusic, squishSound)
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
-  texture <- S.createTexture renderer S.PixelFormatARGB8888 S.TextureAccessStreaming
-                 (fromIntegral w) (fromIntegral h)
   frBuf <- initFRBuf
-  buffer <- mallocBytes (screenWidth * screenHeight * 4)
-  newIORef $ BackendState t t renderer gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1) window
-                levelMusic squishSound buffer texture
-
+  newIORef $ BackendState t t context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1) window
+               levelMusic squishSound
   where
     wflags = [S.WindowShown]
     -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
@@ -182,17 +241,12 @@ runFrameUpdate besRef = do
   let (w,h)      = besDimensions bes
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-      renderer   = besSDLRenderer bes
-      buffer     = besBuffer bes
-      texture    = besTexture bes
 
-  C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*4) $ \surface ->
-     C.renderWith surface $ gsRender gs
-  S.updateTexture texture (S.Rect 0 0 w h) buffer (w*4)
-  S.renderClear renderer
-  S.renderCopy renderer texture Nothing Nothing
-  S.renderPresent renderer
-
+  GL.clearColor $= GL.Color4 1 1 1 1
+  GL.clear [GL.ColorBuffer, GL.DepthBuffer]
+  runGLMIO $ gsRender gs
+  GL.flush
+  S.glSwapWindow (besWindow bes)
 
 ----------------------------------------------------------------------------------------------------
 --

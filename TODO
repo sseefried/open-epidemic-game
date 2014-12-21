@@ -1,5 +1,7 @@
 TODO
 
+[ ] Turn GLScript into a free monad too.
+
 [X] Build and deploy to Android. Have a look at this:
      https://github.com/neurocyte/ghc-android
     (Took approximately a week of hell. Perhaps 70+ hours)
