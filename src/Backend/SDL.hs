@@ -97,7 +97,7 @@ initialize title screenWidth screenHeight gs = do
 
   where
     wflags = [S.WindowShown]
-    -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
+    -- Note: for debugging purposes you can see the true framerate by commenting out [PresentVSync]
     rflags = [S.Accelerated] -- , S.PresentVSync]
     w = fromIntegral screenWidth
     h = fromIntegral screenHeight

@@ -31,8 +31,8 @@ going to go out of bounds. Is this okay?
 periodicsToSum :: Int
 periodicsToSum = 3
 
-jigglePeriodBounds :: (Double, Double)
-jigglePeriodBounds = (7,15)
+--jigglePeriodBounds :: (Double, Double)
+--jigglePeriodBounds = (7,15)
 
 jiggleRadiusAmplitudeBounds :: (Double, Double)
 jiggleRadiusAmplitudeBounds = (0.05, 0.1)
@@ -117,19 +117,16 @@ sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
 --
 drawGerm :: GermGfx -> (Int,Int) -> CairoPoint -> Double -> Anim
 drawGerm gg bounds@(w,h) (x,y) r t = do
-  setSourceRGBA 0 0 0 1
-  circle (x,y) r
-  fill
-  -- asGroup $ do
-  --   translate x y
-  --   scale r r
-  --   withGermGradient (germGfxBodyGrad gg) 1 $ do
-  --     blob . map (movingPtToPt t) . germGfxBody $ gg
-  --   withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
-  --     blob . map (movingPtToPt t) . germGfxNucleus $ gg
-  --   -- scale to radius [r]
-  --   where
-  --     m = fromIntegral (min w h) / 2
+   asGroup $ do
+     translate x y
+     scale r r
+     withGermGradient (germGfxBodyGrad gg) 1 $ do
+       blob . map (movingPtToPt t) . germGfxBody $ gg
+     withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
+       blob . map (movingPtToPt t) . germGfxNucleus $ gg
+     -- scale to radius [r]
+     where
+       m = fromIntegral (min w h) / 2
 
 ----------------------------------------------------------------------------------------------------
 withGermGradient :: GermGradient -> Double -> Render () -> Render ()
@@ -328,7 +325,7 @@ randomGradient = do
 ----------------------------------------------------------------------------------------------------
 randomGermGfx :: RandomGen g => Rand g GermGfx
 randomGermGfx = do
-  n <- getRandomR germSpikeRange
+  n <- return 6 -- getRandomR germSpikeRange
   g <- randomGradient
   g' <- randomGradient
   let bodyPts = starPolyPoints n spikyInnerRadius spikyOuterRadius
@@ -356,7 +353,7 @@ randomRadialPoints2 n = do
 randomPeriodicFuns :: RandomGen g => (Double, Double) -> Rand g [PeriodicFun]
 randomPeriodicFuns ampBounds = do
   amps    <- getRandomRs ampBounds
-  periods <- getRandomRs jigglePeriodBounds
+  let periods =[ 3/21, 5/21, (7/21) :: Double ]   -- getRandomRs jigglePeriodBounds
   phases  <- getRandomRs jigglePhaseBounds
   let pFuns   = zipWith3 PeriodicFun amps periods phases
   return $ take periodicsToSum $ pFuns
