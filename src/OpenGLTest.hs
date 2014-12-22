@@ -173,15 +173,13 @@ mainLoop stRef = loop $ do
   --GL.textureBinding GL.Texture2D $= Just ((stTextureObjs st) V.! idx)
 
   forM [0..4000] $ \_ -> do
-    GL.renderPrimitive GL.TriangleStrip $ do
+    GL.renderPrimitive GL.TriangleFan $ do
+      texCoord2f (GL.TexCoord2 (0.50) (0.50))      ; vertex3f (GL.Vertex3 ( 0  ) (0    )  0)
       texCoord2f (GL.TexCoord2 (0.00-dx) (0.50))   ; vertex3f (GL.Vertex3 (-a  ) (0    )  0)
       texCoord2f (GL.TexCoord2 (0.25-dx) (1.00+dx)); vertex3f (GL.Vertex3 (-a/2) (a    )  0)
-      texCoord2f (GL.TexCoord2 (0.50) (0.50))      ; vertex3f (GL.Vertex3 ( 0  ) (0    )  0)
       texCoord2f (GL.TexCoord2 (0.75   ) (1.00+dx)); vertex3f (GL.Vertex3 ( a/2) (a    )  0)
       texCoord2f (GL.TexCoord2 (1.00   ) (0.50))   ; vertex3f (GL.Vertex3 ( a  ) (0    )  0)
-      texCoord2f (GL.TexCoord2 (1.00   ) (0.50))   ; vertex3f (GL.Vertex3 ( a  ) (0    )  0)
       texCoord2f (GL.TexCoord2 (0.75+dx) (0.00))   ; vertex3f (GL.Vertex3 ( a/2) (-a   )  0)
-      texCoord2f (GL.TexCoord2 (0.50) (0.50))      ; vertex3f (GL.Vertex3 ( 0  ) ( 0   )  0)
       texCoord2f (GL.TexCoord2 (0.25) (0.00))      ; vertex3f (GL.Vertex3 (-a/2) (-a   )  0)
       texCoord2f (GL.TexCoord2 (0.00-dx) (0.50))   ; vertex3f (GL.Vertex3 (-a  ) (0    )  0)
 
