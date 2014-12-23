@@ -20,8 +20,9 @@ powOfTwo = 7
 bytesPerWord32 :: Int
 bytesPerWord32 = 4
 
-foo :: (Double -> C.Render ()) -> IO TextureObject
-foo renderFun = do
+----------------------------------------------------------------------------------------------------
+drawToTextureObj :: (Double -> C.Render ()) -> IO TextureObject
+drawToTextureObj renderFun = do
   ((textureObj :: TextureObject):_) <- genObjectNames 1
   textureBinding Texture2D $= Just textureObj
   textureFilter Texture2D $= ((Linear', Just Linear'), Linear')
@@ -41,8 +42,7 @@ foo renderFun = do
   return textureObj
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
-
-
+----------------------------------------------------------------------------------------------------
 dropEven, dropOdd :: [a] -> [a]
 dropEven [] = []
 dropEven (x:xs) = x:dropOdd xs
@@ -50,13 +50,27 @@ dropEven (x:xs) = x:dropOdd xs
 dropOdd [] = []
 dropOdd (x:xs) = dropEven xs
 
+rep :: [a] -> [a]
+rep [] = []
+rep (x:xs) = (x:repEven xs) ++ [x]
+
+repOdd :: [a] -> [a]
+repOdd [] = []
+repOdd (x:xs) = x:x:repEven xs
+
+repEven :: [a] -> [a]
+repEven [] = []
+repEven (x:xs) = x:repOdd xs
+
+
+----------------------------------------------------------------------------------------------------
 germGfxToGLFun:: GermGfx -> GLM GermGLFun
 germGfxToGLFun gfx = GLM $ do
   let texCoord2f :: (Double, Double) -> IO ()
       texCoord2f (x,y) = texCoord $ TexCoord2 (realToFrac x) (realToFrac y :: GLdouble)
       vertex2f :: (Double, Double) -> IO ()
       vertex2f (x,y) = vertex $ Vertex3  (realToFrac x) (realToFrac y) (0 :: GLdouble)
-  textureObj <- foo (germGfxRenderBody gfx)
+  textureObj <- drawToTextureObj (germGfxRenderBody gfx)
   return $ \(R2 x' y') t r -> GLM $ do
     let bar ((mx,my),(x, y)) = do
           let (tx, ty) = ((x+1)/2,(y+1)/2)
@@ -65,13 +79,13 @@ germGfxToGLFun gfx = GLM $ do
           vertex2f (vx,vy)
 
     textureBinding Texture2D $= Just textureObj
-    -- FIXME: Hideous
+    let splitPts = \pt -> (movingPtToPt t pt, movingPtToStaticPt pt )
     let pts = let pts' = germGfxBody gfx
-                  pts'' = dropEven $  take (length pts'+1) (cycle pts')
-              in map (\pt -> (movingPtToPt t pt, movingPtToStaticPt pt )) pts''
+                  pts'' = take (length pts'+1) (cycle pts')
+              in map splitPts pts''
     color $ Color4 1 1 1 (1 :: GLdouble)
     renderPrimitive TriangleFan $ do
       texCoord2f (0.5, 0.5); vertex2f (x',y')
       mapM_ bar pts
-
-
+    renderPrimitive Triangles $ do
+      mapM_ bar (map splitPts $ rep $ germGfxBody gfx)

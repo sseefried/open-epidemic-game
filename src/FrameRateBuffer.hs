@@ -18,7 +18,7 @@ type FRBuf = IORef FR
 
 
 windowSize :: Int
-windowSize = 30
+windowSize = 100
 
 initFRBuf :: IO FRBuf
 initFRBuf = do
