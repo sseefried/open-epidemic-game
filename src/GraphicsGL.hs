@@ -64,6 +64,19 @@ repEven (x:xs) = x:repOdd xs
 
 
 ----------------------------------------------------------------------------------------------------
+--
+-- This function is reponsible for drawing a wiggling germ.
+--
+-- The basic idea is to draw a polygon, set the texture co-ordinates correctly and then
+-- "wiggle" the polygon vertices without varying the texture co-ordinates. This causes
+-- the texture to deform leading to a wiggling effect.
+--
+-- The [GermGfx] structure contains lists of [MovingPoints]s. There are two functions
+-- that operate on a [MovingPoint]. The first is [movingPtToPt]. This takes a time argument
+-- and gives the position of the point at that time. The other is [movingPtToStaticPt] which
+-- returns the position of the point at time zero. This is used for the texture co-ordinates,
+-- while [movingPtToPt] is used for the polygon vertices.
+--
 germGfxToGLFun:: GermGfx -> GLM GermGLFun
 germGfxToGLFun gfx = GLM $ do
   let texCoord2f :: (Double, Double) -> IO ()
@@ -72,14 +85,14 @@ germGfxToGLFun gfx = GLM $ do
       vertex2f (x,y) = vertex $ Vertex3  (realToFrac x) (realToFrac y) (0 :: GLdouble)
   textureObj <- drawToTextureObj (germGfxRenderBody gfx)
   return $ \(R2 x' y') t r -> GLM $ do
-    let bar ((mx,my),(x, y)) = do
+    let bar ((x,y),(mx,my)) = do
           let (tx, ty) = ((x+1)/2,(y+1)/2)
               (vx, vy) = (r*mx + x', r*my + y')
           texCoord2f (tx,ty)
           vertex2f (vx,vy)
 
     textureBinding Texture2D $= Just textureObj
-    let splitPts = \pt -> (movingPtToPt t pt, movingPtToStaticPt pt )
+    let splitPts = \pt -> (movingPtToStaticPt pt, movingPtToPt t pt)
     let pts = let pts' = germGfxBody gfx
                   pts'' = take (length pts'+1) (cycle pts')
               in map splitPts pts''
