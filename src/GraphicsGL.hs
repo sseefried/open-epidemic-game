@@ -43,12 +43,10 @@ drawToTextureObj renderFun = do
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
 ----------------------------------------------------------------------------------------------------
-dropEven, dropOdd :: [a] -> [a]
-dropEven [] = []
-dropEven (x:xs) = x:dropOdd xs
-
-dropOdd [] = []
-dropOdd (x:xs) = dropEven xs
+--
+-- [rep] is used to create some missing triangles for the germ polygon. These triangles
+-- go "around" the star polygon.
+--
 
 rep :: [a] -> [a]
 rep [] = []
@@ -61,8 +59,6 @@ repOdd (x:xs) = x:x:repEven xs
 repEven :: [a] -> [a]
 repEven [] = []
 repEven (x:xs) = x:repOdd xs
-
-
 ----------------------------------------------------------------------------------------------------
 --
 -- This function is reponsible for drawing a wiggling germ.
@@ -97,8 +93,11 @@ germGfxToGLFun gfx = GLM $ do
                   pts'' = take (length pts'+1) (cycle pts')
               in map splitPts pts''
     color $ Color4 1 1 1 (1 :: GLdouble)
+    -- Create a star polygon.
     renderPrimitive TriangleFan $ do
       texCoord2f (0.5, 0.5); vertex2f (x',y')
       mapM_ bar pts
+    -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
+    -- because there is texture to be drawn in these valleys.)
     renderPrimitive Triangles $ do
       mapM_ bar (map splitPts $ rep $ germGfxBody gfx)
