@@ -9,11 +9,12 @@ import qualified Graphics.UI.SDL.Surface  as S
 import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
-import           Graphics.Rendering.OpenGL (GLint, GLdouble, GLsizei, GLmatrix, ($=))
-import qualified Graphics.Rendering.OpenGL as GL
+import           Graphics.Rendering.OpenGL.Raw
+import           Data.Bits
+import           Data.Maybe (maybe)
 
 
-
+import           Data.List (intersperse)
 import           Data.IORef
 import           Data.Time
 import           Text.Printf
@@ -21,8 +22,14 @@ import           Control.Monad
 import           System.Exit
 -- import           Foreign.C.Types (CUChar)
 --import           Foreign.Marshal.Alloc (mallocBytes)
---import           Foreign.Ptr (Ptr, castPtr)
+import           Foreign.Ptr (Ptr, castPtr, nullPtr)
 import           Foreign.C.Types (CFloat)
+import           Foreign.C.String (withCString, withCStringLen, peekCString)
+import           Foreign.Marshal.Array (allocaArray, pokeArray)
+import           Foreign.Marshal.Alloc (alloca, allocaBytes)
+import           Foreign.Storable (peek)
+
+
 
 -- friends
 import Types
@@ -68,25 +75,57 @@ backendToWorld (w,h) =
     frac f x = cFloatToDouble f * x
 
 ----------------------------------------------------------------------------------------------------
+exitWithError :: String -> IO a
+exitWithError errorStr = putStrLn errorStr >> exitWith (ExitFailure 1)
+
+----------------------------------------------------------------------------------------------------
 initOpenGL :: S.Window -> (Int, Int) -> IO S.GLContext
 initOpenGL window (w,h) = do
   context <- S.glCreateContext window
   mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
   --S.glSetSwapInterval S.SynchronizedUpdates
   S.glSetSwapInterval S.ImmediateUpdates
-  GL.texture GL.Texture2D $= GL.Enabled -- enable textures
-  GL.blend $= GL.Enabled -- enable blending
-  GL.blendFunc $= (GL.SrcAlpha, GL.OneMinusSrcAlpha)
-  GL.depthFunc  $= Just GL.Less
-  GL.shadeModel $= GL.Flat
-  GL.viewport   $= (GL.Position 0 0, GL.Size (fromIntegral w) (fromIntegral h))
+  glEnable gl_TEXTURE_2D
+  glEnable gl_BLEND
+  glBlendFunc gl_ALPHA gl_ONE_MINUS_SRC_ALPHA
+  glEnable gl_DEPTH_TEST
+  glDepthFunc gl_LESS
+  etVertexShader <- loadShader vertexShaderSrc gl_VERTEX_SHADER
+  vertexShader <- exitOnLeft etVertexShader
+  etFragmentShader <- loadShader fragmentShaderSrc gl_FRAGMENT_SHADER
+  fragmentShader <- exitOnLeft etFragmentShader
+  programId <- glCreateProgram
+  when (programId == 0 ) $ exitWithError "Could not create GLSL program"
+
+  glAttachShader programId vertexShader
+  glAttachShader programId fragmentShader
+
+  withCString "vPosition" $ \s -> glBindAttribLocation programId 0 s
+
+  glLinkProgram programId
+  linked <- alloca $ \ptrLinked -> do
+    glGetProgramiv programId gl_LINK_STATUS ptrLinked
+    peek ptrLinked
+  when (linked == 0) $ do
+     errorStr <- getGLError glGetProgramiv glGetProgramInfoLog programId
+     exitWithError errorStr
   --
   -- The co-ordinates are set to be the world co-ordinate system. This saves us
   -- converting for OpenGL calls
   --
-  ortho2D (-w2) w2 (-h2) h2
-  GL.matrixMode $= GL.Modelview 0
-  GL.loadIdentity
+--  ortho2D (-w2) w2 (-h2) h2
+
+--  GL.matrixMode $= GL.Modelview 0
+--  GL.loadIdentity
+
+  allocaArray 9 $ \vertices -> do
+    pokeArray vertices [ 0.0, 0.5, 0.0, -0.5, -0.5, 0.0, 0.5, -0.5, (0.0 :: GLfloat) ]
+    glVertexAttribPointer 0 3 gl_FLOAT (fromIntegral gl_FALSE) 0 vertices
+  glEnableVertexAttribArray 0
+  glViewport 0 0 (fromIntegral w) (fromIntegral h)
+
+  glUseProgram programId
+
   return context
   where
     --
@@ -98,7 +137,9 @@ initOpenGL window (w,h) = do
     scale = realToFrac $ worldMajor / fromIntegral minor
     w2    = (fromIntegral w) * scale / 2
     h2    = (fromIntegral h) * scale / 2
-
+    exitOnLeft et = case et of
+                      Left error -> putStrLn error >> exitWith (ExitFailure 1)
+                      Right val  -> return val
 
 --
 -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
@@ -118,20 +159,20 @@ initOpenGL window (w,h) = do
 
 ----------------------------------------------------------------------------------------------------
 ortho2D :: GLdouble -> GLdouble -> GLdouble -> GLdouble -> IO ()
-ortho2D left right bottom top = do
-  GL.matrixMode $= GL.Projection
-  GL.loadIdentity
-  (mat :: GLmatrix GLdouble) <- GL.newMatrix GL.RowMajor [a, 0, 0, tx, 0, b, 0, ty, 0, 0, c, tz, 0,0,0,1]
-  GL.multMatrix mat
-  where
-    near = -1
-    far = 1
-    a  = 2 / (right - left)
-    b  = 2 / (top - bottom)
-    c  = -2.0 / (far - near)
-    tx = - (right + left)/(right - left)
-    ty = - (top + bottom)/(top - bottom)
-    tz = - (far + near)/(far - near)
+ortho2D left right bottom top = return ()
+  --GL.matrixMode $= GL.Projection
+  --GL.loadIdentity
+  --(mat :: GLmatrix GLdouble) <- GL.newMatrix GL.RowMajor [a, 0, 0, tx, 0, b, 0, ty, 0, 0, c, tz, 0,0,0,1]
+  --GL.multMatrix mat
+  --where
+  --  near = -1
+  --  far = 1
+  --  a  = 2 / (right - left)
+  --  b  = 2 / (top - bottom)
+  --  c  = -2.0 / (far - near)
+  --  tx = - (right + left)/(right - left)
+  --  ty = - (top + bottom)/(top - bottom)
+  --  tz = - (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
@@ -242,10 +283,11 @@ runFrameUpdate besRef = do
       gs         = besGameState bes
       sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
 
-  GL.clearColor $= GL.Color4 1 1 1 1
-  GL.clear [GL.ColorBuffer, GL.DepthBuffer]
-  runGLMIO $ gsRender gs
-  GL.flush
+  glClearColor 1 1 1 1
+  glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
+  glDrawArrays gl_TRIANGLES 0 3
+--  runGLMIO $ gsRender gs
+  glFlush
   S.glSwapWindow (besWindow bes)
 
 ----------------------------------------------------------------------------------------------------
@@ -354,3 +396,93 @@ logFrameRate besRef = do
   when (besFrames bes `mod` 30 == 0) $ do
     avTick <- averageTick (besFRBuf bes)
     printf "Framerate = %.2f frames/s\n" (1/avTick)
+
+----------------------------------------------------------------------------------------------------
+type ShaderId = GLuint
+type ShaderType = GLenum
+----------------------------------------------------------------------------------------------------
+getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())
+           -> (GLuint -> GLsizei -> Ptr GLsizei -> Ptr GLchar -> IO ())
+           -> GLuint -> IO String
+getGLError getVal getInfoLog ident = do
+        infoLen <- alloca $ \ptrInfoLen -> do
+          getVal ident gl_INFO_LOG_LENGTH ptrInfoLen
+          peek ptrInfoLen
+        if (infoLen > 1)
+                    then
+                      allocaBytes (fromIntegral infoLen) $ \infoCStr -> do
+                        getInfoLog ident infoLen nullPtr infoCStr
+                        peekCString infoCStr
+                    else return "Shader compiler failure. Couldn't get errorLog"
+----------------------------------------------------------------------------------------------------
+
+
+loadShader :: String -> ShaderType -> IO (Either String ShaderId)
+loadShader src typ = do
+  shaderId <- glCreateShader typ
+  if (shaderId == 0)
+   then return $ Left "Could not create shader"
+   else do
+     withCStringLen src $ \(cString, len) -> allocaArray 1 $ \ptrCString -> allocaArray 1 $ \ptrLength -> do
+       pokeArray ptrCString [cString]
+       pokeArray ptrLength [fromIntegral len]
+       glShaderSource shaderId 1 ptrCString ptrLength
+     glCompileShader shaderId
+     compileStatus <- alloca $ \ptr -> do
+       glGetShaderiv shaderId gl_COMPILE_STATUS ptr
+       peek ptr
+     if compileStatus == 0
+      then do -- error
+        errorStr <- getGLError glGetShaderiv glGetShaderInfoLog shaderId
+        return $ Left errorStr
+      else return $ Right shaderId
+
+----------------------------------------------------------------------------------------------------
+vertexShaderSrc :: String
+vertexShaderSrc = concat $ intersperse "\n" [
+    "attribute vec4 vPosition;"
+  , "void main() { "
+  , "  gl_Position = vPosition;"
+  , "}"
+  ]
+
+fragmentShaderSrc :: String
+fragmentShaderSrc = concat $ intersperse "\n" [
+--    "precision mediump float;"
+    "void main() {"
+  , "  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);"
+  , "}"
+  ]
+
+
+--vertexShader :: String
+--vertexShader =
+--  concat $ intersperse "\n" [
+--      "attribute vec4 position;         // vertex position attribute"
+--    , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
+--    , "uniform mat4 modelView;          // shader modelview matrix uniform"
+--    , "uniform mat4 projection;         // shader projection matrix uniform"
+--    , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
+--    , "void main()"
+--    , "{"
+--    , "  vec4 p = modelView * position; // transform vertex position with modelview matrix"
+--    , "  gl_Position = projection * p;  // project the transformed position and write it to gl_Position"
+--    , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
+--    , "}"
+--    ]
+
+--fragmentShader :: String
+--fragmentShader = concat $ intersperse "\n" [
+--    "precision mediump float;        // set default precision for floats to medium"
+--    , " "
+--    , "uniform sampler2D texture;      // shader texture uniform"
+--    , " "
+--    , "varying vec2 texCoordVar;       // fragment texture coordinate varying"
+--    , " "
+--    , "void main()"
+--    , "{"
+--    , "    // sample the texture at the interpolated texture coordinate"
+--    , "    // and write it to gl_FragColor "
+--    , "    gl_FragColor = texture2D( texture, texCoordVar);"
+--    , "}"
+--    ]

@@ -121,7 +121,7 @@ executable         Epidemic
     build-depends: Hipmunk
                  , MonadRandom
                  , SDL2
-                 , OpenGL
+                 , OpenGLRaw
                  , sdl2-mixer
                  , cairo
                  , control-monad-free
@@ -160,7 +160,7 @@ executable         GenerateIcons
       cpp-options: -DNOSOUND
 
     build-depends: Hipmunk
-                 , OpenGL
+                 , OpenGLRaw
                  , MonadRandom
                  , cairo
                  -- everything below this line is a dependency of above

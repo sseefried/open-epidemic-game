@@ -1,8 +1,8 @@
 module Types where
 
 import           Graphics.Rendering.Cairo (Render(..))
-import           Graphics.Rendering.OpenGL(GLint, GLfloat, GLsizei)
-import qualified Graphics.Rendering.OpenGL as GL
+import           Graphics.Rendering.OpenGL.Raw (GLint, GLfloat, GLsizei)
+-- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
 import           Control.Applicative
