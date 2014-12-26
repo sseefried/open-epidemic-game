@@ -25,7 +25,7 @@ import           System.Exit
 import           Foreign.Ptr (Ptr, castPtr, nullPtr)
 import           Foreign.C.Types (CFloat)
 import           Foreign.C.String (withCString, withCStringLen, peekCString)
-import           Foreign.Marshal.Array (allocaArray, pokeArray)
+import           Foreign.Marshal.Array (mallocArray, allocaArray, pokeArray)
 import           Foreign.Marshal.Alloc (alloca, allocaBytes)
 import           Foreign.Storable (peek)
 
@@ -113,18 +113,14 @@ initOpenGL window (w,h) = do
   -- The co-ordinates are set to be the world co-ordinate system. This saves us
   -- converting for OpenGL calls
   --
---  ortho2D (-w2) w2 (-h2) h2
-
---  GL.matrixMode $= GL.Modelview 0
---  GL.loadIdentity
-
-  allocaArray 9 $ \vertices -> do
-    pokeArray vertices [ 0.0, 0.5, 0.0, -0.5, -0.5, 0.0, 0.5, -0.5, (0.0 :: GLfloat) ]
-    glVertexAttribPointer 0 3 gl_FLOAT (fromIntegral gl_FALSE) 0 vertices
+  vertices <- mallocArray 9
+  pokeArray vertices [ 0.0, 50, 0.0, -70, -50, 0.0, 50, -50, (0.0 :: GLfloat) ]
+  glVertexAttribPointer 0 3 gl_FLOAT (fromIntegral gl_FALSE) 0 vertices
   glEnableVertexAttribArray 0
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
-
   glUseProgram programId
+  -- ortho2D must appear after glUseProgram programId
+  ortho2D programId (-w2) w2 (-h2) h2
 
   return context
   where
@@ -158,21 +154,25 @@ initOpenGL window (w,h) = do
 
 
 ----------------------------------------------------------------------------------------------------
-ortho2D :: GLdouble -> GLdouble -> GLdouble -> GLdouble -> IO ()
-ortho2D left right bottom top = return ()
-  --GL.matrixMode $= GL.Projection
-  --GL.loadIdentity
-  --(mat :: GLmatrix GLdouble) <- GL.newMatrix GL.RowMajor [a, 0, 0, tx, 0, b, 0, ty, 0, 0, c, tz, 0,0,0,1]
-  --GL.multMatrix mat
-  --where
-  --  near = -1
-  --  far = 1
-  --  a  = 2 / (right - left)
-  --  b  = 2 / (top - bottom)
-  --  c  = -2.0 / (far - near)
-  --  tx = - (right + left)/(right - left)
-  --  ty = - (top + bottom)/(top - bottom)
-  --  tz = - (far + near)/(far - near)
+ortho2D :: ProgramId -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
+ortho2D programId left right bottom top = do
+  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
+  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
+  allocaArray 16 $ \ortho -> do
+    pokeArray ortho [ a,   0,  0, 0
+                    , 0,   b,  0, 0
+                    , 0,   0,  c, 0
+                    , tx, ty, tz, 1 ]
+    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
+  where
+    near = -1
+    far = 1
+    a  = 2 / (right - left)
+    b  = 2 / (top - bottom)
+    c  = -2.0 / (far - near)
+    tx = - (right + left)/(right - left)
+    ty = - (top + bottom)/(top - bottom)
+    tz = - (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
@@ -399,7 +399,9 @@ logFrameRate besRef = do
 
 ----------------------------------------------------------------------------------------------------
 type ShaderId = GLuint
+type ProgramId = GLuint
 type ShaderType = GLenum
+
 ----------------------------------------------------------------------------------------------------
 getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())
            -> (GLuint -> GLsizei -> Ptr GLsizei -> Ptr GLchar -> IO ())
@@ -441,15 +443,18 @@ loadShader src typ = do
 vertexShaderSrc :: String
 vertexShaderSrc = concat $ intersperse "\n" [
     "attribute vec4 vPosition;"
+  , "uniform mat4 modelView;"
   , "void main() { "
-  , "  gl_Position = vPosition;"
+  , "  gl_Position =  modelView * vPosition;"
   , "}"
   ]
 
 fragmentShaderSrc :: String
 fragmentShaderSrc = concat $ intersperse "\n" [
---    "precision mediump float;"
-    "void main() {"
+    "#ifdef GL_ES"
+  , "precision highp float;"
+  , "#endif"
+  , "void main() {"
   , "  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);"
   , "}"
   ]
