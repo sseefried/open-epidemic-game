@@ -177,6 +177,7 @@ ortho2D programId left right bottom top = do
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
 initialize title screenWidth screenHeight gs = do
+  setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   context <- initOpenGL window (w,h)

@@ -12,6 +12,7 @@ import Foreign.C.Types
 --
 
 foreign import ccall "float2double" cFloatToCDouble :: CFloat -> CDouble
+foreign import ccall "set_no_buffering" setNoBuffering ::  IO ()
 
 cFloatToDouble :: CFloat -> Double
 cFloatToDouble = uncurry encodeFloat . decodeFloat . cFloatToCDouble
