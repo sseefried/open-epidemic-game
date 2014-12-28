@@ -1,6 +1,8 @@
 {-# LANGUAGE CPP #-}
 module Platform where
 
+import CUtil
+
 data Platform = MacOSX
               | IOSPlatform
               | Android
@@ -19,3 +21,8 @@ platform = MacOSX
 #endif /* IOS */
 #endif /* NOSOUND */
 #endif /* ANDROID */
+
+debugLog :: String -> IO ()
+debugLog = case platform of
+  Android -> androidLog
+  _       -> putStrLn

@@ -35,6 +35,7 @@ library
     exposed: True
     if flag(android)
       cpp-options: -DANDROID
+      cc-options: -DANDROID
     if flag(ios)
       cpp-options: -DIOS
 

@@ -1,7 +1,8 @@
-{-# LANGUAGE ForeignFunctionInterface #-}
+{-# LANGUAGE ForeignFunctionInterface, CPP #-}
 module CUtil where
 
 import Foreign.C.Types
+import Foreign.C.String
 
 --
 -- When compiling the GHC ARM cross-compiler with LLVM 3.0 it produces incorrect
@@ -13,7 +14,12 @@ import Foreign.C.Types
 
 foreign import ccall "float2double" cFloatToCDouble :: CFloat -> CDouble
 foreign import ccall "set_no_buffering" setNoBuffering ::  IO ()
+#ifdef ANDROID
+foreign import ccall "androidLog" cAndroidLog :: CString -> IO ()
+#endif
 
 cFloatToDouble :: CFloat -> Double
 cFloatToDouble = uncurry encodeFloat . decodeFloat . cFloatToCDouble
 
+androidLog :: String -> IO ()
+androidLog s = withCString s $ \cstr -> cAndroidLog cstr

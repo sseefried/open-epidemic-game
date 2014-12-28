@@ -9,13 +9,12 @@ import Data.IORef
 import Text.Printf
 import Control.Monad (forM_)
 
-data FR = FR { tickIndex :: Int
-             , ticks     :: IOUArray Int Double
-             , tickSum   :: Double
+data FR = FR { tickIndex   :: Int
+             , ticks       :: IOUArray Int Double
+             , tickSum     :: Double
              , tickSamples :: Int }
 
 type FRBuf = IORef FR
-
 
 windowSize :: Int
 windowSize = 100
@@ -40,9 +39,6 @@ averageTick :: FRBuf -> IO Double
 averageTick frRef = readIORef frRef >>= \fr -> return $ tickSum fr / (fromIntegral $ tickSamples fr)
 
 ----------------------------------------------------------------------------------------------------
-
-
-
 test :: IO ()
 test = do
   frBuf <- initFRBuf

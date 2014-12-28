@@ -396,7 +396,7 @@ logFrameRate besRef = do
   bes <- readIORef besRef
   when (besFrames bes `mod` 30 == 0) $ do
     avTick <- averageTick (besFRBuf bes)
-    printf "Framerate = %.2f frames/s\n" (1/avTick)
+    debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 
 ----------------------------------------------------------------------------------------------------
 type ShaderId = GLuint
