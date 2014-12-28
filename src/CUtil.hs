@@ -22,4 +22,9 @@ cFloatToDouble :: CFloat -> Double
 cFloatToDouble = uncurry encodeFloat . decodeFloat . cFloatToCDouble
 
 androidLog :: String -> IO ()
+#ifdef ANDROID
 androidLog s = withCString s $ \cstr -> cAndroidLog cstr
+#else
+-- dummy function for when we're not building on Android
+androidLog _ = return ()
+#endif
