@@ -81,7 +81,7 @@ ideas:
 2. There can be different types of germs.
    a) ones that inhibit the growth of others
    b) ones that multiply very fast.
-   c) one that actually kill others that they are in contact with
+   c) ones that actually kill others that they are in contact with
 
 3. You can pick up and drag a germ?
 
