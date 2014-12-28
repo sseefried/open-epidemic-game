@@ -31,7 +31,7 @@ library
     default-language: Haskell2010
 
     Exposed-Modules: MainLib, Backend.SDL, Game, GameM, Types, Platform
-                   , Graphics, CUtil, FrameRateBuffer
+                   , Graphics, GraphicsGL, CUtil, FrameRateBuffer
     exposed: True
     if flag(android)
       cpp-options: -DANDROID
@@ -49,6 +49,7 @@ library
                  , sdl2-mixer == 0.1.0.0
                  , cairo == 0.12.5.3
                  , control-monad-free == 0.5.3
+                 , OpenGLRaw == 1.5.0.0
                  -- everything below this line is a dependency of above
                  -- the line. We fix to specific versions
                  , base >= 4.7.0.0
