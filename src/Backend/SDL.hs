@@ -421,7 +421,10 @@ loadShader src typ = do
 vertexShaderSrc :: String
 vertexShaderSrc =
   concat $ intersperse "\n" [
-      "attribute vec2 position;         // vertex position attribute"
+      "#ifdef GL_ES"
+    , "precision mediump float;        // set default precision for floats"
+    , "#endif"
+    , "attribute vec2 position;         // vertex position attribute"
     , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
     , "uniform mat4 modelView;          // shader modelview matrix uniform"
     , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
@@ -435,7 +438,7 @@ vertexShaderSrc =
 fragmentShaderSrc :: String
 fragmentShaderSrc = concat $ intersperse "\n" [
       "#ifdef GL_ES"
-    , "precision medium float;        // set default precision for floats"
+    , "precision mediump float;        // set default precision for floats"
     , "#endif"
     , "uniform sampler2D texture;      // shader texture uniform"
     , " "
