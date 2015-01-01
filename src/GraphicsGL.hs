@@ -117,8 +117,8 @@ germGfxToGLFun gfx = GLM $ do
         splitPts = \pt -> (movingPtToStaticPt pt, movingPtToPt t pt)
         germPts  = germGfxBody gfx
         len      = length germPts
-        doubleSize = sizeOf (undefined :: GLdouble)
-        stride = fromIntegral $ perVertex * doubleSize
+        floatSize = sizeOf (undefined :: GLfloat)
+        stride = fromIntegral $ perVertex * floatSize
 
     positionIdx <- getAttributeIndex programId "position"
     texCoordIdx <- getAttributeIndex programId "texCoord"
@@ -129,9 +129,9 @@ germGfxToGLFun gfx = GLM $ do
     let vertexPts = concat $ [x',y',0.5,0.5]:(map (bar . splitPts) $ take (len+1) $ cycle germPts)
         n         = len + 2
     allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices vertexPts
-      glVertexAttribPointer positionIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride vertices
-      glVertexAttribPointer texCoordIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*doubleSize))
+      pokeArray vertices (map d2f vertexPts)
+      glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
+      glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
       glDrawArrays gl_TRIANGLE_FAN 0 (fromIntegral n)
     -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
     -- because there is texture to be drawn in these valleys.)
@@ -139,9 +139,9 @@ germGfxToGLFun gfx = GLM $ do
         vertexPts = concat $ map bar prePts
         n         = length prePts -- FIXME: pre-calculate
     allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices vertexPts
-      glVertexAttribPointer positionIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride vertices
-      glVertexAttribPointer texCoordIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*doubleSize))
+      pokeArray vertices (map d2f vertexPts)
+      glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
+      glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
       glDrawArrays gl_TRIANGLES 0 (fromIntegral n)
 
 ----------------------------------------------------------------------------------------------------

@@ -14,3 +14,6 @@ toDouble = fromRational . toRational
 
 toInt :: Integral a => a -> Int
 toInt = fromIntegral
+
+d2f :: Double -> Float
+d2f = uncurry encodeFloat . decodeFloat

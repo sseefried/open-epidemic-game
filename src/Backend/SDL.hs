@@ -446,5 +446,6 @@ fragmentShaderSrc = concat $ intersperse "\n" [
     , "    // sample the texture at the interpolated texture coordinate"
     , "    // and write it to gl_FragColor "
     , "    gl_FragColor = texture2D( texture, texCoordVar);"
+--    , "    gl_FragColor = vec4(1,0,0,1);"
     , "}"
     ]
