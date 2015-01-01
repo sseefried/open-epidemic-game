@@ -35,6 +35,7 @@ drawToTexture renderFun = do
     [textureId] <- peekArray 1 textures
     return textureId
   glBindTexture gl_TEXTURE_2D textureId
+
   -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
   -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
   glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR_MIPMAP_LINEAR)
@@ -50,30 +51,10 @@ drawToTexture renderFun = do
            C.rectangle 0 0 xd xd
            C.fill
            renderFun (fromIntegral x/2)
-      glTexImage2D gl_TEXTURE_2D i (fromIntegral gl_RGBA) x' x' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
+      glTexImage2D gl_TEXTURE_2D i (fromIntegral gl_RGBA) x' x' 0 gl_RGBA gl_UNSIGNED_BYTE buffer
   return textureId
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
-
-  --((textureObj :: TextureObject):_) <- genObjectNames 1
-  --textureBinding Texture2D $= Just textureObj
-  --textureFilter Texture2D $= ((Linear', Just Linear'), Linear')
-  --textureFunction $= Decal
-  --forM_ (zip textureWidths [0..]) $ \(x,i) -> do
-  --  let x' = fromIntegral x
-  --      xd = fromIntegral x
-  --  allocaBytes (x*x*bytesPerWord32) $ \buffer -> do
-  --    C.withImageSurfaceForData buffer C.FormatARGB32 x x (x*4) $ \surface ->
-  --       C.renderWith surface $ do
-  --         C.setSourceRGBA 1 1 1 1
-  --         C.rectangle 0 0 xd xd
-  --         C.fill
-  --         renderFun (fromIntegral x/2)
-  --    texImage2D Texture2D NoProxy i RGBA' (TextureSize2D x' x') 0
-  --          (PixelData BGRA UnsignedByte (buffer :: Ptr CUChar))
-  --return textureObj
-  --where
-  --  textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
 ----------------------------------------------------------------------------------------------------
 --
 -- [rep] is used to create some missing triangles for the germ polygon. These triangles
