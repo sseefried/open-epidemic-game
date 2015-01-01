@@ -120,8 +120,6 @@ initOpenGL window (w,h) = do
   --
   -- [ortho2D] must appear after glUseProgram programId
   ortho2D programId (-w2) w2 (-h2) h2
-  printf "programID: %d\n" (fromIntegral programId :: Int)
-
   return (programId, context)
   where
     --
