@@ -20,6 +20,9 @@ powOfTwo = 7
 bytesPerWord32 :: Int
 bytesPerWord32 = 4
 
+
+
+
 ----------------------------------------------------------------------------------------------------
 --drawToTextureObj :: (Double -> C.Render ()) -> IO TextureObject
 --drawToTextureObj renderFun = do

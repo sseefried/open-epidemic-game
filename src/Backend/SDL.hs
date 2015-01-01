@@ -60,6 +60,13 @@ data BackendState = BackendState { besStartTime      :: UTCTime
 data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
                                      , backendNormPtToWorldPt :: (CFloat, CFloat) -> R2 }
 
+----------------------------------------------------------------------------------------------------
+type ShaderId       = GLuint
+type ProgramId      = GLuint
+type ShaderType     = GLenum
+type AttributeIndex = GLuint
+
+----------------------------------------------------------------------------------------------------
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
   BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x - w'/2)  * scale)
@@ -90,11 +97,11 @@ initOpenGL window (w,h) = do
   glBlendFunc gl_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST
   glDepthFunc gl_LESS
-  etVertexShader <- loadShader vertexShaderSrc gl_VERTEX_SHADER
-  vertexShader <- exitOnLeft etVertexShader
+  etVertexShader   <- loadShader vertexShaderSrc gl_VERTEX_SHADER
+  vertexShader     <- exitOnLeft etVertexShader
   etFragmentShader <- loadShader fragmentShaderSrc gl_FRAGMENT_SHADER
-  fragmentShader <- exitOnLeft etFragmentShader
-  programId <- glCreateProgram
+  fragmentShader   <- exitOnLeft etFragmentShader
+  programId        <- glCreateProgram
   when (programId == 0 ) $ exitWithError "Could not create GLSL program"
 
   glAttachShader programId vertexShader
@@ -109,21 +116,23 @@ initOpenGL window (w,h) = do
   when (linked == 0) $ do
      errorStr <- getGLError glGetProgramiv glGetProgramInfoLog programId
      exitWithError errorStr
+
+  glViewport 0 0 (fromIntegral w) (fromIntegral h)
+  glUseProgram programId
   --
   -- The co-ordinates are set to be the world co-ordinate system. This saves us
   -- converting for OpenGL calls
   --
-  vertices <- mallocArray 9
-  pokeArray vertices [ 0.0, 50, 0.0, -70, -50, 0.0, 50, -50, (0.0 :: GLfloat) ]
-  glVertexAttribPointer 0 3 gl_FLOAT (fromIntegral gl_FALSE) 0 vertices
-  glEnableVertexAttribArray 0
-  glViewport 0 0 (fromIntegral w) (fromIntegral h)
-  glUseProgram programId
-  -- ortho2D must appear after glUseProgram programId
+  -- [ortho2D] must appear after glUseProgram programId
   ortho2D programId (-w2) w2 (-h2) h2
 
   return context
   where
+    getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
+    getAttributeIndex programId s = do
+      idx <- withCString s $ \str -> glGetAttribLocation programId str
+      when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
+      return $ fromIntegral idx
     --
     -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
     -- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
@@ -137,23 +146,11 @@ initOpenGL window (w,h) = do
                       Left error -> putStrLn error >> exitWith (ExitFailure 1)
                       Right val  -> return val
 
---
--- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
--- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
--- to. If W < C then there will be margins on the left and right that will not be drawn to.
---
---worldToCanvas :: (Int, Int) -> WorldToCanvas
---worldToCanvas (w,h) =
---  WorldToCanvas { worldPtToCanvasPt   = \(R2 x y) -> (w'/2 + scale*x, h'/2 - scale*y)
---                , worldLenToCanvasLen = (scale*)  }
---  where
---    w' = fromIntegral w
---    h' = fromIntegral h
---    minor = min w' h'
---    scale = minor / worldMajor
-
-
 ----------------------------------------------------------------------------------------------------
+--
+-- Open GL functions 'glOrtho' and 'glOrtho2D' are not supported by GL ES 2.0 so we write
+-- our own function to create the correct matrix.
+--
 ortho2D :: ProgramId -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
 ortho2D programId left right bottom top = do
   modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
@@ -398,10 +395,6 @@ logFrameRate besRef = do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 
-----------------------------------------------------------------------------------------------------
-type ShaderId = GLuint
-type ProgramId = GLuint
-type ShaderType = GLenum
 
 ----------------------------------------------------------------------------------------------------
 getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())
@@ -418,8 +411,6 @@ getGLError getVal getInfoLog ident = do
                         peekCString infoCStr
                     else return "Shader compiler failure. Couldn't get errorLog"
 ----------------------------------------------------------------------------------------------------
-
-
 loadShader :: String -> ShaderType -> IO (Either String ShaderId)
 loadShader src typ = do
   shaderId <- glCreateShader typ
@@ -442,53 +433,32 @@ loadShader src typ = do
 
 ----------------------------------------------------------------------------------------------------
 vertexShaderSrc :: String
-vertexShaderSrc = concat $ intersperse "\n" [
-    "attribute vec4 vPosition;"
-  , "uniform mat4 modelView;"
-  , "void main() { "
-  , "  gl_Position =  modelView * vPosition;"
-  , "}"
-  ]
+vertexShaderSrc =
+  concat $ intersperse "\n" [
+      "attribute vec4 position;         // vertex position attribute"
+    , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
+    , "uniform mat4 modelView;          // shader modelview matrix uniform"
+    , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
+    , "void main()"
+    , "{"
+    , "  gl_Position = modelView * position; // transform vertex position with modelview matrix"
+    , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
+    , "}"
+    ]
 
 fragmentShaderSrc :: String
 fragmentShaderSrc = concat $ intersperse "\n" [
-    "#ifdef GL_ES"
-  , "precision highp float;"
-  , "#endif"
-  , "void main() {"
-  , "  gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);"
-  , "}"
-  ]
-
-
---vertexShader :: String
---vertexShader =
---  concat $ intersperse "\n" [
---      "attribute vec4 position;         // vertex position attribute"
---    , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
---    , "uniform mat4 modelView;          // shader modelview matrix uniform"
---    , "uniform mat4 projection;         // shader projection matrix uniform"
---    , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
---    , "void main()"
---    , "{"
---    , "  vec4 p = modelView * position; // transform vertex position with modelview matrix"
---    , "  gl_Position = projection * p;  // project the transformed position and write it to gl_Position"
---    , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
---    , "}"
---    ]
-
---fragmentShader :: String
---fragmentShader = concat $ intersperse "\n" [
---    "precision mediump float;        // set default precision for floats to medium"
---    , " "
---    , "uniform sampler2D texture;      // shader texture uniform"
---    , " "
---    , "varying vec2 texCoordVar;       // fragment texture coordinate varying"
---    , " "
---    , "void main()"
---    , "{"
---    , "    // sample the texture at the interpolated texture coordinate"
---    , "    // and write it to gl_FragColor "
---    , "    gl_FragColor = texture2D( texture, texCoordVar);"
---    , "}"
---    ]
+      "#ifdef GL_ES"
+    , "precision medium float;        // set default precision for floats"
+    , "#endif"
+    , "uniform sampler2D texture;      // shader texture uniform"
+    , " "
+    , "varying vec2 texCoordVar;       // fragment texture coordinate varying"
+    , " "
+    , "void main()"
+    , "{"
+    , "    // sample the texture at the interpolated texture coordinate"
+    , "    // and write it to gl_FragColor "
+    , "    gl_FragColor = texture2D( texture, texCoordVar);"
+    , "}"
+    ]
