@@ -4,10 +4,14 @@ module GraphicsGL where
 import qualified Graphics.Rendering.Cairo as C
 import           Graphics.Rendering.OpenGL.Raw
 import           Text.Printf
-import           Foreign.Marshal.Alloc
+import           Foreign.Marshal.Alloc (alloca, allocaBytes)
+import           Foreign.Marshal.Array (mallocArray, allocaArray, pokeArray, peekArray)
 import           Foreign.Ptr
+import           Foreign.C.String
 import           Foreign.C.Types
+import           Foreign.Storable
 import           Control.Monad
+import           Util
 
 -- friends
 import Types
@@ -21,11 +25,36 @@ bytesPerWord32 :: Int
 bytesPerWord32 = 4
 
 
-
-
 ----------------------------------------------------------------------------------------------------
---drawToTextureObj :: (Double -> C.Render ()) -> IO TextureObject
---drawToTextureObj renderFun = do
+-- FIXME: For even more speed perhaps pre-allocate [maxGerms] of these buffers and re-use them.
+--
+drawToTexture :: (Double -> C.Render ()) -> IO TextureId
+drawToTexture renderFun = do
+  textureId <- allocaArray 1 $ \textures -> do
+    glGenTextures 1 (textures :: Ptr GLuint)
+    [textureId] <- peekArray 1 textures
+    return textureId
+  glBindTexture gl_TEXTURE_2D textureId
+  -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
+  -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR_MIPMAP_LINEAR)
+  -- gl_TEXTURE_MAG_FILTER accepts gl_NEAREST or gl_LINEAR
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
+  forM_ (zip textureWidths [0..]) $ \(x,i) -> do
+    let x' = fromIntegral x
+        xd = fromIntegral x
+    allocaBytes (x*x*bytesPerWord32) $ \buffer -> do
+      C.withImageSurfaceForData buffer C.FormatARGB32 x x (x*4) $ \surface ->
+         C.renderWith surface $ do
+           C.setSourceRGBA 1 1 1 1
+           C.rectangle 0 0 xd xd
+           C.fill
+           renderFun (fromIntegral x/2)
+      glTexImage2D gl_TEXTURE_2D i (fromIntegral gl_RGBA) x' x' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
+  return textureId
+  where
+    textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
+
   --((textureObj :: TextureObject):_) <- genObjectNames 1
   --textureBinding Texture2D $= Just textureObj
   --textureFilter Texture2D $= ((Linear', Just Linear'), Linear')
@@ -76,31 +105,48 @@ repEven (x:xs) = x:repOdd xs
 -- returns the position of the point at time zero. This is used for the texture co-ordinates,
 -- while [movingPtToPt] is used for the polygon vertices.
 --
-germGfxToGLFun:: GermGfx -> GLM GermGLFun
-germGfxToGLFun gfx = GLM $ return $ \_ _ _ -> return ()
-  --let texCoord2f :: (Double, Double) -> IO ()
-  --    texCoord2f (x,y) = texCoord $ TexCoord2 (realToFrac x) (realToFrac y :: GLdouble)
-  --    vertex2f :: (Double, Double) -> IO ()
-  --    vertex2f (x,y) = vertex $ Vertex3  (realToFrac x) (realToFrac y) (0 :: GLdouble)
-  --textureObj <- drawToTextureObj (germGfxRenderBody gfx)
-  --return $ \(R2 x' y') t r -> GLM $ do
-  --  let bar ((x,y),(mx,my)) = do
-  --        let (tx, ty) = ((x+1)/2,(y+1)/2)
-  --            (vx, vy) = (r*mx + x', r*my + y')
-  --        texCoord2f (tx,ty)
-  --        vertex2f (vx,vy)
+germGfxToGLFun :: GermGfx -> GLM GermGLFun
+germGfxToGLFun gfx = GLM $ do
+  textureId <- drawToTexture (germGfxRenderBody gfx)
+  return $ \(R2 x' y') t r programId -> GLM $ do
+    let bar ((x,y),(mx,my)) =
+          let (tx, ty) = ((x+1)/2,(y+1)/2)
+              (vx, vy) = (r*mx + x', r*my + y')
+          in [vx,vy,tx,ty]
+        perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
+        splitPts = \pt -> (movingPtToStaticPt pt, movingPtToPt t pt)
+        germPts  = germGfxBody gfx
+        len      = length germPts
+        doubleSize = sizeOf (undefined :: GLdouble)
+        stride = fromIntegral $ perVertex * doubleSize
 
-  --  textureBinding Texture2D $= Just textureObj
-  --  let splitPts = \pt -> (movingPtToStaticPt pt, movingPtToPt t pt)
-  --  let pts = let pts' = germGfxBody gfx
-  --                pts'' = take (length pts'+1) (cycle pts')
-  --            in map splitPts pts''
-  --  color $ Color4 1 1 1 (1 :: GLdouble)
-  --  -- Create a star polygon.
-  --  renderPrimitive TriangleFan $ do
-  --    texCoord2f (0.5, 0.5); vertex2f (x',y')
-  --    mapM_ bar pts
-  --  -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
-  --  -- because there is texture to be drawn in these valleys.)
-  --  renderPrimitive Triangles $ do
-  --    mapM_ bar (map splitPts $ rep $ germGfxBody gfx)
+    positionIdx <- getAttributeIndex programId "position"
+    texCoordIdx <- getAttributeIndex programId "texCoord"
+    glBindTexture gl_TEXTURE_2D textureId
+    glEnableVertexAttribArray positionIdx
+    glEnableVertexAttribArray texCoordIdx
+    -- Create a star polygon.
+    let vertexPts = concat $ [x',y',0.5,0.5]:(map (bar . splitPts) $ take (len+1) $ cycle germPts)
+        n         = len + 2
+    allocaArray (n*perVertex) $ \vertices -> do
+      pokeArray vertices vertexPts
+      glVertexAttribPointer positionIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride vertices
+      glVertexAttribPointer texCoordIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*doubleSize))
+      glDrawArrays gl_TRIANGLE_FAN 0 (fromIntegral n)
+    -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
+    -- because there is texture to be drawn in these valleys.)
+    let prePts    = map splitPts $ rep germPts
+        vertexPts = concat $ map bar prePts
+        n         = length prePts -- FIXME: pre-calculate
+    allocaArray (n*perVertex) $ \vertices -> do
+      pokeArray vertices vertexPts
+      glVertexAttribPointer positionIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride vertices
+      glVertexAttribPointer texCoordIdx 2 gl_DOUBLE (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*doubleSize))
+      glDrawArrays gl_TRIANGLES 0 (fromIntegral n)
+
+----------------------------------------------------------------------------------------------------
+getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
+getAttributeIndex programId s = do
+  idx <- withCString s $ \str -> glGetAttribLocation programId str
+  when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
+  return $ fromIntegral idx

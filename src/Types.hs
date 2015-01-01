@@ -1,7 +1,7 @@
 module Types where
 
 import           Graphics.Rendering.Cairo (Render(..))
-import           Graphics.Rendering.OpenGL.Raw (GLint, GLfloat, GLsizei)
+import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLfloat, GLsizei, GLenum)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
@@ -74,7 +74,14 @@ data PeriodicFun =
 --
 data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 
-type GermGLFun = R2 -> Time -> Double -> GLM ()
+type ProgramId      = GLuint
+type ShaderId       = GLuint
+type ShaderType     = GLenum
+type AttributeIndex = GLuint
+type TextureId = GLuint
+
+
+type GermGLFun = R2 -> Time -> Double -> ProgramId -> GLM ()
 
 --
 --
@@ -133,7 +140,7 @@ type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
 
-data GameState = GameState { gsRender        :: GLM () -- GL commands
+data GameState = GameState { gsRender        :: ProgramId -> GLM () -- GL commands
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
                            , gsWorldToCanvas :: !WorldToCanvas

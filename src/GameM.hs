@@ -149,7 +149,7 @@ removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
 ----------------------------------------------------------------------------------------------------
 
-runGameM ::GameState -> GameM b -> IO (b, GameState)
+runGameM :: GameState -> GameM b -> IO (b, GameState)
 runGameM gs gameM = do
   gsRef <- newIORef gs
   a <- go gsRef gameM

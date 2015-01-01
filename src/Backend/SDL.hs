@@ -38,11 +38,13 @@ import GameM
 import Graphics()
 import Platform
 import CUtil
+import Util
 import FrameRateBuffer
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besLastTime       :: UTCTime
+                                 , besProgramId      :: ProgramId
                                  , besGLContext      :: S.GLContext
                                  , besGameState      :: GameState
                                  , besDimensions     :: (Int,Int)
@@ -61,11 +63,6 @@ data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R
                                      , backendNormPtToWorldPt :: (CFloat, CFloat) -> R2 }
 
 ----------------------------------------------------------------------------------------------------
-type ShaderId       = GLuint
-type ProgramId      = GLuint
-type ShaderType     = GLenum
-type AttributeIndex = GLuint
-
 ----------------------------------------------------------------------------------------------------
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
@@ -82,11 +79,9 @@ backendToWorld (w,h) =
     frac f x = cFloatToDouble f * x
 
 ----------------------------------------------------------------------------------------------------
-exitWithError :: String -> IO a
-exitWithError errorStr = putStrLn errorStr >> exitWith (ExitFailure 1)
 
 ----------------------------------------------------------------------------------------------------
-initOpenGL :: S.Window -> (Int, Int) -> IO S.GLContext
+initOpenGL :: S.Window -> (Int, Int) -> IO (ProgramId, S.GLContext)
 initOpenGL window (w,h) = do
   context <- S.glCreateContext window
   mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
@@ -125,14 +120,10 @@ initOpenGL window (w,h) = do
   --
   -- [ortho2D] must appear after glUseProgram programId
   ortho2D programId (-w2) w2 (-h2) h2
+  printf "programID: %d\n" (fromIntegral programId :: Int)
 
-  return context
+  return (programId, context)
   where
-    getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
-    getAttributeIndex programId s = do
-      idx <- withCString s $ \str -> glGetAttribLocation programId str
-      when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
-      return $ fromIntegral idx
     --
     -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
     -- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
@@ -177,7 +168,7 @@ initialize title screenWidth screenHeight gs = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
-  context <- initOpenGL window (w,h)
+  (programId, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
     NoSound -> return (error "levelMusic", error "squishSound")
@@ -191,8 +182,8 @@ initialize title screenWidth screenHeight gs = do
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   frBuf <- initFRBuf
-  newIORef $ BackendState t t context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1) window
-               levelMusic squishSound
+  newIORef $ BackendState t t programId context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1)
+               window levelMusic squishSound
   where
     wflags = [S.WindowShown]
     -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
@@ -269,8 +260,6 @@ runAndTime besRef upd io = do
   return result
   where
 
-toDouble :: Real a => a -> Double
-toDouble = fromRational . toRational
 
 ----------------------------------------------------------------------------------------------------
 runFrameUpdate :: IORef BackendState -> IO ()
@@ -283,8 +272,7 @@ runFrameUpdate besRef = do
 
   glClearColor 1 1 1 1
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-  glDrawArrays gl_TRIANGLES 0 3
---  runGLMIO $ gsRender gs
+  runGLMIO $ gsRender gs (besProgramId bes)
   glFlush
   S.glSwapWindow (besWindow bes)
 
@@ -435,13 +423,13 @@ loadShader src typ = do
 vertexShaderSrc :: String
 vertexShaderSrc =
   concat $ intersperse "\n" [
-      "attribute vec4 position;         // vertex position attribute"
+      "attribute vec2 position;         // vertex position attribute"
     , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
     , "uniform mat4 modelView;          // shader modelview matrix uniform"
     , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
     , "void main()"
     , "{"
-    , "  gl_Position = modelView * position; // transform vertex position with modelview matrix"
+    , "  gl_Position = modelView * vec4(position,0,1); // transform vertex position with modelview matrix"
     , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
     , "}"
     ]

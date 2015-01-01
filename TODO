@@ -1,5 +1,8 @@
 TODO
 
+[ ] Fix GLFun type to use pre-defined attribute locations instead of
+    re-calculating each time. (See GraphicsGL.hs)
+
 [ ] Turn GLScript into a free monad too.
 
 [X] Build and deploy to Android. Have a look at this:
