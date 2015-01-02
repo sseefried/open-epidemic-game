@@ -174,7 +174,7 @@ addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
   GameState
-    (const $ return ())
+    (return ())
     bounds
     germMapList
     (worldToCanvas bounds)
@@ -347,10 +347,10 @@ physics duration = do
       w2c = gsWorldToCanvas gs
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
-  let drawOneGerm :: ProgramId -> Germ -> GLM ()
-      drawOneGerm programId g = do
-        (germGL g) (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g)) programId
-  modify $ \gs -> let render programId = mapM_ (drawOneGerm programId) (M.elems $ gsGerms gs)
+  let drawOneGerm :: Germ -> GLM ()
+      drawOneGerm g = do
+        (germGL g) (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
+  modify $ \gs -> let render = mapM_ drawOneGerm (M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 
 ----------------------------------------------------------------------------------------------------

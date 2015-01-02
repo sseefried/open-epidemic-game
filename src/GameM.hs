@@ -149,8 +149,8 @@ removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
 ----------------------------------------------------------------------------------------------------
 
-runGameM :: GameState -> GameM b -> IO (b, GameState)
-runGameM gs gameM = do
+runGameM :: GLSLState -> GameState -> GameM b -> IO (b, GameState)
+runGameM glsls gs gameM = do
   gsRef <- newIORef gs
   a <- go gsRef gameM
   gs' <- readIORef gsRef
@@ -168,7 +168,7 @@ runGameM gs gameM = do
         (Impure (PrintStr s p))         -> putStr s >> go' p
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
-        (Impure (RunGLM glm f))         -> runGLMIO glm >>= go' . f
+        (Impure (RunGLM glm f))         -> runGLMIO glm glsls >>= go' . f
         (Pure x)                        -> return x
 
 ----------------------------------------------------------------------------------------------------
@@ -224,5 +224,5 @@ runHipMIO space = go
       H.spaceRemove space s
 
 ----------------------------------------------------------------------------------------------------
-runGLMIO :: GLM a -> IO a
-runGLMIO (GLM io) = io
+runGLMIO :: GLM a -> GLSLState -> IO a
+runGLMIO (GLM f) glsls = f glsls

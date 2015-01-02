@@ -74,15 +74,6 @@ data PeriodicFun =
 --
 data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
 
-type ProgramId      = GLuint
-type ShaderId       = GLuint
-type ShaderType     = GLenum
-type AttributeIndex = GLuint
-type TextureId = GLuint
-
-
-type GermGLFun = R2 -> Time -> Double -> ProgramId -> GLM ()
-
 --
 --
 -- The [germCumulativeTime] field is used in animating the germs. This is the value
@@ -109,25 +100,34 @@ data Germ = Germ { germMultiplyAt     :: Time
 -- to hide the IO monad. I still might do that, but for now
 --
 --
-data GLM a = GLM {unGLM :: IO a }
+data GLM a = GLM { unGLM :: GLSLState -> IO a }
+
+data GLSLState = GLSLState { glslPosition  :: AttributeIndex
+                           , glslTexcoord  :: AttributeIndex
+                           , glslProgramId :: ProgramId
+                           }
 
 instance Functor GLM where
-  fmap f (GLM m) = GLM (fmap f m)
+  -- (a -> b) -> (GLM a -> GLM b)
+  fmap f (GLM g) = GLM $ fmap f . g
 
 instance Monad GLM where
-  return = GLM . return
-  (GLM m) >>= k = GLM $ m >>= unGLM . k
+  return = GLM . const . return
+  (GLM f) >>= k = GLM $ \as -> f as >>= \a -> unGLM (k a) as
 
 instance Applicative GLM where
   pure = return
-  (GLM m) <*> (GLM m') = GLM $ m <*> m'
+  (GLM f) <*> (GLM f') = GLM $ liftA2 (<*>) f f'
+
+type ProgramId      = GLuint
+type ShaderId       = GLuint
+type ShaderType     = GLenum
+type AttributeIndex = GLuint
+type TextureId      = GLuint
+type GermGLFun      = R2 -> Time -> Double -> GLM ()
 
 ----------------------------------------------------------------------------------------------------
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
-
-----------------------------------------------------------------------------------------------------
-
-
 --
 -- The canvas might not have the same aspect ratio as the world, in which case
 -- we ensure there will be some portions of the canvas that won't be drawn to.
@@ -140,7 +140,7 @@ type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
 
-data GameState = GameState { gsRender        :: ProgramId -> GLM () -- GL commands
+data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
                            , gsWorldToCanvas :: !WorldToCanvas

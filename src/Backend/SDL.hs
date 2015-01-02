@@ -44,7 +44,7 @@ import FrameRateBuffer
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { besStartTime      :: UTCTime
                                  , besLastTime       :: UTCTime
-                                 , besProgramId      :: ProgramId
+                                 , besGLSLState      :: GLSLState
                                  , besGLContext      :: S.GLContext
                                  , besGameState      :: GameState
                                  , besDimensions     :: (Int,Int)
@@ -81,7 +81,7 @@ backendToWorld (w,h) =
 ----------------------------------------------------------------------------------------------------
 
 ----------------------------------------------------------------------------------------------------
-initOpenGL :: S.Window -> (Int, Int) -> IO (ProgramId, S.GLContext)
+initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
 initOpenGL window (w,h) = do
   context <- S.glCreateContext window
   mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
@@ -120,7 +120,12 @@ initOpenGL window (w,h) = do
   --
   -- [ortho2D] must appear after glUseProgram programId
   ortho2D programId (-w2) w2 (-h2) h2
-  return (programId, context)
+  positionIdx <- getAttributeIndex programId "position"
+  texCoordIdx <- getAttributeIndex programId "texCoord"
+  let glsls = GLSLState { glslProgramId = programId
+                        , glslPosition  = positionIdx
+                        , glslTexcoord  = texCoordIdx }
+  return (glsls, context)
   where
     --
     -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
@@ -134,6 +139,13 @@ initOpenGL window (w,h) = do
     exitOnLeft et = case et of
                       Left error -> putStrLn error >> exitWith (ExitFailure 1)
                       Right val  -> return val
+
+----------------------------------------------------------------------------------------------------
+getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
+getAttributeIndex programId s = do
+  idx <- withCString s $ \str -> glGetAttribLocation programId str
+  when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
+  return $ fromIntegral idx
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -166,7 +178,7 @@ initialize title screenWidth screenHeight gs = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
-  (programId, context) <- initOpenGL window (w,h)
+  (glslState, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
     Android -> return (error "levelMusic", error "squishSound")
     NoSound -> return (error "levelMusic", error "squishSound")
@@ -180,7 +192,7 @@ initialize title screenWidth screenHeight gs = do
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   frBuf <- initFRBuf
-  newIORef $ BackendState t t programId context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1)
+  newIORef $ BackendState t t glslState context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
     wflags = [S.WindowShown]
@@ -241,7 +253,7 @@ runOnGameState :: (a -> BackendState -> BackendState)
                -> IO ()
 runOnGameState upd besRef gameM cont  = do
   bes     <- readIORef besRef
-  (a, gs) <- runGameM (besGameState bes) gameM
+  (a, gs) <- runGameM (besGLSLState bes) (besGameState bes) gameM
   writeIORef besRef $ upd a $ bes { besGameState = gs }
   cont gs
 
@@ -270,7 +282,7 @@ runFrameUpdate besRef = do
 
   glClearColor 1 1 1 1
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-  runGLMIO $ gsRender gs (besProgramId bes)
+  runGLMIO (gsRender gs) (besGLSLState bes)
   glFlush
   S.glSwapWindow (besWindow bes)
 
@@ -300,7 +312,7 @@ runPhysicsEventHandler besRef handleEvent = do
   let gs = besGameState bes
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
-  (fsmState', gs') <- runGameM gs (handleEvent fsmState (Physics duration))
+  (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
   case fsmState' of
     FSMPlayingLevel _ -> do
       -- If there are any queued sounds play them now

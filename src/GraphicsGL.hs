@@ -87,9 +87,9 @@ repEven (x:xs) = x:repOdd xs
 -- while [movingPtToPt] is used for the polygon vertices.
 --
 germGfxToGLFun :: GermGfx -> GLM GermGLFun
-germGfxToGLFun gfx = GLM $ do
+germGfxToGLFun gfx = GLM . const $ do
   textureId <- drawToTexture (germGfxRenderBody gfx)
-  return $ \(R2 x' y') t r programId -> GLM $ do
+  return $ \(R2 x' y') t r  -> GLM $ \glslAttrs -> do
     let bar ((x,y),(mx,my)) =
           let (tx, ty) = ((x+1)/2,(y+1)/2)
               (vx, vy) = (r*mx + x', r*my + y')
@@ -100,17 +100,16 @@ germGfxToGLFun gfx = GLM $ do
         len      = length germPts
         floatSize = sizeOf (undefined :: GLfloat)
         stride = fromIntegral $ perVertex * floatSize
-
-    positionIdx <- getAttributeIndex programId "position"
-    texCoordIdx <- getAttributeIndex programId "texCoord"
+        positionIdx = glslPosition glslAttrs
+        texCoordIdx = glslTexcoord glslAttrs
     glBindTexture gl_TEXTURE_2D textureId
-    glEnableVertexAttribArray positionIdx
-    glEnableVertexAttribArray texCoordIdx
+    glEnableVertexAttribArray (glslPosition glslAttrs)
+    glEnableVertexAttribArray (glslTexcoord glslAttrs)
     -- Create a star polygon.
     let vertexPts = concat $ [x',y',0.5,0.5]:(map (bar . splitPts) $ take (len+1) $ cycle germPts)
         n         = len + 2
     allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices (map d2f vertexPts)
+      pokeArray vertices ({-# SCC "double2float-1" #-} map d2f vertexPts)
       glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
       glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
       glDrawArrays gl_TRIANGLE_FAN 0 (fromIntegral n)
@@ -120,14 +119,9 @@ germGfxToGLFun gfx = GLM $ do
         vertexPts = concat $ map bar prePts
         n         = length prePts -- FIXME: pre-calculate
     allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices (map d2f vertexPts)
+      pokeArray vertices ({-# SCC "double2float-2" #-} map d2f vertexPts)
       glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
       glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
       glDrawArrays gl_TRIANGLES 0 (fromIntegral n)
 
 ----------------------------------------------------------------------------------------------------
-getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
-getAttributeIndex programId s = do
-  idx <- withCString s $ \str -> glGetAttribLocation programId str
-  when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
-  return $ fromIntegral idx
