@@ -32,6 +32,8 @@ data R2 = R2 !Double !Double deriving (Show, Eq, Ord)
 -- Internally we use type [CairoPoint]. This uses Cairo's co-ordinate system which has the origin
 -- in the top-left corner, x axis goes left to right and y axis goes to bottom.
 --
+type Frac = Float
+
 type Time = Double
 
 type Anim = Time -> Render ()
@@ -40,7 +42,7 @@ data Color = Color !Double !Double !Double !Double deriving Show
 
 type CairoPoint = (Double, Double)
 
-type Frac = Double
+
 
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
@@ -50,7 +52,7 @@ black = Color 0 0 0 1
 type GermGradient = (Color, Color)
 
 -- polar point (r,a) that lies inside a unit circle. Invariant: r < 1, 0 <= a < 1
-data PolarPoint = P2 Double Double -- radius and angle
+data PolarPoint = P2 Frac Frac -- radius and angle
 
 data GermGfx =
   GermGfx { germGfxBodyGrad    :: !GermGradient
@@ -73,7 +75,7 @@ type PeriodicFun = (Frac, Frac, Frac)
 -- The final point at a time 't' is determined by summing the value of
 -- the periodic functions at 't' and adding that to the component.
 --
-data MovingPoint = MP2 (Double, Vector PeriodicFun) (Double, Vector PeriodicFun)
+newtype MovingPoint = MP2 ((Frac, Vector PeriodicFun),(Frac, Vector PeriodicFun))
 
 --
 --

@@ -13,6 +13,9 @@ import           Foreign.Storable
 import           Control.Monad
 import           Util
 
+import qualified Data.Vector.Unboxed as VU
+import qualified Data.Vector as V
+
 -- friends
 import Types
 import Graphics
@@ -72,6 +75,22 @@ repOdd (x:xs) = x:x:repEven xs
 repEven :: [a] -> [a]
 repEven [] = []
 repEven (x:xs) = x:repOdd xs
+
+
+
+
+uForMi_ :: (Monad m, VU.Unbox a) => VU.Vector a -> (Int -> a -> m b) -> m ()
+uForMi_ v f = VU.foldM' f' 0 v >> return ()
+  where
+    f' i a = f i a >> return (i+1)
+
+forMi_ :: Monad m => V.Vector a -> (Int -> a -> m b) -> m ()
+forMi_ v f = V.foldM' f' 0 v >> return ()
+  where
+    f' i a = f i a >> return (i+1)
+
+
+
 ----------------------------------------------------------------------------------------------------
 --
 -- This function is reponsible for drawing a wiggling germ.
@@ -89,15 +108,18 @@ repEven (x:xs) = x:repOdd xs
 germGfxToGLFun :: GermGfx -> GLM GermGLFun
 germGfxToGLFun gfx = GLM . const $ do
   textureId <- drawToTexture (germGfxRenderBody gfx)
+  let germPts         = germGfxBody gfx
+      len             = length germPts
+      preFanPts       = (MP2 ((0,VU.empty), (0,VU.empty))):(take (len+1) $ cycle germPts)
+      preFanPts'      = V.fromList preFanPts
+      staticFanPts    = VU.fromList $ map movingPtToStaticPt preFanPts
+      preTriPts       = rep germPts
+      preTriPts'      = V.fromList preTriPts
+      staticTriPts    = VU.fromList $ map movingPtToStaticPt preTriPts
+      lenTri          = V.length preTriPts'
+
   return $ \(R2 x' y') t r  -> GLM $ \glslAttrs -> do
-    let bar ((x,y),(mx,my)) =
-          let (tx, ty) = ((x+1)/2,(y+1)/2)
-              (vx, vy) = (r*mx + x', r*my + y')
-          in [vx,vy,tx,ty]
-        perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
-        splitPts = \pt -> (movingPtToStaticPt pt, movingPtToPt t pt)
-        germPts  = germGfxBody gfx
-        len      = length germPts
+    let perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
         floatSize = sizeOf (undefined :: GLfloat)
         stride = fromIntegral $ perVertex * floatSize
         positionIdx = glslPosition glslAttrs
@@ -106,22 +128,29 @@ germGfxToGLFun gfx = GLM . const $ do
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
     -- Create a star polygon.
-    let vertexPts = concat $ [x',y',0.5,0.5]:(map (bar . splitPts) $ take (len+1) $ cycle germPts)
-        n         = len + 2
-    allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices ({-# SCC "double2float-1" #-} map d2f vertexPts)
-      glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
-      glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
-      glDrawArrays gl_TRIANGLE_FAN 0 (fromIntegral n)
+    let drawPolys n arrayType staticPts movingPts = do
+          allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
+            uForMi_ staticPts $ \i (x,y) -> do
+              let vx = ((d2f r)*x + d2f x')
+                  vy = ((d2f r)*y + d2f y')
+                  base = i*perVertex*floatSize
+              pokeByteOff vertices base             vx
+              pokeByteOff vertices (base+floatSize) vy
+            forMi_ movingPts $ \i (x,y) -> do
+              let tx = (x+1)/2
+                  ty = (y+1)/2
+                  base = i*perVertex*floatSize
+              pokeByteOff vertices (base+2*floatSize) tx
+              pokeByteOff vertices (base+3*floatSize) ty
+            glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
+            glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride
+              (vertices `plusPtr` (2*floatSize))
+            glDrawArrays arrayType 0 (fromIntegral n)
+    let n         = len + 2
+        texCoords = V.map (movingPtToPt t) preFanPts'
+    drawPolys n gl_TRIANGLE_FAN staticFanPts texCoords
+
     -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
     -- because there is texture to be drawn in these valleys.)
-    let prePts    = map splitPts $ rep germPts
-        vertexPts = concat $ map bar prePts
-        n         = length prePts -- FIXME: pre-calculate
-    allocaArray (n*perVertex) $ \vertices -> do
-      pokeArray vertices ({-# SCC "double2float-2" #-} map d2f vertexPts)
-      glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
-      glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride (vertices `plusPtr` (2*floatSize))
-      glDrawArrays gl_TRIANGLES 0 (fromIntegral n)
-
-----------------------------------------------------------------------------------------------------
+    let texCoords = V.map (movingPtToPt t) preTriPts'
+    drawPolys lenTri gl_TRIANGLES staticTriPts texCoords

@@ -19,6 +19,7 @@ import qualified Data.Vector.Unboxed as V
 
 -- friends
 import Types
+import Util
 
 {-
 
@@ -35,16 +36,16 @@ going to go out of bounds. Is this okay?
 periodicsToSum :: Int
 periodicsToSum = 3
 
-jigglePeriodBounds :: (Double, Double)
+jigglePeriodBounds :: (Frac, Frac)
 jigglePeriodBounds = (7,15)
 
-jiggleRadiusAmplitudeBounds :: (Double, Double)
+jiggleRadiusAmplitudeBounds :: (Frac, Frac)
 jiggleRadiusAmplitudeBounds = (0.05, 0.1)
 
-jiggleAngleAmplitudeBounds :: (Double, Double)
+jiggleAngleAmplitudeBounds :: (Frac, Frac)
 jiggleAngleAmplitudeBounds = (-0.02, 0.02)
 
-jigglePhaseBounds :: (Double, Double)
+jigglePhaseBounds :: (Frac, Frac)
 jigglePhaseBounds = (0,1)
 
 tileGermsPerRow = 10
@@ -60,11 +61,11 @@ nucleusAlpha = 0.5
 numNucleusPoints :: Int
 numNucleusPoints = 10
 
-nucleusRadiusRange :: (Double, Double)
+nucleusRadiusRange :: (Frac, Frac)
 nucleusRadiusRange = (0.2,0.5)
 
 -- Between 0 and 1
-spikyInnerRadius, spikyOuterRadius :: Double
+spikyInnerRadius, spikyOuterRadius :: Frac
 spikyInnerRadius = 0.5
 spikyOuterRadius = 1
 
@@ -93,8 +94,8 @@ tanU a = sinU a / cosU a
 
 
 ----------------------------------------------------------------------------------------------------
-movingPtToPt :: Time -> MovingPoint -> CairoPoint
-movingPtToPt t (MP2 (r, pfs) (a, pfs')) =
+movingPtToPt :: Time -> MovingPoint -> (Frac, Frac)
+movingPtToPt t (MP2 ((r, pfs),(a, pfs'))) =
   polarPtToPt (P2 r' a')
   where
     r' = r + sumPeriodics t pfs
@@ -103,15 +104,20 @@ movingPtToPt t (MP2 (r, pfs) (a, pfs')) =
 --
 -- [movingPtToStaticPt] throws away the perturbations.
 --
-movingPtToStaticPt :: MovingPoint -> CairoPoint
-movingPtToStaticPt (MP2 (r, _) (a, _)) = polarPtToPt (P2 r a)
-----------------------------------------------------------------------------------------------------
-periodicValue :: Time -> PeriodicFun -> Frac
-periodicValue t (amp, period, phase) = amp * sinU ((t + phase)/period)
+movingPtToStaticPt :: MovingPoint -> (Frac, Frac)
+movingPtToStaticPt (MP2 ((r, _),(a, _))) = polarPtToPt (P2 r a)
 
 ----------------------------------------------------------------------------------------------------
-sumPeriodics :: Time -> Vector PeriodicFun -> Double
-sumPeriodics t pfs = V.sum . V.map ((/n') . periodicValue t) $ pfs
+ptToCairoPt :: (Frac, Frac) -> CairoPoint
+ptToCairoPt (x,y) = (f2d x, f2d y)
+
+----------------------------------------------------------------------------------------------------
+periodicValue :: Time -> PeriodicFun -> Frac
+periodicValue t (amp, period, phase) = amp * sinU (((d2f t) + phase)/period)
+
+----------------------------------------------------------------------------------------------------
+sumPeriodics :: Time -> Vector PeriodicFun -> Frac
+sumPeriodics t pfs = V.foldl' (\sum pf -> sum + (periodicValue t pf)/n') 0 pfs
   where n = V.length pfs
         n' = fromIntegral n
 
@@ -129,7 +135,7 @@ germGfxRenderNucleus gg r = do
      scale r r
      translate 0.5 0.5
      withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
-       blob . map movingPtToStaticPt . germGfxNucleus $ gg
+       blob . map (ptToCairoPt . movingPtToStaticPt) . germGfxNucleus $ gg
      -- scale to radius [r]
 
 ----------------------------------------------------------------------------------------------------
@@ -139,7 +145,7 @@ germGfxRenderBody gg r = do
      scale r r
      translate 1 1
      withGermGradient (germGfxBodyGrad gg) 1 $ do
-       blob . map movingPtToStaticPt . germGfxBody $ gg
+       blob . map (ptToCairoPt . movingPtToStaticPt) . germGfxBody $ gg
      -- scale to radius [r]
 
 ----------------------------------------------------------------------------------------------------
@@ -209,7 +215,7 @@ alternate xs [] = xs
 alternate (x:xs) (y:ys) = x:y:alternate xs ys
 
 ----------------------------------------------------------------------------------------------------
-polarPtToPt :: PolarPoint -> CairoPoint
+polarPtToPt :: PolarPoint -> (Frac, Frac)
 polarPtToPt (P2 r ang) = (r*cosU ang, r*sinU ang)
 
 ----------------------------------------------------------------------------------------------------
@@ -218,7 +224,7 @@ polarPtToPt (P2 r ang) = (r*cosU ang, r*sinU ang)
 -- the inner and out radii, returns the points defining a star.
 -- The first "point" of the star points right.
 --
-starPolyPoints :: Int -> Double -> Double -> [PolarPoint]
+starPolyPoints :: Int -> Frac -> Frac -> [PolarPoint]
 starPolyPoints n ri ro = polarPoints
   where
     n' = fromIntegral n
@@ -368,7 +374,7 @@ randomRadialPoints2 n = do
     n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
-randomPeriodicFuns :: RandomGen g => (Double, Double) -> Rand g (Vector PeriodicFun)
+randomPeriodicFuns :: RandomGen g => (Frac, Frac) -> Rand g (Vector PeriodicFun)
 randomPeriodicFuns ampBounds = do
   amps    <- getRandomRs ampBounds
   periods <- getRandomRs jigglePeriodBounds
@@ -381,7 +387,7 @@ polarPtToMovingPt :: RandomGen g => PolarPoint -> Rand g MovingPoint
 polarPtToMovingPt (P2 r a) = do
   pfs <- randomPeriodicFuns jiggleRadiusAmplitudeBounds
   pfs' <- randomPeriodicFuns jiggleAngleAmplitudeBounds
-  return $ MP2 (r, pfs) (a, pfs')
+  return $ MP2 ((r, pfs),(a, pfs'))
 
 ----------------------------------------------------------------------------------------------------
 changeAlpha :: Double -> Color -> Color
