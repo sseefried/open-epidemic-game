@@ -38,20 +38,20 @@ import Util
 import FrameRateBuffer
 
 ----------------------------------------------------------------------------------------------------
-data BackendState = BackendState { _besStartTime      :: !UTCTime
-                                 , besLastTime       :: !UTCTime
-                                 , besGLSLState      :: !GLSLState
-                                 , _besGLContext      :: !S.GLContext
-                                 , besGameState      :: !GameState
-                                 , besBackendToWorld :: !BackendToWorld
-                                 , besFrames         :: !Integer
-                                 , besFRBuf          :: !FRBuf
-                                 , besFSMState       :: !FSMState
+data BackendState = BackendState { _besStartTime     :: UTCTime
+                                 , besLastTime       :: UTCTime
+                                 , besGLSLState      :: GLSLState
+                                 , _besGLContext     :: S.GLContext
+                                 , besGameState      :: GameState
+                                 , besBackendToWorld :: BackendToWorld
+                                 , besFrames         :: Integer
+                                 , besFRBuf          :: FRBuf
+                                 , besFSMState       :: FSMState
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
-                                 , besWindow         :: !S.Window
-                                 , besLevelMusic     :: !M.Music
-                                 , besSquishSound    :: !M.Chunk
+                                 , besWindow         :: S.Window
+                                 , besLevelMusic     :: M.Music
+                                 , besSquishSound    :: M.Chunk
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
