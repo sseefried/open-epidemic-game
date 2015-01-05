@@ -7,16 +7,8 @@ module Main where
 import Game
 import Backend.SDL as B
 
-screenWidth, screenHeight :: Int
-screenWidth  = 1280
-screenHeight = 720
-
-w, h :: Double
-w = fromIntegral screenWidth
-h = fromIntegral screenHeight
 
 main :: IO ()
 main = do
-  gs     <- newGameState (screenWidth, screenHeight)
-  besRef <- B.initialize "Epidemic" screenWidth screenHeight gs
+  besRef <- B.initialize "Epidemic"
   B.mainLoop besRef handleEvent

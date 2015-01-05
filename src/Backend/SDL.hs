@@ -168,10 +168,18 @@ ortho2D programId left right bottom top = do
     tz = - (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
-initialize :: String -> Int -> Int -> GameState -> IO (IORef BackendState)
-initialize title screenWidth screenHeight gs = do
+initialize :: String -> IO (IORef BackendState)
+initialize title = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
+
+
+  dims@(w,h) <- case screenDimensions of
+    Just (w',h') -> return (w', h')
+    Nothing -> do
+      mode <- S.getCurrentDisplayMode 0
+      return (fromIntegral (S.displayModeWidth mode), fromIntegral (S.displayModeHeight mode))
+
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   (glslState, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
@@ -185,14 +193,14 @@ initialize title screenWidth screenHeight gs = do
       squishSound <- M.loadWAVRW rwOps False
       return (levelMusic, squishSound)
   t        <- getCurrentTime
-  let dims = (screenWidth, screenHeight)
   frBuf <- initFRBuf
+  gs <- newGameState (w,h)
+
   newIORef $ BackendState t t glslState context gs (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
     wflags = [S.WindowShown]
-    w = fromIntegral screenWidth
-    h = fromIntegral screenHeight
+
 
 --debugPrintKey sdlEvent = case sdlEvent of
 --  S.KeyboardEvent (S.Keysym key mods unicode) ->

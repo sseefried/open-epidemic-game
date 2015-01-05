@@ -26,3 +26,13 @@ debugLog :: String -> IO ()
 debugLog = case platform of
   Android -> androidLog
   _       -> putStrLn
+
+--
+-- [Nothing] means fullscreen. [Just (w,h)] means set screen size to width [w] and height [h]
+--
+screenDimensions :: Maybe (Int,Int)
+screenDimensions = case platform of
+  Android     -> Nothing
+  IOSPlatform -> Nothing
+  _           -> Just (1280, 720)
+
