@@ -75,7 +75,7 @@ type PeriodicFun = (Frac, Frac, Frac)
 -- The final point at a time 't' is determined by summing the value of
 -- the periodic functions at 't' and adding that to the component.
 --
-newtype MovingPoint = MP2 ((Frac, Vector PeriodicFun),(Frac, Vector PeriodicFun))
+type MovingPoint = ((Frac, PeriodicFun),(Frac, PeriodicFun))
 
 --
 --

@@ -32,10 +32,6 @@ going to go out of bounds. Is this okay?
 -------------------------------------------
 -- Constants
 
--- number of sin waves to sum together to produce a fairly unpredictable periodic motion
-periodicsToSum :: Int
-periodicsToSum = 3
-
 jigglePeriodBounds :: (Frac, Frac)
 jigglePeriodBounds = (7,15)
 
@@ -94,18 +90,20 @@ tanU a = sinU a / cosU a
 
 
 ----------------------------------------------------------------------------------------------------
+{-# INLINE movingPtToPt #-}
 movingPtToPt :: Time -> MovingPoint -> (Frac, Frac)
-movingPtToPt t (MP2 ((r, pfs),(a, pfs'))) =
+movingPtToPt t ((r, pf),(a, pf')) =
   polarPtToPt (P2 r' a')
   where
-    r' = r + sumPeriodics t pfs
-    a' = a + sumPeriodics t pfs'
+    r' = r + periodicValue t pf
+    a' = a + periodicValue t pf'
 ----------------------------------------------------------------------------------------------------
 --
 -- [movingPtToStaticPt] throws away the perturbations.
 --
+{-# INLINE movingPtToStaticPt #-}
 movingPtToStaticPt :: MovingPoint -> (Frac, Frac)
-movingPtToStaticPt (MP2 ((r, _),(a, _))) = polarPtToPt (P2 r a)
+movingPtToStaticPt ((r, _),(a, _)) = polarPtToPt (P2 r a)
 
 ----------------------------------------------------------------------------------------------------
 ptToCairoPt :: (Frac, Frac) -> CairoPoint
@@ -114,12 +112,6 @@ ptToCairoPt (x,y) = (f2d x, f2d y)
 ----------------------------------------------------------------------------------------------------
 periodicValue :: Time -> PeriodicFun -> Frac
 periodicValue t (amp, period, phase) = amp * sinU (((d2f t) + phase)/period)
-
-----------------------------------------------------------------------------------------------------
-sumPeriodics :: Time -> Vector PeriodicFun -> Frac
-sumPeriodics t pfs = V.foldl' (\sum pf -> sum + (periodicValue t pf)/n') 0 pfs
-  where n = V.length pfs
-        n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -215,6 +207,7 @@ alternate xs [] = xs
 alternate (x:xs) (y:ys) = x:y:alternate xs ys
 
 ----------------------------------------------------------------------------------------------------
+{-# INLINE polarPtToPt #-}
 polarPtToPt :: PolarPoint -> (Frac, Frac)
 polarPtToPt (P2 r ang) = (r*cosU ang, r*sinU ang)
 
@@ -374,20 +367,19 @@ randomRadialPoints2 n = do
     n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
-randomPeriodicFuns :: RandomGen g => (Frac, Frac) -> Rand g (Vector PeriodicFun)
+randomPeriodicFuns :: RandomGen g => (Frac, Frac) -> Rand g PeriodicFun
 randomPeriodicFuns ampBounds = do
-  amps    <- getRandomRs ampBounds
-  periods <- getRandomRs jigglePeriodBounds
-  phases  <- getRandomRs jigglePhaseBounds
-  let pFuns   = zipWith3 (,,) amps periods phases
-  return $ V.fromList $ take periodicsToSum $ pFuns
+  amp    <- getRandomR ampBounds
+  period <- getRandomR jigglePeriodBounds
+  phase  <- getRandomR jigglePhaseBounds
+  return $ (amp, period, phase)
 
 ----------------------------------------------------------------------------------------------------
 polarPtToMovingPt :: RandomGen g => PolarPoint -> Rand g MovingPoint
 polarPtToMovingPt (P2 r a) = do
   pfs <- randomPeriodicFuns jiggleRadiusAmplitudeBounds
   pfs' <- randomPeriodicFuns jiggleAngleAmplitudeBounds
-  return $ MP2 ((r, pfs),(a, pfs'))
+  return $ ((r, pfs),(a, pfs'))
 
 ----------------------------------------------------------------------------------------------------
 changeAlpha :: Double -> Color -> Color

@@ -14,7 +14,6 @@ import           Control.Monad
 import           Util
 
 import qualified Data.Vector.Unboxed as VU
-import qualified Data.Vector as V
 
 -- friends
 import Types
@@ -26,8 +25,6 @@ powOfTwo = 7
 
 bytesPerWord32 :: Int
 bytesPerWord32 = 4
-
-
 ----------------------------------------------------------------------------------------------------
 -- FIXME: For even more speed perhaps pre-allocate [maxGerms] of these buffers and re-use them.
 --
@@ -76,21 +73,10 @@ repEven :: [a] -> [a]
 repEven [] = []
 repEven (x:xs) = x:repOdd xs
 
-
-
-
-uForMi_ :: (Monad m, VU.Unbox a) => VU.Vector a -> (Int -> a -> m b) -> m ()
-uForMi_ v f = VU.foldM' f' 0 v >> return ()
+forMi_ :: (Monad m, VU.Unbox a) => VU.Vector a -> (Int -> a -> m b) -> m ()
+forMi_ v f = VU.foldM' f' 0 v >> return ()
   where
     f' i a = f i a >> return (i+1)
-
-forMi_ :: Monad m => V.Vector a -> (Int -> a -> m b) -> m ()
-forMi_ v f = V.foldM' f' 0 v >> return ()
-  where
-    f' i a = f i a >> return (i+1)
-
-
-
 ----------------------------------------------------------------------------------------------------
 --
 -- This function is reponsible for drawing a wiggling germ.
@@ -110,47 +96,38 @@ germGfxToGLFun gfx = GLM . const $ do
   textureId <- drawToTexture (germGfxRenderBody gfx)
   let germPts         = germGfxBody gfx
       len             = length germPts
-      preFanPts       = (MP2 ((0,VU.empty), (0,VU.empty))):(take (len+1) $ cycle germPts)
-      preFanPts'      = V.fromList preFanPts
-      staticFanPts    = VU.fromList $ map movingPtToStaticPt preFanPts
-      preTriPts       = rep germPts
-      preTriPts'      = V.fromList preTriPts
-      staticTriPts    = VU.fromList $ map movingPtToStaticPt preTriPts
-      lenTri          = V.length preTriPts'
-
+      fanPts          = VU.fromList $ ((0,(0,1,0)), (0,(0,1,0))):(take (len+1) $ cycle germPts)
+      triPts          = VU.fromList $ rep germPts
+      lenTri          = VU.length triPts
+      perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
+      floatSize = sizeOf (undefined :: GLfloat)
+      stride = fromIntegral $ perVertex * floatSize
   return $ \(R2 x' y') t r  -> GLM $ \glslAttrs -> do
-    let perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
-        floatSize = sizeOf (undefined :: GLfloat)
-        stride = fromIntegral $ perVertex * floatSize
-        positionIdx = glslPosition glslAttrs
+    let positionIdx = glslPosition glslAttrs
         texCoordIdx = glslTexcoord glslAttrs
     glBindTexture gl_TEXTURE_2D textureId
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
     -- Create a star polygon.
-    let drawPolys n arrayType staticPts movingPts = do
+    let drawPolys n arrayType movingPts = do
           allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
-            uForMi_ staticPts $ \i (x,y) -> do
-              let vx = ((d2f r)*x + d2f x')
+            forMi_ movingPts $ \i movingPt -> do
+              let (x,y)    = movingPtToStaticPt movingPt
+                  (mx, my) = movingPtToPt t movingPt
+                  vx = ((d2f r)*x + d2f x')
                   vy = ((d2f r)*y + d2f y')
+                  tx = (mx+1)/2
+                  ty = (my+1)/2
                   base = i*perVertex*floatSize
-              pokeByteOff vertices base             vx
-              pokeByteOff vertices (base+floatSize) vy
-            forMi_ movingPts $ \i (x,y) -> do
-              let tx = (x+1)/2
-                  ty = (y+1)/2
-                  base = i*perVertex*floatSize
+              pokeByteOff vertices base               vx
+              pokeByteOff vertices (base+  floatSize) vy
               pokeByteOff vertices (base+2*floatSize) tx
               pokeByteOff vertices (base+3*floatSize) ty
             glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
             glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride
-              (vertices `plusPtr` (2*floatSize))
+                                  (vertices `plusPtr` (2*floatSize))
             glDrawArrays arrayType 0 (fromIntegral n)
-    let n         = len + 2
-        texCoords = V.map (movingPtToPt t) preFanPts'
-    drawPolys n gl_TRIANGLE_FAN staticFanPts texCoords
-
+    drawPolys (len+2) gl_TRIANGLE_FAN fanPts
     -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
     -- because there is texture to be drawn in these valleys.)
-    let texCoords = V.map (movingPtToPt t) preTriPts'
-    drawPolys lenTri gl_TRIANGLES staticTriPts texCoords
+    drawPolys lenTri gl_TRIANGLES triPts
