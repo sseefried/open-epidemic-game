@@ -13,7 +13,8 @@ import           Foreign.Storable
 import           Control.Monad
 import           Util
 
-import qualified Data.Vector.Unboxed as VU
+import           Data.Vector.Unboxed (Vector, Unbox)
+import qualified Data.Vector.Unboxed as V
 
 -- friends
 import Types
@@ -73,8 +74,8 @@ repEven :: [a] -> [a]
 repEven [] = []
 repEven (x:xs) = x:repOdd xs
 
-forMi_ :: (Monad m, VU.Unbox a) => VU.Vector a -> (Int -> a -> m b) -> m ()
-forMi_ v f = VU.foldM' f' 0 v >> return ()
+forMi_ :: (Monad m, Unbox a) => Vector a -> (Int -> a -> m b) -> m ()
+forMi_ v f = V.foldM' f' 0 v >> return ()
   where
     f' i a = f i a >> return (i+1)
 ----------------------------------------------------------------------------------------------------
@@ -96,9 +97,9 @@ germGfxToGLFun gfx = GLM . const $ do
   textureId <- drawToTexture (germGfxRenderBody gfx)
   let germPts         = germGfxBody gfx
       len             = length germPts
-      fanPts          = VU.fromList $ ((0,(0,1,0)), (0,(0,1,0))):(take (len+1) $ cycle germPts)
-      triPts          = VU.fromList $ rep germPts
-      lenTri          = VU.length triPts
+      fanPts          = V.fromList $ ((0,(0,1,0)), (0,(0,1,0))):(take (len+1) $ cycle germPts)
+      triPts          = V.fromList $ rep germPts
+      lenTri          = V.length triPts
       perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
       floatSize = sizeOf (undefined :: GLfloat)
       stride = fromIntegral $ perVertex * floatSize
