@@ -6,11 +6,14 @@ module Graphics (
   movingPtToPt, movingPtToStaticPt
 ) where
 
-import Graphics.Rendering.Cairo
-import Control.Monad
-import Control.Monad.Random
-import Control.Applicative
-import Debug.Trace
+import           Graphics.Rendering.Cairo
+import           Control.Monad
+import           Control.Monad.Random
+import           Control.Applicative
+import           Debug.Trace
+import           Data.Vector.Unboxed (Vector)
+import qualified Data.Vector.Unboxed as V
+
 -- import GameMonad
 -- import Data.Foldable
 
@@ -103,13 +106,13 @@ movingPtToPt t (MP2 (r, pfs) (a, pfs')) =
 movingPtToStaticPt :: MovingPoint -> CairoPoint
 movingPtToStaticPt (MP2 (r, _) (a, _)) = polarPtToPt (P2 r a)
 ----------------------------------------------------------------------------------------------------
-periodicValue :: Time -> PeriodicFun -> Double
-periodicValue t pf = pfAmp pf * sinU ((t + pfPhase pf)/(pfPeriod pf))
+periodicValue :: Time -> PeriodicFun -> Frac
+periodicValue t (amp, period, phase) = amp * sinU ((t + phase)/period)
 
 ----------------------------------------------------------------------------------------------------
-sumPeriodics :: Time -> [PeriodicFun] -> Double
-sumPeriodics t pfs = sum . map ((/n') . periodicValue t) $ pfs
-  where n = length pfs
+sumPeriodics :: Time -> Vector PeriodicFun -> Double
+sumPeriodics t pfs = V.sum . V.map ((/n') . periodicValue t) $ pfs
+  where n = V.length pfs
         n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
@@ -365,13 +368,13 @@ randomRadialPoints2 n = do
     n' = fromIntegral n
 
 ----------------------------------------------------------------------------------------------------
-randomPeriodicFuns :: RandomGen g => (Double, Double) -> Rand g [PeriodicFun]
+randomPeriodicFuns :: RandomGen g => (Double, Double) -> Rand g (Vector PeriodicFun)
 randomPeriodicFuns ampBounds = do
   amps    <- getRandomRs ampBounds
   periods <- getRandomRs jigglePeriodBounds
   phases  <- getRandomRs jigglePhaseBounds
-  let pFuns   = zipWith3 PeriodicFun amps periods phases
-  return $ take periodicsToSum $ pFuns
+  let pFuns   = zipWith3 (,,) amps periods phases
+  return $ V.fromList $ take periodicsToSum $ pFuns
 
 ----------------------------------------------------------------------------------------------------
 polarPtToMovingPt :: RandomGen g => PolarPoint -> Rand g MovingPoint

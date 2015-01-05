@@ -177,6 +177,7 @@ executable         GenerateIcons
                  , text
                  , transformers
                  , utf8-string
+                 , vector
     if flag(android) || flag(ios)
       Buildable: False
     else

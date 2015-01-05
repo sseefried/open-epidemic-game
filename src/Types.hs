@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 module Types where
 
 import           Graphics.Rendering.Cairo (Render(..))
@@ -6,6 +7,11 @@ import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLfloat, GLsizei,
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
 import           Control.Applicative
+import           Data.Vector.Unboxed (MVector(..), Vector(..), Unbox(..))
+import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Generic.Mutable as MV
+import qualified Data.Vector.Generic as G
+import           Control.Monad (liftM)
 
 
 --
@@ -34,6 +40,7 @@ data Color = Color !Double !Double !Double !Double deriving Show
 
 type CairoPoint = (Double, Double)
 
+type Frac = Double
 
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
@@ -46,33 +53,27 @@ type GermGradient = (Color, Color)
 data PolarPoint = P2 Double Double -- radius and angle
 
 data GermGfx =
-  GermGfx { germGfxBodyGrad    :: GermGradient
-          , germGfxNucleusGrad :: GermGradient
+  GermGfx { germGfxBodyGrad    :: !GermGradient
+          , germGfxNucleusGrad :: !GermGradient
           , germGfxBody        :: [MovingPoint]
           , germGfxNucleus     :: [MovingPoint]
-          , germGfxSpikes      :: Int
+          , germGfxSpikes      :: !Int
           }
 
-
-
-
+----------------------------------------------------------------------------------------------------
 --
 -- Represents a periodic function as data.
 -- \t -> pfAmp * sinU ((t + pfPhase)/pfPeriod)
 --
-data PeriodicFun =
-  PeriodicFun { pfAmp    :: Double
-              , pfPeriod :: Double
-              , pfPhase  :: Double
-              }
-
+type PeriodicFun = (Frac, Frac, Frac)
+----------------------------------------------------------------------------------------------------
 --
 -- A [MovingPoint] is a polar point but each component 'r' and 'a' has been
 -- annotated with a list of [PeriodicFun]s.
 -- The final point at a time 't' is determined by summing the value of
 -- the periodic functions at 't' and adding that to the component.
 --
-data MovingPoint = MP2 (Double, [PeriodicFun]) (Double, [PeriodicFun])
+data MovingPoint = MP2 (Double, Vector PeriodicFun) (Double, Vector PeriodicFun)
 
 --
 --
@@ -153,3 +154,4 @@ data GameSound = GameSoundLevelMusicStart -- start level music
                | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish
 ----------------------------------------------------------------------------------------------------
+
