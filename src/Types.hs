@@ -1,17 +1,12 @@
 {-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
 module Types where
 
-import           Graphics.Rendering.Cairo (Render(..))
-import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLfloat, GLsizei, GLenum)
+import           Graphics.Rendering.Cairo (Render)
+import           Graphics.Rendering.OpenGL.Raw (GLuint, GLenum)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
 import           Control.Applicative
-import           Data.Vector.Unboxed (MVector(..), Vector(..), Unbox(..))
-import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Generic.Mutable as MV
-import qualified Data.Vector.Generic as G
-import           Control.Monad (liftM)
 
 
 --
@@ -44,6 +39,7 @@ type CairoPoint = (Double, Double)
 
 
 
+white, blue, green, black :: Color
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
 green = Color 0 1 0 1

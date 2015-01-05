@@ -3,12 +3,9 @@ module GraphicsGL where
 
 import qualified Graphics.Rendering.Cairo as C
 import           Graphics.Rendering.OpenGL.Raw
-import           Text.Printf
-import           Foreign.Marshal.Alloc (alloca, allocaBytes)
-import           Foreign.Marshal.Array (mallocArray, allocaArray, pokeArray, peekArray)
+import           Foreign.Marshal.Alloc (allocaBytes)
+import           Foreign.Marshal.Array (allocaArray, peekArray)
 import           Foreign.Ptr
-import           Foreign.C.String
-import           Foreign.C.Types
 import           Foreign.Storable
 import           Control.Monad
 import           Util
@@ -36,7 +33,6 @@ drawToTexture renderFun = do
     [textureId] <- peekArray 1 textures
     return textureId
   glBindTexture gl_TEXTURE_2D textureId
-
   -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
   -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
   glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR_MIPMAP_LINEAR)

@@ -5,15 +5,11 @@ module Backend.SDL (
 ) where
 
 import qualified Graphics.UI.SDL          as S
-import qualified Graphics.UI.SDL.Surface  as S
 import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
 import           Graphics.Rendering.OpenGL.Raw
 import           Data.Bits
-import           Data.Maybe (maybe)
-
-
 import           Data.List (intersperse)
 import           Data.IORef
 import           Data.Time
@@ -22,10 +18,10 @@ import           Control.Monad
 import           System.Exit
 -- import           Foreign.C.Types (CUChar)
 --import           Foreign.Marshal.Alloc (mallocBytes)
-import           Foreign.Ptr (Ptr, castPtr, nullPtr)
+import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.Types (CFloat)
 import           Foreign.C.String (withCString, withCStringLen, peekCString)
-import           Foreign.Marshal.Array (mallocArray, allocaArray, pokeArray)
+import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Marshal.Alloc (alloca, allocaBytes)
 import           Foreign.Storable (peek)
 
@@ -42,21 +38,20 @@ import Util
 import FrameRateBuffer
 
 ----------------------------------------------------------------------------------------------------
-data BackendState = BackendState { besStartTime      :: UTCTime
-                                 , besLastTime       :: UTCTime
-                                 , besGLSLState      :: GLSLState
-                                 , besGLContext      :: S.GLContext
-                                 , besGameState      :: GameState
-                                 , besDimensions     :: (Int,Int)
-                                 , besBackendToWorld :: BackendToWorld
-                                 , besFrames         :: Integer
-                                 , besFRBuf          :: FRBuf
-                                 , besFSMState       :: FSMState
+data BackendState = BackendState { _besStartTime      :: !UTCTime
+                                 , besLastTime       :: !UTCTime
+                                 , besGLSLState      :: !GLSLState
+                                 , _besGLContext      :: !S.GLContext
+                                 , besGameState      :: !GameState
+                                 , besBackendToWorld :: !BackendToWorld
+                                 , besFrames         :: !Integer
+                                 , besFRBuf          :: !FRBuf
+                                 , besFSMState       :: !FSMState
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
-                                 , besWindow         :: S.Window
-                                 , besLevelMusic     :: M.Music
-                                 , besSquishSound    :: M.Chunk
+                                 , besWindow         :: !S.Window
+                                 , besLevelMusic     :: !M.Music
+                                 , besSquishSound    :: !M.Chunk
                                  }
 
 data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
@@ -192,12 +187,10 @@ initialize title screenWidth screenHeight gs = do
   t        <- getCurrentTime
   let dims = (screenWidth, screenHeight)
   frBuf <- initFRBuf
-  newIORef $ BackendState t t glslState context gs dims (backendToWorld dims) 0 frBuf (FSMLevel 1)
+  newIORef $ BackendState t t glslState context gs (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
     wflags = [S.WindowShown]
-    -- Note: for debuggin purposes you can see the true framerate by commented out [PresentVSync]
-    rflags = [S.Accelerated] -- , S.PresentVSync]
     w = fromIntegral screenWidth
     h = fromIntegral screenHeight
 
@@ -260,8 +253,8 @@ runOnGameState upd besRef gameM cont  = do
 ----------------------------------------------------------------------------------------------------
 --
 -- Executes an IO action, times it and then updates the BackendState with that duration.
-runAndTime :: IORef BackendState -> (Time -> BackendState -> BackendState) -> IO a -> IO a
-runAndTime besRef upd io = do
+_runAndTime :: IORef BackendState -> (Time -> BackendState -> BackendState) -> IO a -> IO a
+_runAndTime besRef upd io = do
   bes <- readIORef besRef
   t <- getCurrentTime
   result <- io
@@ -275,11 +268,7 @@ runAndTime besRef upd io = do
 runFrameUpdate :: IORef BackendState -> IO ()
 runFrameUpdate besRef = do
   bes <- readIORef besRef
-  t <- getCurrentTime
-  let (w,h)      = besDimensions bes
-      gs         = besGameState bes
-      sinceStart = toDouble $ diffUTCTime t (besStartTime bes)
-
+  let gs         = besGameState bes
   glClearColor 1 1 1 1
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   runGLMIO (gsRender gs) (besGLSLState bes)

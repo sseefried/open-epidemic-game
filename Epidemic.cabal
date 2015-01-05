@@ -71,7 +71,7 @@ library
 executable         EpidemicStaticLib
     hs-source-dirs : src
     default-language:  Haskell2010
-    ghc-options: -Wall -threaded -O2 -staticlib
+    ghc-options: -W -threaded -O2 -staticlib
     cpp-options: -DIOS
     main-is:       MainLib.hs
 
@@ -108,7 +108,7 @@ executable         EpidemicStaticLib
 executable         Epidemic
     hs-source-dirs : src
     default-language:  Haskell2010
-    ghc-options: -Wall -threaded -O2
+    ghc-options: -W -threaded -O2
     ghc-prof-options: -prof -auto-all
 
     main-is:       Main.hs

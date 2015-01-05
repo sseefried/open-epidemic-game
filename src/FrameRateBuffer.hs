@@ -39,8 +39,8 @@ averageTick :: FRBuf -> IO Double
 averageTick frRef = readIORef frRef >>= \fr -> return $ tickSum fr / (fromIntegral $ tickSamples fr)
 
 ----------------------------------------------------------------------------------------------------
-test :: IO ()
-test = do
+_test :: IO ()
+_test = do
   frBuf <- initFRBuf
   forM_ (take 20 $ cycle [30,25,20]) $ \tick -> do
     addTick frBuf tick

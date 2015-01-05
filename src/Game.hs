@@ -11,7 +11,6 @@ import           Control.Monad.Random hiding (getRandom, evalRand)
 import           Control.Monad (replicateM)
 import           Control.Applicative
 import           Text.Printf
-import           Data.Map (Map)
 import qualified Data.Map as M
 
 -- friends
@@ -190,7 +189,6 @@ initGameState bounds hipSpace germs =
 handleEvent :: FSMState -> Event -> GameM FSMState
 handleEvent fsmState ev = do
   -- events that can occur in any FSM State
-  gs <- get
   case ev of
     Reset   -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
@@ -205,7 +203,6 @@ handleEvent fsmState ev = do
       resetGameState
       gs <- get
       -- create n germs randomly
-      let bounds = gsBounds gs
       germs <- replicateM i $ do
                  x <- getRandom (-worldWidth/8, worldWidth/8)
                  y <- getRandom (-worldHeight/8, worldHeight/8)
@@ -235,7 +232,7 @@ handleEvent fsmState ev = do
         TapAnywhere -> return $ FSMLevel 1
         _ -> do
           modify $ \gs -> gs { gsRender = do
-                             let w2c = gsWorldToCanvas gs
+--                             let w2c = gsWorldToCanvas gs
                              gsRender gs -- draw what we had before
 -- FIXME: Draw text
 --                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
@@ -343,8 +340,6 @@ insertGerm germId germ = modify $ \gs -> gs { gsGerms = M.insert germId germ (gs
 physics :: Time -> GameM ()
 physics duration = do
   gs <- get
-  let bounds = gsBounds gs
-      w2c = gsWorldToCanvas gs
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
   let drawOneGerm :: Germ -> GLM ()

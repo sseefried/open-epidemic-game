@@ -1,21 +1,17 @@
 module Graphics (
   -- types
-  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render(..),
+  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
-  movingPtToPt, movingPtToStaticPt
+  movingPtToPt, movingPtToStaticPt,
+  -- extra functions
+  alpha, clear, circle, polygon, lineTo, inContext, withColor, drawBackground, consoleLog
+
 ) where
 
 import           Graphics.Rendering.Cairo
-import           Control.Monad
 import           Control.Monad.Random
-import           Control.Applicative
 import           Debug.Trace
-import           Data.Vector.Unboxed (Vector)
-import qualified Data.Vector.Unboxed as V
-
--- import GameMonad
--- import Data.Foldable
 
 -- friends
 import Types
@@ -44,8 +40,6 @@ jiggleAngleAmplitudeBounds = (-0.02, 0.02)
 jigglePhaseBounds :: (Frac, Frac)
 jigglePhaseBounds = (0,1)
 
-tileGermsPerRow = 10
-
 germSpikeRange :: (Int, Int)
 germSpikeRange = (5,13)
 
@@ -65,16 +59,6 @@ spikyInnerRadius, spikyOuterRadius :: Frac
 spikyInnerRadius = 0.5
 spikyOuterRadius = 1
 
---
--- Small germs need to have their animation speed sped up because otherwise
--- it doesn't look like they are moving. If m = min w h where (w,h) is the bounds
--- of the canvas then the scale time, and r is the radius of the germ then
--- time is scaled by m/r * germAnimTimeScale
---
-germAnimTimeScale :: Double
-germAnimTimeScale = 1
-
-
 ----------------------------------------------------------------------------------------------------
 --
 -- [sinU], [cosU], [tanU] are like sin, cos and tan except that they work in units of
@@ -86,8 +70,6 @@ germAnimTimeScale = 1
 sinU, cosU :: Floating a => a -> a
 sinU   = sin . (2*pi*)
 cosU   = cos . (2*pi*)
-tanU a = sinU a / cosU a
-
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE movingPtToPt #-}
@@ -155,56 +137,6 @@ withGermGradient (Color r g b a, Color r' g' b' a') radius drawing = do
     fill
 
 ----------------------------------------------------------------------------------------------------
--- TODO: Draw some pictures of how you derived radCircle and lenPolySide
-wobble :: Int -> Double -> Render ()
-wobble bumpiness radius = do
-  let radial s a = (s*cosU a, s*sinU a)
-      l          = lenPolySide bumpiness radius
-      r          = radius - l/4
-      evenPts    = map (radial (radius - l/4))     [0,2/bumps..1]
-      oddPts     = map (radial (radInnerCircle bumpiness r)) [1/bumps,3/bumps..1]
-      smallCircle pt = circle pt (l/4) >> fill
-  mapM_ smallCircle evenPts
-  polygon evenPts >> fill
-  mapM_ (clear . smallCircle) oddPts
-    where
-      bumps = fromIntegral (2*bumpiness)
-
---
--- Take a circle of radius [r], transcribe a regular polygon with [n] sides
--- inside it. Each vertex touches the circle at regular intervals. Now transcribe
--- a circle within that polygon. The circle will touch the mid-point of each side
--- of the polygon.
---
--- This function returns radius of that inner circle.
---
-radInnerCircle :: Int -> Double -> Double
-radInnerCircle n r =   r*sinU (alpha n/2)
-
---
---
---
-lenPolySide :: Int -> Double -> Double
-lenPolySide    n r = 2*r*c/(1+1/2*c) where c = cosU (alpha n/2)
-
-----------------------------------------------------------------------------------------------------
---
--- Takes two lists, not necessarily of the same length.
--- Returns a list that alternates between elements of the
--- first list and the second list up to the point where
--- the shorter list runs out of values. The remaning elements
--- are from the longer list.
---
--- Examples:
---
--- alternate [1,2]     [10,20]     == [1,10,2,20]
--- alternate [1,2]     [10,20,30]  == [1,10,2,20,30]
--- alternate [1,2,3,4] [10,20]     == [1,10,2,20,3,4]
---
-alternate :: [a] -> [a] -> [a]
-alternate [] ys = ys
-alternate xs [] = xs
-alternate (x:xs) (y:ys) = x:y:alternate xs ys
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE polarPtToPt #-}
@@ -320,11 +252,6 @@ randomColor = do
   return $ Color r g b 1
 
 ----------------------------------------------------------------------------------------------------
---
--- Like mod but for RealFrac's
---
-fmod :: RealFrac a => a -> a -> a
-fmod a b = snd (properFraction (a / b)) * b
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -383,7 +310,7 @@ polarPtToMovingPt (P2 r a) = do
 
 ----------------------------------------------------------------------------------------------------
 changeAlpha :: Double -> Color -> Color
-changeAlpha a' (Color r g b a) = Color r g b a'
+changeAlpha a' (Color r g b _) = Color r g b a'
 
 ----------------------------------------------------------------------------------------------------
 -- map over uniform pairs. Would be better to use a new data structure [data Pair a = Pair a a]
@@ -432,7 +359,7 @@ text fontFamily c (x,y) w s = do
   setColor c
   setFontSize 1
   selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  te@(TextExtents bx _ tw _ _ _) <- textExtents s
+  (TextExtents bx _ tw _ _ _) <- textExtents s
   let scale = w/tw
   setFontSize scale
   moveTo (-bx*scale + x) y
