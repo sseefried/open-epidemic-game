@@ -1,3 +1,16 @@
+# Mon 5 Jan 2015
+
+I thought I had found out the reason for the unspeakble hack I had to add to Haskell package OpenGLRaw (i.e. directly loading libGLESv2.so using dyld). But it was not the case:
+
+I thought the reason was because I had failed to add:
+
+    System.loadLibrary("GLESv2");
+
+in `SDLActivity.java`.
+
+This has not turned out to be the case. Investigate further.
+
+
 # Sun 21 Dec 2014
 
 I've now settled on a new solution for drawing germs. I'm no longer going to draw the germs "on
