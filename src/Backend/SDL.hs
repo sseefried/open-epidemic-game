@@ -192,9 +192,9 @@ initialize title = do
       rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
       squishSound <- M.loadWAVRW rwOps False
       return (levelMusic, squishSound)
-  t        <- getCurrentTime
+  t     <- getCurrentTime
   frBuf <- initFRBuf
-  gs <- newGameState (w,h)
+  gs    <- newGameState (w,h)
 
   newIORef $ BackendState t t glslState context gs (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
