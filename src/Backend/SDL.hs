@@ -147,6 +147,13 @@ getAttributeIndex programId s = do
 -- Open GL functions 'glOrtho' and 'glOrtho2D' are not supported by GL ES 2.0 so we write
 -- our own function to create the correct matrix.
 --
+-- See http://en.wikipedia.org/wiki/Orthographic_projection
+--
+-- One of the particularly confusing aspects of the orthographic projection is the
+-- definitions of the terms "near" and "far". (See http://math.hws.edu/graphicsnotes/c3/s5.html)
+-- 'near' is actually negative 'zMax' and 'far' is negative 'zMin'
+--
+--
 ortho2D :: ProgramId -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
 ortho2D programId left right bottom top = do
   modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
@@ -158,14 +165,14 @@ ortho2D programId left right bottom top = do
                     , tx, ty, tz, 1 ]
     glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
   where
-    near = -1
-    far  =  1
+    near = -zMax
+    far  = -zMin
     a    =  2 / (right - left)
     b    =  2 / (top - bottom)
-    c    = -2.0 / (far - near)
+    c    = -2 / (far - near)
     tx   = - (right + left)/(right - left)
     ty   = - (top + bottom)/(top - bottom)
-    tz   = - (far + near)/(far - near)
+    tz   =   (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> IO (IORef BackendState)

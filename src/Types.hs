@@ -2,7 +2,7 @@
 module Types where
 
 import           Graphics.Rendering.Cairo (Render)
-import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum)
+import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum, GLfloat)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
@@ -44,6 +44,8 @@ white = Color 1 1 1 1
 blue  = Color 0 0 1 1
 green = Color 0 1 0 1
 black = Color 0 0 0 1
+
+
 
 type GermGradient = (Color, Color)
 
@@ -117,6 +119,14 @@ instance Monad GLM where
 instance Applicative GLM where
   pure = return
   (GLM f) <*> (GLM f') = GLM $ liftA2 (<*>) f f'
+
+
+--
+-- Magnitude of near and far planes in orthographic project
+--
+zMin, zMax :: GLfloat
+zMin = -10000
+zMax = 10000
 
 type MipMapIndex     = GLint
 type ProgramId       = GLuint

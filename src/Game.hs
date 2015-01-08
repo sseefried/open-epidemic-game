@@ -344,7 +344,7 @@ physics duration = do
         (germGLFun . germGL $ g) i (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
       w2c = gsWorldToCanvas gs
   modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
-                  in  gs { gsRender = drawText "Hi there" (R2 (-50) (0)) (100,50) w2c >> render }
+                  in  gs { gsRender = render }
 
 ----------------------------------------------------------------------------------------------------
 
