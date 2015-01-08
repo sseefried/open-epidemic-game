@@ -79,13 +79,13 @@ createGerm :: Double -> R2 -> HipCirc -> GameM Germ
 createGerm initSize pos hipCirc = do
   gfx        <- evalRand $ randomGermGfx
   multiplyAt <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
-  glFun      <- runGLM $ germGfxToGLFun gfx
+  germGL     <- runGLM $ germGfxToGLFun gfx
   return $ Germ { germMultiplyAt     = multiplyAt
                 , germSizeFun        = germSizeFunForParams initSize multiplyAt
                 , germHipCirc        = hipCirc
                 , germPos            = pos
                 , germGfx            = gfx
-                , germGL             = glFun
+                , germGL             = germGL
                 , germCumulativeTime = 0
                 , germAnimTime       = 0
                 }
@@ -105,8 +105,6 @@ data FSMState = FSMLevel Int -- level number
               | FSMGameOver
               deriving (Show, Eq, Ord)
 
-
-----------------------------------------------------------------------------------------------------
 ----------------------------------------------------------------------------------------------------
 --
 -- Events
@@ -201,7 +199,6 @@ handleEvent fsmState ev = do
   where
     fsmLevel i = do
       resetGameState
-      gs <- get
       -- create n germs randomly
       germs <- replicateM i $ do
                  x <- getRandom (-worldWidth/8, worldWidth/8)
@@ -209,7 +206,7 @@ handleEvent fsmState ev = do
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
                  createGerm initSize (R2 x y) hc
-      put $ gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
+      modify $ \gs -> gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
                , gsSoundQueue = [GameSoundLevelMusicStart]}
       return $ FSMPlayingLevel i
     --------------------------------------
@@ -232,7 +229,6 @@ handleEvent fsmState ev = do
         TapAnywhere -> return $ FSMLevel 1
         _ -> do
           modify $ \gs -> gs { gsRender = do
---                             let w2c = gsWorldToCanvas gs
                              gsRender gs -- draw what we had before
 -- FIXME: Draw text
 --                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
@@ -264,6 +260,7 @@ killGerm p = do
         runOnHipState $ removeHipCirc (germHipCirc germ)
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
                            , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
+        runGLM . germGLFinaliser . germGL $ germ
   mapM_ kkk germsToKill
   where
     tapCollides :: R2 -> Germ -> Bool
@@ -342,16 +339,17 @@ physics duration = do
   gs <- get
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
-  let drawOneGerm :: Germ -> GLM ()
-      drawOneGerm g = do
-        (germGL g) (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
-  modify $ \gs -> let render = mapM_ drawOneGerm (M.elems $ gsGerms gs)
-                  in  gs { gsRender = render }
+  let drawOneGerm :: (Int, Germ) -> GLM ()
+      drawOneGerm (i,g) = do
+        (germGLFun . germGL $ g) i (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
+      w2c = gsWorldToCanvas gs
+  modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
+                  in  gs { gsRender = drawText "Hi there" (R2 (-50) (0)) (100,50) w2c >> render }
 
 ----------------------------------------------------------------------------------------------------
 
-drawText :: WorldToCanvas -> Color -> R2 -> Double -> String -> Render ()
-drawText w2c c pos w s = do
-  let wl2cl = worldLenToCanvasLen w2c
-      wp2cp = worldPtToCanvasPt w2c
-  text "Helvetica" c (wp2cp pos) (wl2cl w) s
+--drawText :: WorldToCanvas -> Color -> R2 -> Double -> String -> Render ()
+--drawText w2c c pos w s = do
+--  let wl2cl = worldLenToCanvasLen w2c
+--      wp2cp = worldPtToCanvasPt w2c
+--  text "Helvetica" c (wp2cp pos) (wl2cl w) s

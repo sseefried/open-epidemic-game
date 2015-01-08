@@ -2,7 +2,7 @@
 module Types where
 
 import           Graphics.Rendering.Cairo (Render)
-import           Graphics.Rendering.OpenGL.Raw (GLuint, GLenum)
+import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
@@ -89,7 +89,7 @@ data Germ = Germ { germMultiplyAt     :: Time
                  , germHipCirc        :: HipCirc
                  , germPos            :: R2 -- cached pos
                  , germGfx            :: GermGfx
-                 , germGL             :: GermGLFun
+                 , germGL             :: GermGL
                  , germCumulativeTime :: Time
                  , germAnimTime       :: Time
                  }
@@ -118,12 +118,18 @@ instance Applicative GLM where
   pure = return
   (GLM f) <*> (GLM f') = GLM $ liftA2 (<*>) f f'
 
-type ProgramId      = GLuint
-type ShaderId       = GLuint
-type ShaderType     = GLenum
-type AttributeIndex = GLuint
-type TextureId      = GLuint
-type GermGLFun      = R2 -> Time -> Double -> GLM ()
+type MipMapIndex     = GLint
+type ProgramId       = GLuint
+type ShaderId        = GLuint
+type ShaderType      = GLenum
+type AttributeIndex  = GLuint
+type TextureId       = GLuint
+data GermGL = GermGL { germGLFun :: Int    -- z index
+                                 -> R2     -- position
+                                 -> Time   -- cumulative animation time
+                                 -> Double -- radius
+                                 -> GLM ()
+                     , germGLFinaliser :: GLM () }
 
 ----------------------------------------------------------------------------------------------------
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }

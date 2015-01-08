@@ -10,6 +10,7 @@ module Graphics (
 ) where
 
 import           Graphics.Rendering.Cairo
+import qualified Graphics.Rendering.Cairo.Matrix as M
 import           Control.Monad.Random
 import           Debug.Trace
 
@@ -355,14 +356,15 @@ asGroup r = do
 -- depends on the [fontFamily].
 --
 text :: String -> Color -> CairoPoint -> Double -> String -> Render ()
-text fontFamily c (x,y) w s = do
+text fontFamily c (x,y) w s = inContext $ do
   setColor c
   setFontSize 1
   selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  (TextExtents bx _ tw _ _ _) <- textExtents s
+  (TextExtents bx by tw th _ _) <- textExtents s
   let scale = w/tw
   setFontSize scale
-  moveTo (-bx*scale + x) y
+  setMatrix $ M.Matrix 1 0 0 (-1) 0 0
+  moveTo (-bx*scale + x) ((-th - by)*scale - y)
   showText s
 
 ----------------------------------------------------------------------------------------------------

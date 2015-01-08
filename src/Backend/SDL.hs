@@ -84,7 +84,7 @@ initOpenGL window (w,h) = do
   S.glSetSwapInterval S.ImmediateUpdates
   glEnable gl_TEXTURE_2D
   glEnable gl_BLEND
-  glBlendFunc gl_ALPHA gl_ONE_MINUS_SRC_ALPHA
+  glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST
   glDepthFunc gl_LESS
   etVertexShader   <- loadShader vertexShaderSrc gl_VERTEX_SHADER
@@ -159,13 +159,13 @@ ortho2D programId left right bottom top = do
     glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
   where
     near = -1
-    far = 1
-    a  = 2 / (right - left)
-    b  = 2 / (top - bottom)
-    c  = -2.0 / (far - near)
-    tx = - (right + left)/(right - left)
-    ty = - (top + bottom)/(top - bottom)
-    tz = - (far + near)/(far - near)
+    far  =  1
+    a    =  2 / (right - left)
+    b    =  2 / (top - bottom)
+    c    = -2.0 / (far - near)
+    tx   = - (right + left)/(right - left)
+    ty   = - (top + bottom)/(top - bottom)
+    tz   = - (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> IO (IORef BackendState)
@@ -433,13 +433,13 @@ vertexShaderSrc =
       "#ifdef GL_ES"
     , "precision mediump float;        // set default precision for floats"
     , "#endif"
-    , "attribute vec2 position;         // vertex position attribute"
+    , "attribute vec3 position;         // vertex position attribute"
     , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
     , "uniform mat4 modelView;          // shader modelview matrix uniform"
     , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
     , "void main()"
     , "{"
-    , "  gl_Position = modelView * vec4(position,0,1); // transform vertex position with modelview matrix"
+    , "  gl_Position = modelView * vec4(position,1); // transform vertex position with modelview matrix"
     , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
     , "}"
     ]
@@ -457,7 +457,7 @@ fragmentShaderSrc = concat $ intersperse "\n" [
     , "{"
     , "    // sample the texture at the interpolated texture coordinate"
     , "    // and write it to gl_FragColor "
-    , "    gl_FragColor = texture2D( texture, texCoordVar);"
---    , "    gl_FragColor = vec4(1,0,0,1);"
+    , "    vec4 color = texture2D(texture, texCoordVar);"
+    , "    gl_FragColor = color;"
     , "}"
     ]

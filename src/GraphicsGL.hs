@@ -3,12 +3,13 @@ module GraphicsGL where
 
 import qualified Graphics.Rendering.Cairo as C
 import           Graphics.Rendering.OpenGL.Raw
-import           Foreign.Marshal.Alloc (allocaBytes)
-import           Foreign.Marshal.Array (allocaArray, peekArray)
+import           Foreign.Marshal.Alloc (allocaBytes, alloca)
+import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Ptr
 import           Foreign.Storable
+import           GHC.Word (Word32)
 import           Control.Monad
-import           Util
+
 
 import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
@@ -16,22 +17,128 @@ import qualified Data.Vector.Unboxed as V
 -- friends
 import Types
 import Graphics
+import Util
+import Platform
 
+----------------------------------------------------------------------------------------------------
+rgbFormat :: GLuint
+rgbFormat = case platform of
+  Android -> gl_RGBA
+  _       -> gl_BGRA
+
+----------------------------------------------------------------------------------------------------
 -- Resolution of largest texture for mipmap is 2^powOfTwo
 powOfTwo :: Int
 powOfTwo = 7
 
+----------------------------------------------------------------------------------------------------
 bytesPerWord32 :: Int
 bytesPerWord32 = 4
+
 ----------------------------------------------------------------------------------------------------
--- FIXME: For even more speed perhaps pre-allocate [maxGerms] of these buffers and re-use them.
+floatSize :: Int
+floatSize = sizeOf (undefined :: GLfloat)
+
+----------------------------------------------------------------------------------------------------
+genTexture :: IO TextureId
+genTexture =
+  alloca $ \(ptr :: Ptr GLuint) -> do { glGenTextures 1 ptr; peek ptr }
+
+----------------------------------------------------------------------------------------------------
 --
-drawToTexture :: (Double -> C.Render ()) -> IO TextureId
-drawToTexture renderFun = do
-  textureId <- allocaArray 1 $ \textures -> do
-    glGenTextures 1 (textures :: Ptr GLuint)
-    [textureId] <- peekArray 1 textures
-    return textureId
+-- Frees the [textureId] for reuse and deletes any bound textures.
+--
+delTexture :: TextureId -> IO ()
+delTexture textureId =
+  alloca $ \(ptr :: Ptr GLuint) -> do { poke ptr textureId; glDeleteTextures 1 ptr }
+
+----------------------------------------------------------------------------------------------------
+renderCairoToTexture :: TextureId -> Maybe MipMapIndex -> (Int, Int) -> Render () -> IO ()
+renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
+  allocaBytes (w*h*bytesPerWord32) $ \buffer -> do
+    -- zero the buffer
+    forM_ [0..w*h - 1] $ do \i -> pokeByteOff buffer (i*bytesPerWord32) (0 :: Word32)
+    C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
+      C.renderWith surface cairoRender
+    glBindTexture gl_TEXTURE_2D textureId
+    glTexImage2D gl_TEXTURE_2D index (fromIntegral gl_RGBA) w' h' 0 rgbFormat gl_UNSIGNED_BYTE buffer
+  where
+    w' = fromIntegral w
+    h' = fromIntegral h
+    index = maybe 0 id mbIdx
+
+----------------------------------------------------------------------------------------------------
+--
+-- If you're not using the texture anymore it must be freed.
+--
+renderCairoToNewTexture :: (Int, Int) -> Render () -> IO TextureId
+renderCairoToNewTexture dims r =
+  do { tid <- genTexture; renderCairoToTexture tid Nothing dims r; return tid }
+
+----------------------------------------------------------------------------------------------------
+--
+-- Generates a new texture, does something with it, frees it.
+--
+withNewTexture :: (TextureId -> IO ()) -> IO ()
+withNewTexture f = do
+  textureId <- genTexture
+  f textureId
+  delTexture textureId
+
+----------------------------------------------------------------------------------------------------
+--
+-- Best for one-off renders that will not take very long (since we don't use mipmapping)
+--
+renderCairoToQuad :: (Frac, Frac) -> (Frac, Frac) -> WorldToCanvas -> Render () -> GLM ()
+renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
+  --
+  -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
+  -- we take the ceiling of [w] and [h] and use that as our bounds.
+  -- We then scale the [cairoRender] by that amount (which will be very close to 1.)
+  --
+  let positionIdx = glslPosition glslAttrs
+      texCoordIdx = glslTexcoord glslAttrs
+      (x,y,w,h) = (f2gl x', f2gl y', f2gl w', f2gl h')
+      cw        = worldLenToCanvasLen w2c $ f2d w'
+      ch        = worldLenToCanvasLen w2c $ f2d h'
+      wi        = ceiling cw
+      hi        = ceiling ch
+      sx        = (fromIntegral wi)/cw
+      sy        = (fromIntegral hi)/ch
+      ptsInPos  = 2
+      ptsInTex  = 2
+      ptsInQuad = 4
+      (ptsInPos', ptsInTex')  = (fromIntegral ptsInPos, fromIntegral ptsInTex)
+      perVertex = ptsInPos + ptsInTex
+      stride    = fromIntegral $ perVertex*floatSize
+  withNewTexture $ \tid -> do
+    renderCairoToTexture tid Nothing (wi, hi) $ do
+      C.scale sx sy
+      cairoRender
+    glBindTexture gl_TEXTURE_2D tid
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
+    glEnableVertexAttribArray (glslPosition glslAttrs)
+    glEnableVertexAttribArray (glslTexcoord glslAttrs)
+    allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
+      pokeArray vs [ x  , y  , 0, 0  -- bottom-left
+                   , x+w, y  , 1, 0  -- upper-left
+                   , x+w, y+h, 1, 1  -- upper-right
+                   , x  , y+h, 0, 1  -- bottom-right
+                   ]
+      glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
+      glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                    (vs `plusPtr` (ptsInPos*floatSize))
+      glDrawArrays gl_QUADS 0 (fromIntegral ptsInQuad)
+
+----------------------------------------------------------------------------------------------------
+f2gl :: Float -> GLfloat
+f2gl = uncurry encodeFloat . decodeFloat
+
+----------------------------------------------------------------------------------------------------
+drawToMipmapTexture :: (Double -> C.Render ()) -> IO TextureId
+drawToMipmapTexture renderFun = do
+  textureId <- genTexture
   glBindTexture gl_TEXTURE_2D textureId
   -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
   -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
@@ -39,16 +146,12 @@ drawToTexture renderFun = do
   -- gl_TEXTURE_MAG_FILTER accepts gl_NEAREST or gl_LINEAR
   glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
   forM_ (zip textureWidths [0..]) $ \(x,i) -> do
-    let x' = fromIntegral x
-        xd = fromIntegral x
-    allocaBytes (x*x*bytesPerWord32) $ \buffer -> do
-      C.withImageSurfaceForData buffer C.FormatARGB32 x x (x*4) $ \surface ->
-         C.renderWith surface $ do
-           C.setSourceRGBA 1 1 1 1
-           C.rectangle 0 0 xd xd
-           C.fill
-           renderFun (fromIntegral x/2)
-      glTexImage2D gl_TEXTURE_2D i (fromIntegral gl_RGBA) x' x' 0 gl_RGBA gl_UNSIGNED_BYTE buffer
+    let xd = fromIntegral x
+    renderCairoToTexture textureId (Just i) (x,x) $ do
+      C.setSourceRGBA 1 1 1 0
+      C.rectangle 0 0 xd xd
+      C.fill
+      renderFun (fromIntegral x/2)
   return textureId
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
@@ -74,6 +177,7 @@ forMi_ :: (Monad m, Unbox a) => Vector a -> (Int -> a -> m b) -> m ()
 forMi_ v f = V.foldM' f' 0 v >> return ()
   where
     f' i a = f i a >> return (i+1)
+
 ----------------------------------------------------------------------------------------------------
 --
 -- This function is reponsible for drawing a wiggling germ.
@@ -88,43 +192,67 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- returns the position of the point at time zero. This is used for the texture co-ordinates,
 -- while [movingPtToPt] is used for the polygon vertices.
 --
-germGfxToGLFun :: GermGfx -> GLM GermGLFun
+germGfxToGLFun :: GermGfx -> GLM GermGL
 germGfxToGLFun gfx = GLM . const $ do
-  textureId <- drawToTexture (germGfxRenderBody gfx)
+  textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
+  --
+  -- We pre-allocate a bunch of unboxed vectors (from Data.Vector). (Data.Vector uses
+  -- the type family trick to change arrays of tuples to tuples of arrays.)
+  -- This means the performance is quite decent.
+  --
   let germPts         = germGfxBody gfx
       len             = length germPts
       fanPts          = V.fromList $ ((0,(0,1,0)), (0,(0,1,0))):(take (len+1) $ cycle germPts)
       triPts          = V.fromList $ rep germPts
       lenTri          = V.length triPts
-      perVertex = 4 -- number of GLfloats per vertex. 2 for position, 2 for texture
-      floatSize = sizeOf (undefined :: GLfloat)
+      ptsInPos        = 3
+      ptsInTex        = 2
+      (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
+      perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-  return $ \(R2 x' y') t r  -> GLM $ \glslAttrs -> do
-    let positionIdx = glslPosition glslAttrs
-        texCoordIdx = glslTexcoord glslAttrs
-    glBindTexture gl_TEXTURE_2D textureId
-    glEnableVertexAttribArray (glslPosition glslAttrs)
-    glEnableVertexAttribArray (glslTexcoord glslAttrs)
-    -- Create a star polygon.
-    let drawPolys n arrayType movingPts = do
-          allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
-            forMi_ movingPts $ \i movingPt -> do
-              let (x,y)    = movingPtToStaticPt movingPt
-                  (mx, my) = movingPtToPt t movingPt
-                  vx = ((d2f r)*x + d2f x')
-                  vy = ((d2f r)*y + d2f y')
-                  tx = (mx+1)/2
-                  ty = (my+1)/2
-                  base = i*perVertex*floatSize
-              pokeByteOff vertices base               vx
-              pokeByteOff vertices (base+  floatSize) vy
-              pokeByteOff vertices (base+2*floatSize) tx
-              pokeByteOff vertices (base+3*floatSize) ty
-            glVertexAttribPointer positionIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride vertices
-            glVertexAttribPointer texCoordIdx 2 gl_FLOAT (fromIntegral gl_FALSE) stride
-                                  (vertices `plusPtr` (2*floatSize))
-            glDrawArrays arrayType 0 (fromIntegral n)
-    drawPolys (len+2) gl_TRIANGLE_FAN fanPts
-    -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
-    -- because there is texture to be drawn in these valleys.)
-    drawPolys lenTri gl_TRIANGLES triPts
+      germGLFun = \zIndex (R2 x' y') t r  -> GLM $ \glslAttrs -> do
+        let positionIdx = glslPosition glslAttrs
+            texCoordIdx = glslTexcoord glslAttrs
+        glBindTexture gl_TEXTURE_2D textureId
+        glEnableVertexAttribArray (glslPosition glslAttrs)
+        glEnableVertexAttribArray (glslTexcoord glslAttrs)
+        -- Create a star polygon.
+        let drawPolys n arrayType movingPts = do
+              allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
+                forMi_ movingPts $ \i movingPt -> do
+                  let (x,y)    = movingPtToStaticPt movingPt
+                      (mx, my) = movingPtToPt t movingPt
+                      vx = ((d2f r)*x + d2f x')
+                      vy = ((d2f r)*y + d2f y')
+                      vz = fromIntegral zIndex * 0.0001 :: GLfloat
+                      tx = (mx+1)/2
+                      ty = (my+1)/2
+                      base = i*perVertex*floatSize
+                      texBase = base + ptsInPos*floatSize
+                  pokeByteOff vertices base                vx
+                  pokeByteOff vertices (base+  floatSize)  vy
+                  pokeByteOff vertices (base+2*floatSize)  vz
+                  pokeByteOff vertices texBase             tx
+                  pokeByteOff vertices (texBase+floatSize) ty
+                glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                      vertices
+                glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                      (vertices `plusPtr` (ptsInPos*floatSize))
+                glDrawArrays arrayType 0 (fromIntegral n)
+        drawPolys (len+2) gl_TRIANGLE_FAN fanPts
+        -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
+        -- because there is texture to be drawn in these valleys.)
+        drawPolys lenTri gl_TRIANGLES triPts
+      finaliser = GLM . const $ delTexture textureId
+  return $ GermGL germGLFun finaliser
+
+----------------------------------------------------------------------------------------------------
+drawText :: String -> R2 -> (Int,Int) -> WorldToCanvas -> GLM ()
+drawText s (R2 x y) (w,h) w2c =
+  renderCairoToQuad (d2f x, d2f y) (w', h') w2c $ do
+    text "Helvetica" (Color 1 0.5 0.25 1) (0,0) cw s
+  where
+    w' = fromIntegral w
+    h' = fromIntegral h
+    cw = worldLenToCanvasLen w2c $ fromIntegral w
+    ch = worldLenToCanvasLen w2c $ fromIntegral h
