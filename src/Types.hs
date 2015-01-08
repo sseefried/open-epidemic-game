@@ -162,6 +162,7 @@ data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsNextGermId    :: !GermId
                            , gsHipState      :: HipSpace
                            , gsSoundQueue    :: ![GameSound]
+                           , gsCurrentLevel  :: Int
                            }
 
 data GameSound = GameSoundLevelMusicStart -- start level music

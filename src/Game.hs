@@ -99,7 +99,7 @@ randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
 -- Finite State Machine states for this game.
 --
 data FSMState = FSMLevel Int -- level number
-              | FSMPlayingLevel Int -- level number
+              | FSMPlayingLevel
               | FSMAntibioticUnlocked
               | FSMLevelComplete
               | FSMGameOver
@@ -178,6 +178,7 @@ initGameState bounds hipSpace germs =
     (length germs)
     hipSpace
     []
+    1 -- current level
   where
     germMapList = M.fromList $ zip [0..] germs
 ----------------------------------------------------------------------------------------------------
@@ -190,12 +191,11 @@ handleEvent fsmState ev = do
   case ev of
     Reset   -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
-            FSMLevel i            -> fsmLevel i
-            FSMPlayingLevel i     -> fsmPlayingLevel i
-            FSMAntibioticUnlocked -> fsmAntibioticUnlocked
-            FSMLevelComplete      -> fsmLevelComplete
-            FSMGameOver           -> fsmGameOver
-          )
+             FSMLevel i            -> fsmLevel i
+             FSMPlayingLevel       -> fsmPlayingLevel
+             FSMAntibioticUnlocked -> fsmAntibioticUnlocked
+             FSMLevelComplete      -> fsmLevelComplete
+             FSMGameOver           -> fsmGameOver)
   where
     fsmLevel i = do
       resetGameState
@@ -206,23 +206,36 @@ handleEvent fsmState ev = do
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
                  createGerm initSize (R2 x y) hc
-      modify $ \gs -> gs { gsGerms = M.fromList (zip [0..] germs), gsNextGermId = length germs
-               , gsSoundQueue = [GameSoundLevelMusicStart]}
-      return $ FSMPlayingLevel i
+      modify $ \gs -> gs { gsGerms        = M.fromList (zip [0..] germs)
+                         , gsNextGermId   = length germs
+                         , gsSoundQueue   = [GameSoundLevelMusicStart]
+                         , gsCurrentLevel = i
+                         }
+      return $ FSMPlayingLevel
     --------------------------------------
-    fsmPlayingLevel i = do
+    fsmPlayingLevel = do
       gs <- get
       if M.size (gsGerms gs) > maxGerms
-       then return $ FSMGameOver
+       then return FSMGameOver
        else do
         case ev of
-          Tap p            -> playingLevelTap i p
-          Physics duration -> physics duration >> return fsmState
+          Tap p            -> playingLevelTap p
+          Physics duration -> do
+            physics duration
+            return fsmState
           _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     --------------------------------------
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
     --------------------------------------
-    fsmLevelComplete      = error "fsmLevelComplete not implemented"
+    fsmLevelComplete      = do
+      gs <- get
+      case ev of
+        TapAnywhere -> return $ FSMLevel (gsCurrentLevel gs + 1)
+        _ -> do
+          let w2c = gsWorldToCanvas gs
+              rendery = drawText "Epidemic averted!" (R2 (-50) (0)) (100,50) w2c
+          modify $ \gs -> gs { gsRender = rendery }
+          return $ FSMLevelComplete
     --------------------------------------
     fsmGameOver           = do
       case ev of
@@ -240,13 +253,13 @@ handleEvent fsmState ev = do
           return FSMGameOver
 
 ----------------------------------------------------------------------------------------------------
-playingLevelTap :: Int -> R2 -> GameM FSMState
-playingLevelTap level p = do
+playingLevelTap ::  R2 -> GameM FSMState
+playingLevelTap p = do
   killGerm p
   gs <- get
   return $ case M.size (gsGerms gs) of
-    0 -> FSMLevel (level +1)
-    _ -> FSMPlayingLevel level
+    0 -> FSMLevelComplete
+    _ -> FSMPlayingLevel
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -342,7 +355,6 @@ physics duration = do
   let drawOneGerm :: (Int, Germ) -> GLM ()
       drawOneGerm (i,g) = do
         (germGLFun . germGL $ g) i (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
-      w2c = gsWorldToCanvas gs
   modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 

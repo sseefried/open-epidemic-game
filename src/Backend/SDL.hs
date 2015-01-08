@@ -179,8 +179,6 @@ initialize :: String -> IO (IORef BackendState)
 initialize title = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
-
-
   dims@(w,h) <- case screenDimensions of
     Just (w',h') -> return (w', h')
     Nothing -> do
@@ -219,24 +217,20 @@ initialize title = do
 --
 sdlEventToEvent :: BackendToWorld -> FSMState -> S.Event -> Maybe Event
 sdlEventToEvent b2w fsmState sdlEvent =
-  -- events that can occur in any FSM State
-  case sdlEvent of
---    S.KeyDown _ -> Just Reset
-    _           -> (case fsmState of -- events that occur in specific FSM states
-                      FSMPlayingLevel _ -> playingLevel sdlEvent
-                      FSMGameOver       -> gameOver sdlEvent
-                      _                 -> Nothing)
+  case fsmState of -- events that occur in specific FSM states
+    FSMPlayingLevel   -> playingLevel sdlEvent
+    FSMGameOver       -> tapAnywhere sdlEvent
+    FSMLevelComplete  -> tapAnywhere sdlEvent
+    _                 -> Nothing
   where
     playingLevel e = case e of
       _ | Just pt <- isMouseOrTouchDown b2w e -> Just $ Tap pt
       _                                       -> Nothing
     ---------------------------------------
-    gameOver e = case e of
+    tapAnywhere e = case e of
       _ | Just _ <- isMouseOrTouchDown b2w e -> Just TapAnywhere
       _                                      -> Nothing
 
-
-isMobile = platform `elem` [IOSPlatform, Android]
 
 --
 -- True if any mouse button is down.
@@ -317,13 +311,18 @@ runPhysicsEventHandler besRef handleEvent = do
       duration = toDouble $ diffUTCTime t (besLastTime bes)
       fsmState = besFSMState bes
   (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
+  playSoundQueue bes (gsSoundQueue gs')
+  -- update the fsmState and gameState. MUST BE DONE
+  modifyIORef besRef $ \bes -> bes { besFSMState = fsmState'
+                                   , besGameState = gs' { gsSoundQueue = [] } }
+
+  -- extra actions
   case fsmState' of
-    FSMPlayingLevel _ -> do
+    FSMPlayingLevel -> do
       -- If there are any queued sounds play them now
-      playSoundQueue bes (gsSoundQueue gs')
+      bes <- readIORef besRef
       addTick (besFRBuf bes) duration
-      writeIORef besRef $ bes { besGameState = gs' { gsSoundQueue = [] }
-                              , besLastTime = t, besFSMState = fsmState'
+      writeIORef besRef $ bes { besLastTime = t
                               , besFrames = besFrames bes + 1 }
     _ -> return ()
 
@@ -393,7 +392,7 @@ mainLoop besRef handleEvent = loop $ do
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
   bes <- readIORef besRef
-  when (besFrames bes `mod` 30 == 0) $ do
+  when (besFrames bes `mod` 30 == 0 && besFSMState bes == FSMPlayingLevel) $ do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s" (1/avTick)
 

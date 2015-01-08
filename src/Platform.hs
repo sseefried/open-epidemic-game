@@ -22,6 +22,9 @@ platform = MacOSX
 #endif /* NOSOUND */
 #endif /* ANDROID */
 
+isMobile :: Bool
+isMobile = platform `elem` [IOSPlatform, Android]
+
 debugLog :: String -> IO ()
 debugLog = case platform of
   Android -> androidLog
