@@ -58,20 +58,36 @@ data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R
                                      , backendNormPtToWorldPt :: (CFloat, CFloat) -> R2 }
 
 ----------------------------------------------------------------------------------------------------
-----------------------------------------------------------------------------------------------------
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
-  BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x - w'/2)  * scale)
-                                                      ((h'/2 - fromIntegral y) * scale)
-                 , backendNormPtToWorldPt = \(fx,fy) -> R2 (frac (fx - 0.5) (w' * scale))
-                                                           (frac (0.5 - fy) (h' * scale))
+  BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x + left)  * scale)
+                                                      ((top - fromIntegral y) * scale)
+                 , backendNormPtToWorldPt = \(fx,fy) -> R2 ((cf2d fx + nleft) * w' * scale)
+                                                           ((ntop - cf2d fy) * h' * scale)
                  }
   where
-    minor = min w' h'
-    scale = worldMajor / minor
-    w' = fromIntegral w
-    h' = fromIntegral h
-    frac f x = cFloatToDouble f * x
+    minor    = min w' h'
+    scale    = worldMajor / minor
+    w'       = fromIntegral w
+    h'       = fromIntegral h
+    cf2d     = cFloatToDouble
+
+    --(left,right)     = (-w'/2, w'/2)
+    --(bottom,top)     = (-h'/2, h'/2)
+
+    nleft = left/(right - left)
+    ntop = top/(top - bottom)
+
+
+    majorAxis = if w > h then HorizontalMajor else VerticalMajor
+    (left,right) = case majorAxis of
+              HorizontalMajor -> (-(w' - h'/2), h'/2)
+              VerticalMajor   -> (-w'/2, w'/2)
+    (bottom,top) = case majorAxis of
+              HorizontalMajor -> (-h'/2, h'/2)
+              VerticalMajor   -> (-(h' - w'/2), w'/2)
+
+
 
 ----------------------------------------------------------------------------------------------------
 
@@ -114,7 +130,7 @@ initOpenGL window (w,h) = do
   -- converting for OpenGL calls
   --
   -- [ortho2D] must appear after glUseProgram programId
-  ortho2D programId (-w2) w2 (-h2) h2
+  ortho2D programId left right bottom top
   positionIdx <- getAttributeIndex programId "position"
   texCoordIdx <- getAttributeIndex programId "texCoord"
   let glsls = GLSLState { glslProgramId = programId
@@ -128,12 +144,21 @@ initOpenGL window (w,h) = do
     -- to. If W < C then there will be margins on the left and right that will not be drawn to.
     --
     minor = min w h
+    majorAxis = if w > h then HorizontalMajor else VerticalMajor
     scale = realToFrac $ worldMajor / fromIntegral minor
-    w2    = (fromIntegral w) * scale / 2
-    h2    = (fromIntegral h) * scale / 2
+    wd = (fromIntegral w) * scale
+    ht = (fromIntegral h) * scale
+    (left,right) = case majorAxis of
+              HorizontalMajor -> (-(wd - ht/2), ht/2)
+              VerticalMajor   -> (-wd/2, wd/2)
+    (bottom,top) = case majorAxis of
+              HorizontalMajor -> (-ht/2, ht/2)
+              VerticalMajor   -> (-(ht - wd/2), wd/2)
     exitOnLeft et = case et of
                       Left error -> putStrLn error >> exitWith (ExitFailure 1)
                       Right val  -> return val
+
+data MajorAxis = HorizontalMajor | VerticalMajor deriving (Show, Eq)
 
 ----------------------------------------------------------------------------------------------------
 getAttributeIndex :: ProgramId -> String -> IO AttributeIndex

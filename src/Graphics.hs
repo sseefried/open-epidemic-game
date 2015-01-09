@@ -16,7 +16,6 @@ import           Debug.Trace
 
 -- friends
 import Types
-import Util
 
 {-
 
