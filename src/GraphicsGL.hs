@@ -264,16 +264,13 @@ germGfxToGLFun gfx = GLM . const $ do
   return $ GermGL germGLFun finaliser
 
 ----------------------------------------------------------------------------------------------------
-drawText :: String -> R2 -> (Int,Int) -> WorldToCanvas -> GLM ()
-drawText s (R2 x y) (w,h) w2c =
+drawText :: Color -> R2 -> (Double,Double) -> WorldToCanvas -> String -> GLM ()
+drawText color (R2 x y) (w,h) w2c s =
   renderCairoToQuad (d2f x - w'/2, d2f y - h'/2) (w', h') w2c $ do
---    C.setSourceRGBA 1 1 1 1
---    C.rectangle 0 0 cw ch
---    C.fill
-    text "Helvetica" (Color 1 0.5 0.25 1) (cw/2,ch/2) cw s
+    text "Helvetica" color (cw/2,ch/2) cw s
 
   where
-    w' = fromIntegral w
-    h' = fromIntegral h
-    cw = worldLenToCanvasLen w2c $ fromIntegral w
-    ch = worldLenToCanvasLen w2c $ fromIntegral h
+    w' = realToFrac w
+    h' = realToFrac h
+    cw = worldLenToCanvasLen w2c $  w
+    ch = worldLenToCanvasLen w2c $ h

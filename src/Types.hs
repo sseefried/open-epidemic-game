@@ -9,6 +9,16 @@ import           Data.Map (Map)
 import           Control.Applicative
 
 
+----------------------------------------------------------------------------------------------------
+-- Constants
+
+levelCompleteColor :: Color
+levelCompleteColor = Color 0.09 0.37 0.16 1
+
+gameOverColor = Color 0.73 0.18 0.18 1
+
+
+----------------------------------------------------------------------------------------------------
 --
 -- World co-ordinates vs. canvas co-ordinates
 --

@@ -237,9 +237,8 @@ handleEvent fsmState ev = do
         TapAnywhere -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
           let w2c = gsWorldToCanvas gs
-              ww = floor worldWidth
-              wh = floor worldHeight
-              render = drawText "Epidemic averted!" (R2 0 0) (ww,wh `div` 2) w2c
+              render = drawText levelCompleteColor (R2 0 0) (worldWidth,worldHeight/2) w2c
+                         "Epidemic averted!"
           modify $ \gs -> gs { gsRender = render }
           return $ FSMLevelComplete
     --------------------------------------
@@ -251,15 +250,10 @@ handleEvent fsmState ev = do
            gs { gsRender = do
                   gsRender gs -- draw what we had before
                   let w2c = gsWorldToCanvas gs
-                  drawText "Infected!" (R2 0 0) (worldWidthI,worldHeightI `div` 2) w2c
-                  drawText "Infected!" (R2 0 0) (worldWidthI,worldHeightI `div` 2 ) w2c
--- FIXME: Draw text
---                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
---                                      "INFECTED!"
---                             drawText w2c (Color 0 0 0 1) (R2 (-worldWidth/8) (-worldHeight/4))
---                                      (worldWidth/4) "Tap to continue"
-                             , gsSoundQueue = [GameSoundLevelMusicStop]
-                             }
+                  drawText gameOverColor (R2 0 0) (worldWidth,worldHeight/2) w2c
+                    "Infected!"
+              , gsSoundQueue = [GameSoundLevelMusicStop]
+              }
           return FSMGameOver
 
 ----------------------------------------------------------------------------------------------------
