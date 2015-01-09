@@ -90,11 +90,11 @@ movingPtToStaticPt ((r, _),(a, _)) = polarPtToPt (P2 r a)
 
 ----------------------------------------------------------------------------------------------------
 ptToCairoPt :: (Frac, Frac) -> CairoPoint
-ptToCairoPt (x,y) = (f2d x, f2d y)
+ptToCairoPt = id
 
 ----------------------------------------------------------------------------------------------------
 periodicValue :: Time -> PeriodicFun -> Frac
-periodicValue t (amp, period, phase) = amp * sinU (((d2f t) + phase)/period)
+periodicValue t (amp, period, phase) = amp * sinU ((t + phase)/period)
 
 ----------------------------------------------------------------------------------------------------
 --

@@ -17,7 +17,6 @@ import qualified Data.Vector.Unboxed as V
 -- friends
 import Types
 import Graphics
-import Util
 import Platform
 
 ----------------------------------------------------------------------------------------------------
@@ -53,12 +52,19 @@ delTexture textureId =
   alloca $ \(ptr :: Ptr GLuint) -> do { poke ptr textureId; glDeleteTextures 1 ptr }
 
 ----------------------------------------------------------------------------------------------------
+{-# INLINE forN #-}
+forN :: Int -> Int -> (Int -> IO ()) -> IO ()
+forN n i f | i < n = f i >> forN n (i+1) f
+           | otherwise = return ()
+
+{-# INLINE clearBuffer #-}
 --
 -- Clears a buffer of n 32-bit words to a particular color.
 --
 clearBuffer :: Color -> Int -> Ptr a -> IO ()
 clearBuffer (Color r g b a) n ptr = do
-  forM_ [0..n - 1] $ \i -> do
+  let for = forN n
+  for 0 $ \i -> do
     let pk off x = pokeByteOff ptr (i*bytesPerWord32+off) (toColorWord x)
     pk 0 r
     pk 1 g
@@ -116,8 +122,8 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
   let positionIdx = glslPosition glslAttrs
       texCoordIdx = glslTexcoord glslAttrs
       (x,y,w,h) = (f2gl x', f2gl y', f2gl w', f2gl h')
-      cw        = worldLenToCanvasLen w2c $ f2d w'
-      ch        = worldLenToCanvasLen w2c $ f2d h'
+      cw        = worldLenToCanvasLen w2c $ w'
+      ch        = worldLenToCanvasLen w2c $ h'
       wi        = ceiling cw
       hi        = ceiling ch
       sx        = (fromIntegral wi)/cw
@@ -149,8 +155,8 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
       glDrawArrays gl_QUADS 0 (fromIntegral ptsInQuad)
 
 ----------------------------------------------------------------------------------------------------
-f2gl :: Float -> GLfloat
-f2gl = uncurry encodeFloat . decodeFloat
+f2gl :: Double -> GLfloat
+f2gl = realToFrac
 
 ----------------------------------------------------------------------------------------------------
 drawToMipmapTexture :: (Double -> C.Render ()) -> IO TextureId
@@ -239,18 +245,20 @@ germGfxToGLFun gfx = GLM . const $ do
                 forMi_ movingPts $ \i movingPt -> do
                   let (x,y)    = movingPtToStaticPt movingPt
                       (mx, my) = movingPtToPt t movingPt
-                      vx = ((d2f r)*x + d2f x')
-                      vy = ((d2f r)*y + d2f y')
-                      vz = fromIntegral zIndex * (0.001) :: GLfloat
-                      tx = (mx+1)/2
-                      ty = (my+1)/2
-                      base = i*perVertex*floatSize
-                      texBase = base + ptsInPos*floatSize
-                  pokeByteOff vertices base                vx
-                  pokeByteOff vertices (base+  floatSize)  vy
-                  pokeByteOff vertices (base+2*floatSize)  vz
-                  pokeByteOff vertices texBase             tx
-                  pokeByteOff vertices (texBase+floatSize) ty
+                      vx       = (r*x + x')
+                      vy       = (r*y + y')
+                      vz       = fromIntegral zIndex * (0.001) :: GLfloat
+                      tx       = (mx+1)/2
+                      ty       = (my+1)/2
+                      base     = i*perVertex*floatSize
+                      texBase  = base + ptsInPos*floatSize
+                      pk :: Int -> GLfloat -> IO ()
+                      pk off x = pokeByteOff vertices off x
+                  pk base                (f2gl vx)
+                  pk (base+  floatSize)  (f2gl vy)
+                  pk (base+2*floatSize)  vz
+                  pk texBase             (f2gl tx)
+                  pk (texBase+floatSize) (f2gl ty)
                 glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride
                                       vertices
                 glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
@@ -266,7 +274,7 @@ germGfxToGLFun gfx = GLM . const $ do
 ----------------------------------------------------------------------------------------------------
 drawText :: Color -> R2 -> (Double,Double) -> WorldToCanvas -> String -> GLM ()
 drawText color (R2 x y) (w,h) w2c s =
-  renderCairoToQuad (d2f x - w'/2, d2f y - h'/2) (w', h') w2c $ do
+  renderCairoToQuad (x - w'/2, y - h'/2) (w', h') w2c $ do
     text "Helvetica" color (cw/2,ch/2) cw s
 
   where

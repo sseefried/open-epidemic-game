@@ -14,7 +14,6 @@ import           Control.Applicative
 
 levelCompleteColor :: Color
 levelCompleteColor = Color 0.09 0.37 0.16 1
-
 gameOverColor = Color 0.73 0.18 0.18 1
 
 
@@ -37,7 +36,7 @@ data R2 = R2 !Double !Double deriving (Show, Eq, Ord)
 -- Internally we use type [CairoPoint]. This uses Cairo's co-ordinate system which has the origin
 -- in the top-left corner, x axis goes left to right and y axis goes to bottom.
 --
-type Frac = Float
+type Frac = Double
 
 type Time = Double
 
