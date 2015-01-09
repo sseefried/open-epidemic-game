@@ -352,19 +352,18 @@ asGroup r = do
 
 --
 -- [text fontFamily c (x,y) w  s] renders the text [s] at location [(x,y)] with width [w].
--- The bottom left hand corner of the text is at [(x,y)] and the height of the text
--- depends on the [fontFamily].
+-- The text is centered at [(x,y)] and the height of the text depends on the [fontFamily].
 --
 text :: String -> Color -> CairoPoint -> Double -> String -> Render ()
 text fontFamily c (x,y) w s = inContext $ do
   setColor c
   setFontSize 1
   selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  (TextExtents bx by tw th _ _) <- textExtents s
+  (TextExtents bx by tw _ _ _) <- textExtents s
   let scale = w/tw
   setFontSize scale
   setMatrix $ M.Matrix 1 0 0 (-1) 0 0
-  moveTo (-bx*scale + x) ((-th - by)*scale - y)
+  moveTo (-bx*scale + x - w/2) (-((by/2)*scale + y))
   showText s
 
 ----------------------------------------------------------------------------------------------------

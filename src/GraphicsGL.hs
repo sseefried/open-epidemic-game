@@ -7,7 +7,7 @@ import           Foreign.Marshal.Alloc (allocaBytes, alloca)
 import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Ptr
 import           Foreign.Storable
-import           GHC.Word (Word32)
+import           GHC.Word (Word8)
 import           Control.Monad
 
 
@@ -53,11 +53,28 @@ delTexture textureId =
   alloca $ \(ptr :: Ptr GLuint) -> do { poke ptr textureId; glDeleteTextures 1 ptr }
 
 ----------------------------------------------------------------------------------------------------
+--
+-- Clears a buffer of n 32-bit words to a particular color.
+--
+clearBuffer :: Color -> Int -> Ptr a -> IO ()
+clearBuffer (Color r g b a) n ptr = do
+  forM_ [0..n - 1] $ \i -> do
+    let pk off x = pokeByteOff ptr (i*bytesPerWord32+off) (toColorWord x)
+    pk 0 r
+    pk 1 g
+    pk 2 b
+    pk 3 a
+  where
+    toColorWord :: Double -> Word8
+    toColorWord x = floor (x*255.0)
+
+
+----------------------------------------------------------------------------------------------------
 renderCairoToTexture :: TextureId -> Maybe MipMapIndex -> (Int, Int) -> Render () -> IO ()
 renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
   allocaBytes (w*h*bytesPerWord32) $ \buffer -> do
     -- zero the buffer
-    forM_ [0..w*h - 1] $ do \i -> pokeByteOff buffer (i*bytesPerWord32) (0 :: Word32)
+    clearBuffer backgroundColor (w*h) buffer
     C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
       C.renderWith surface cairoRender
     glBindTexture gl_TEXTURE_2D textureId
@@ -105,7 +122,7 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
       hi        = ceiling ch
       sx        = (fromIntegral wi)/cw
       sy        = (fromIntegral hi)/ch
-      ptsInPos  = 2
+      ptsInPos  = 3
       ptsInTex  = 2
       ptsInQuad = 4
       (ptsInPos', ptsInTex')  = (fromIntegral ptsInPos, fromIntegral ptsInTex)
@@ -121,10 +138,10 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
-      pokeArray vs [ x  , y  , 0, 0  -- bottom-left
-                   , x+w, y  , 1, 0  -- upper-left
-                   , x+w, y+h, 1, 1  -- upper-right
-                   , x  , y+h, 0, 1  -- bottom-right
+      pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
+                   , x+w, y  , zMax, 1, 0  -- upper-left
+                   , x+w, y+h, zMax, 1, 1  -- upper-right
+                   , x  , y+h, zMax, 0, 1  -- bottom-right
                    ]
       glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
       glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
@@ -249,8 +266,12 @@ germGfxToGLFun gfx = GLM . const $ do
 ----------------------------------------------------------------------------------------------------
 drawText :: String -> R2 -> (Int,Int) -> WorldToCanvas -> GLM ()
 drawText s (R2 x y) (w,h) w2c =
-  renderCairoToQuad (d2f x, d2f y) (w', h') w2c $ do
-    text "Helvetica" (Color 1 0.5 0.25 1) (0,0) cw s
+  renderCairoToQuad (d2f x - w'/2, d2f y - h'/2) (w', h') w2c $ do
+--    C.setSourceRGBA 1 1 1 1
+--    C.rectangle 0 0 cw ch
+--    C.fill
+    text "Helvetica" (Color 1 0.5 0.25 1) (cw/2,ch/2) cw s
+
   where
     w' = fromIntegral w
     h' = fromIntegral h

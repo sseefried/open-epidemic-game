@@ -39,12 +39,13 @@ type CairoPoint = (Double, Double)
 
 
 
-white, blue, green, black :: Color
+white, blue, green, black, whiteT :: Color
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
 green = Color 0 1 0 1
 black = Color 0 0 0 1
-
+whiteT = Color 1 1 1 0 -- T means transparent
+backgroundColor = whiteT
 
 
 type GermGradient = (Color, Color)

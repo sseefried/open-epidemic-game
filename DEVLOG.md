@@ -1,3 +1,21 @@
+# Fri 9 Jan 2015
+
+Today I tried to make sure that when I rendered Cairo graphics to an OpenGL texture it
+drew on top of transparent white. The problem was the Cairo graphics were anti-aliasing
+as if they had a black background. It was really clear.
+
+My first attempt at solving this problem was to draw a transparent white rectangle (in Cairo)
+and then render the graphics on top of that. This did not work. Since the alpha value was zero
+Cairo treated the background as if it wasn't there. Further study of Cairo's compositing operators
+yielded no solution.
+
+The trick to solving this was to initialise the very buffer of 32-bit words that Cairo was
+rendering to. It seems there is quite a difference between:
+  a) rendering Cairo to a buffer
+  b) compositing one Cairo object on top of another.
+
+In case a) if the buffer already contains transparent white (i.e. alpha = 0) values then the anti-aliasing will work as if there is a white value there.
+
 # Mon 5 Jan 2015
 
 I thought I had found out the reason for the unspeakble hack I had to add to Haskell package OpenGLRaw (i.e. directly loading libGLESv2.so using dyld). But it was not the case:

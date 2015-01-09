@@ -1,5 +1,13 @@
 TODO
 
+[ ] Refactor runPhysicsHandler. Was previously updating state with
+    old state. Pattern
+
+     bes <- readIORef besRef
+     writeIORef $ ...
+
+     is inherently dangerous
+
 [ ] Rename Physics event to Idle event.
 
 [ ] Fix GLFun type to use pre-defined attribute locations instead of

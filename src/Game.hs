@@ -28,6 +28,10 @@ worldHeight = 100
 worldMajor = max worldWidth worldHeight
 worldMinor = min worldWidth worldHeight
 
+worldWidthI, worldHeightI :: Int
+worldWidthI = floor worldWidth
+worldHeightI = floor worldHeight
+
 initialGermSize :: Double
 initialGermSize = worldMajor / 30
 
@@ -199,7 +203,7 @@ handleEvent fsmState ev = do
   where
     fsmLevel i = do
       resetGameState
-      -- create n germs randomly
+      -- create [n] germs randomly
       germs <- replicateM i $ do
                  x <- getRandom (-worldWidth/8, worldWidth/8)
                  y <- getRandom (-worldHeight/8, worldHeight/8)
@@ -233,16 +237,22 @@ handleEvent fsmState ev = do
         TapAnywhere -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
           let w2c = gsWorldToCanvas gs
-              rendery = drawText "Epidemic averted!" (R2 (-50) (0)) (100,50) w2c
-          modify $ \gs -> gs { gsRender = rendery }
+              ww = floor worldWidth
+              wh = floor worldHeight
+              render = drawText "Epidemic averted!" (R2 0 0) (ww,wh `div` 2) w2c
+          modify $ \gs -> gs { gsRender = render }
           return $ FSMLevelComplete
     --------------------------------------
     fsmGameOver           = do
       case ev of
         TapAnywhere -> return $ FSMLevel 1
         _ -> do
-          modify $ \gs -> gs { gsRender = do
-                             gsRender gs -- draw what we had before
+          modify $ \gs ->
+           gs { gsRender = do
+                  gsRender gs -- draw what we had before
+                  let w2c = gsWorldToCanvas gs
+                  drawText "Infected!" (R2 0 0) (worldWidthI,worldHeightI `div` 2) w2c
+                  drawText "Infected!" (R2 0 0) (worldWidthI,worldHeightI `div` 2 ) w2c
 -- FIXME: Draw text
 --                             drawText w2c (Color 1 0 0 1) (R2 (-worldWidth/4) 0) (worldWidth/2)
 --                                      "INFECTED!"
