@@ -24,7 +24,7 @@ import           Foreign.C.String (withCString, withCStringLen, peekCString)
 import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Marshal.Alloc (alloca, allocaBytes)
 import           Foreign.Storable (peek)
-
+import           Control.Applicative ((<$>))
 
 
 -- friends
@@ -80,7 +80,7 @@ initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
 initOpenGL window (w,h) = do
   context <- S.glCreateContext window
   mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
-  --S.glSetSwapInterval S.SynchronizedUpdates
+--  S.glSetSwapInterval S.SynchronizedUpdates
   S.glSetSwapInterval S.ImmediateUpdates
   glEnable gl_TEXTURE_2D
   glEnable gl_BLEND
@@ -278,7 +278,8 @@ runFrameUpdate :: IORef BackendState -> IO ()
 runFrameUpdate besRef = do
   bes <- readIORef besRef
   let gs         = besGameState bes
-  glClearColor 1 1 1 1
+      (Color r g b a) = backgroundColor
+  glClearColor (realToFrac r) (realToFrac g) (realToFrac b) (realToFrac a)
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   runGLMIO (gsRender gs) (besGLSLState bes)
   glFlush
@@ -303,28 +304,39 @@ runInputEventHandler besRef handleEvent = do
     updFSMState fsmState bes = bes { besFSMState = fsmState }
 
 ----------------------------------------------------------------------------------------------------
+--
+-- Like [modifyIORef] but takes a monadic action.
+--
+withIORef :: IORef a -> (a -> IO a) -> IO ()
+withIORef ioRef io = do { a <- readIORef ioRef; a' <- io a; writeIORef ioRef a' }
+
+----------------------------------------------------------------------------------------------------
+projIORef :: (s -> a) -> IORef s -> IO a
+projIORef f ioRef = do { s <- readIORef ioRef; return $ f s }
+
+----------------------------------------------------------------------------------------------------
 runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runPhysicsEventHandler besRef handleEvent = do
-  bes <- readIORef besRef
   t <- getCurrentTime
-  let gs = besGameState bes
-      duration = toDouble $ diffUTCTime t (besLastTime bes)
-      fsmState = besFSMState bes
-  (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
-  playSoundQueue bes (gsSoundQueue gs')
-  -- update the fsmState and gameState. MUST BE DONE
-  modifyIORef besRef $ \bes -> bes { besFSMState = fsmState'
-                                   , besGameState = gs' { gsSoundQueue = [] } }
+  duration <- (toDouble . diffUTCTime t) <$> projIORef besLastTime besRef
+  withIORef besRef $ \bes -> do
+    let gs = besGameState bes
+        fsmState = besFSMState bes
+    (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
+    playSoundQueue bes (gsSoundQueue gs')
+    -- update the fsmState and gameState.
+    return $ bes { besFSMState = fsmState'
+                 , besGameState = gs' { gsSoundQueue = [] } }
 
   -- extra actions
-  case fsmState' of
-    FSMPlayingLevel -> do
-      -- If there are any queued sounds play them now
-      bes <- readIORef besRef
-      addTick (besFRBuf bes) duration
-      writeIORef besRef $ bes { besLastTime = t
-                              , besFrames = besFrames bes + 1 }
-    _ -> return ()
+  withIORef besRef $ \bes -> do
+    case besFSMState bes of
+      FSMPlayingLevel -> do
+        -- If there are any queued sounds play them now
+        addTick (besFRBuf bes) duration
+        return $ bes { besLastTime = t
+                     , besFrames = besFrames bes + 1 }
+      _ -> return bes
 
 ----------------------------------------------------------------------------------------------------
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
