@@ -281,9 +281,9 @@ sdlEventToEvent b2w fsmState sdlEvent =
 --
 isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
 isMouseOrTouchDown b2w e = case S.eventData e of
-  S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } ->
+  S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } | not isMobile ->
     Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
-  S.TouchFinger { S.touchX = fx, S.touchY = fy } | isMobile ->
+  S.TouchFinger { S.touchFingerEvent = S.TouchFingerDown, S.touchX = fx, S.touchY = fy } | isMobile ->
     Just $ backendNormPtToWorldPt b2w (fx, fy)
   _                                              -> Nothing
 
