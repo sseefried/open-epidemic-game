@@ -45,6 +45,7 @@ import           Data.IORef
 
 -- friends
 import Types
+import Platform
 
 data GameScript next =
     forall a. Random a => GetRandom    (a,a) (a -> next)
@@ -165,7 +166,7 @@ runGameM glsls gs gameM = do
         (Impure (Get f))                -> readIORef gsRef >>= go' . f
         (Impure (Modify f p))           -> modifyIORef gsRef f >> go' p
         (Impure (Put gs' p))            -> writeIORef gsRef gs' >> go' p
-        (Impure (PrintStr s p))         -> putStr s >> go' p
+        (Impure (PrintStr s p))         -> debugLog s >> go' p
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
         (Impure (RunGLM glm f))         -> runGLMIO glsls glm  >>= go' . f

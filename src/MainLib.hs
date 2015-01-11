@@ -8,7 +8,6 @@ module MainLib where
 -- friends
 import Game
 import Backend.SDL as B
-import Platform
 
 foreign export ccall "haskell_main" main :: IO ()
 
