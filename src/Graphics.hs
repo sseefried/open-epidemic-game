@@ -72,7 +72,7 @@ cosU   = cos . (2*pi*)
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE movingPtToPt #-}
-movingPtToPt :: Time -> MovingPoint -> (Frac, Frac)
+movingPtToPt :: Time -> MovingPoint -> (Double, Double)
 movingPtToPt t ((r, pf),(a, pf')) =
   polarPtToPt (P2 r' a')
   where
@@ -83,7 +83,7 @@ movingPtToPt t ((r, pf),(a, pf')) =
 -- [movingPtToStaticPt] throws away the perturbations.
 --
 {-# INLINE movingPtToStaticPt #-}
-movingPtToStaticPt :: MovingPoint -> (Frac, Frac)
+movingPtToStaticPt :: MovingPoint -> (Double, Double)
 movingPtToStaticPt ((r, _),(a, _)) = polarPtToPt (P2 r a)
 
 ----------------------------------------------------------------------------------------------------
