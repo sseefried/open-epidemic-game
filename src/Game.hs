@@ -20,55 +20,6 @@ import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
 ----------------------------------------------------------------------------------------------------
 --
--- Game constants
---
-worldWidth, worldHeight, worldMajor :: Double
-worldWidth  = 100
-worldHeight = 100
-worldMajor = max worldWidth worldHeight
-worldMinor = min worldWidth worldHeight
-
-worldWidthI, worldHeightI :: Int
-worldWidthI = floor worldWidth
-worldHeightI = floor worldHeight
-
-initialGermSize :: Double
-initialGermSize = worldMajor / 30
-
-initialGermSizeVariance :: Double
-initialGermSizeVariance = worldMajor / 150
-
-doublingPeriod :: Double
-doublingPeriod = 3
-
-doublingPeriodVariance :: Double
-doublingPeriodVariance = 0.5
-
-resistanceIncrease :: Double
-resistanceIncrease = 1.1
-
--- Maximum number of germs before you are "infected"
-maxGerms :: Int
-maxGerms = 50
-
-----------------------------------------------------------------------------------------------------
---
--- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
--- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
--- to. If W < C then there will be margins on the left and right that will not be drawn to.
---
-worldToCanvas :: (Int, Int) -> WorldToCanvas
-worldToCanvas (w,h) =
-  WorldToCanvas { worldPtToCanvasPt   = \(R2 x y) -> (w'/2 + scale*x, h'/2 - scale*y)
-                , worldLenToCanvasLen = (scale*)  }
-  where
-    w' = fromIntegral w
-    h' = fromIntegral h
-    minor = min w' h'
-    scale = minor / worldMajor
-
-----------------------------------------------------------------------------------------------------
---
 -- Given an initial size [initSize] and a time that the germ should multiply at [multiplyAt]
 -- (now being twice its original size) returns a function that given a time [t] returns
 -- the current germ size.
@@ -83,7 +34,7 @@ createGerm :: Double -> R2 -> HipCirc -> GameM Germ
 createGerm initSize pos hipCirc = do
   gfx        <- evalRand $ randomGermGfx
   multiplyAt <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
-  germGL     <- runGLM $ germGfxToGLFun gfx
+  germGL     <- runGLM $ germGfxToGermGL gfx
   return $ Germ { germMultiplyAt     = multiplyAt
                 , germSizeFun        = germSizeFunForParams initSize multiplyAt
                 , germHipCirc        = hipCirc
@@ -168,8 +119,8 @@ addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
   -- right
   addHipStaticPoly [R2 (w) (-h), R2 (w) h, R2 (w+d) h, R2 (w+d) (-h)]
   where
-    w = worldWidth/2
-    h = worldHeight/2
+    w = fieldWidth/2
+    h = fieldHeight/2
     d  = 0.2 * w
 
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
@@ -178,7 +129,6 @@ initGameState bounds hipSpace germs =
     (return ())
     bounds
     germMapList
-    (worldToCanvas bounds)
     (length germs)
     hipSpace
     []
@@ -205,8 +155,8 @@ handleEvent fsmState ev = do
       resetGameState
       -- create [n] germs randomly
       germs <- replicateM i $ do
-                 x <- getRandom (-worldWidth/8, worldWidth/8)
-                 y <- getRandom (-worldHeight/8, worldHeight/8)
+                 x <- getRandom (-fieldWidth/8, fieldWidth/8)
+                 y <- getRandom (-fieldHeight/8, fieldHeight/8)
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
                  createGerm initSize (R2 x y) hc
@@ -236,8 +186,7 @@ handleEvent fsmState ev = do
       case ev of
         TapAnywhere -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
-          let w2c = gsWorldToCanvas gs
-              render = drawText levelCompleteColor (R2 0 0) (worldWidth,worldHeight/2) w2c
+          let render = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
                          "Epidemic averted!"
           modify $ \gs -> gs { gsRender = render }
           return $ FSMLevelComplete
@@ -249,8 +198,7 @@ handleEvent fsmState ev = do
           modify $ \gs ->
            gs { gsRender = do
                   gsRender gs -- draw what we had before
-                  let w2c = gsWorldToCanvas gs
-                  drawText gameOverColor (R2 0 0) (worldWidth,worldHeight/2) w2c
+                  drawText gameOverColor (R2 0 0) (fieldWidth,fieldHeight/2)
                     "Infected!"
               , gsSoundQueue = [GameSoundLevelMusicStop]
               }
@@ -330,7 +278,7 @@ growGerm duration germId = do
       runOnHipState $ setHipCircRadius hc sz -- update the size in the physics
       let g' = g { germCumulativeTime = duration + t
                  , germPos            = R2 x y
-                 , germAnimTime       = (sqrt (worldMajor / sz) * duration) + animT }
+                 , germAnimTime       = (sqrt (fieldHeight / sz) * duration) + animT }
       insertGerm germId g'
 
 ----------------------------------------------------------------------------------------------------

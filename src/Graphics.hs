@@ -3,9 +3,8 @@ module Graphics (
   GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
-  movingPtToPt, movingPtToStaticPt,
-  -- extra functions
-  alpha, clear, circle, polygon, lineTo, inContext, withColor, drawBackground, consoleLog
+  movingPtToPt, movingPtToStaticPt
+
 
 ) where
 
@@ -183,35 +182,35 @@ midPt (x,y) (x',y') = ((x+x')/2, (y+y')/2)
 --
 -- alpha returns the internal angle of a regular n-gon in turns
 --
-alpha :: (Integral a, Fractional f) => a -> f
-alpha n = (n'-2)/(2*n') where n' = fromIntegral n
+_alpha :: (Integral a, Fractional f) => a -> f
+_alpha n = (n'-2)/(2*n') where n' = fromIntegral n
 
 -------------------------------------------------
 -- Random helpers to make Cairo more declarative
 
-clear :: Render () -> Render ()
-clear r = inContext $ do
+_clear :: Render () -> Render ()
+_clear r = inContext $ do
   setOperator OperatorClear
   r
 
 ----------------------------------------------------------------------------------------------------
-circle :: CairoPoint -> Double -> Render ()
-circle (x,y) r = arc x y r 0 (2*pi)
+_circle :: CairoPoint -> Double -> Render ()
+_circle (x,y) r = arc x y r 0 (2*pi)
 
 ----------------------------------------------------------------------------------------------------
-polygon :: [CairoPoint] -> Render ()
-polygon []  = return ()
-polygon [_] = return ()
-polygon (s:x:xs) = moveTo' s >> go (x:xs)
+_polygon :: [CairoPoint] -> Render ()
+_polygon []  = return ()
+_polygon [_] = return ()
+_polygon (s:x:xs) = moveTo' s >> go (x:xs)
   where
-    go []     = lineTo' s
-    go (x:xs) = lineTo' x >> go xs
+    go []     = _lineTo' s
+    go (x:xs) = _lineTo' x >> go xs
 
 
 ----------------------------------------------------------------------------------------------------
-moveTo', lineTo' :: (Double, Double) -> Render ()
+moveTo', _lineTo' :: (Double, Double) -> Render ()
 moveTo' = uncurry moveTo
-lineTo' = uncurry lineTo
+_lineTo' = uncurry lineTo
 
 ----------------------------------------------------------------------------------------------------
 setColor :: Color -> Render ()
@@ -222,8 +221,8 @@ inContext :: Render () -> Render ()
 inContext r = save >> r >> restore
 
 ----------------------------------------------------------------------------------------------------
-withColor :: Color -> Render () -> Render ()
-withColor color d = inContext $ setColor color >> d
+_withColor :: Color -> Render () -> Render ()
+_withColor color d = inContext $ setColor color >> d
 
 ----------------------------------------------------------------------------------------------------
 quadraticCurveTo :: CairoPoint -> CairoPoint -> Render ()
@@ -234,15 +233,12 @@ quadraticCurveTo (cx,cy) (ex,ey) = do
      f a b = 1.0/3.0 * a + 2.0/3.0 * b
 
 ----------------------------------------------------------------------------------------------------
-drawBackground :: (Int, Int) -> Render ()
-drawBackground (w, h)  = do
+_drawBackground :: (Int, Int) -> Render ()
+_drawBackground (w, h)  = do
   setAntialias AntialiasSubpixel
-  drawBackground
-  where
-    drawBackground = do
-      setColor white
-      rectangle 0 0 (fromIntegral w) (fromIntegral h)
-      fill
+  setColor white
+  rectangle 0 0 (fromIntegral w) (fromIntegral h)
+  fill
 ----------------------------------------------------------------------------------------------------
 -- Randomness
 
@@ -361,7 +357,7 @@ text fontFamily c (x,y) w s = inContext $ do
   (TextExtents bx by tw _ _ _) <- textExtents s
   let scale = w/tw
   setFontSize scale
-  setMatrix $ M.Matrix 1 0 0 (-1) 0 0
+  transform $ M.Matrix 1 0 0 (-1) 0 0
   moveTo (-bx*scale + x - w/2) (-((by/2)*scale + y))
   showText s
 
@@ -369,5 +365,5 @@ text fontFamily c (x,y) w s = inContext $ do
 --
 -- Use [consoleLog] to print out values to the console inside the [Render] monad.
 --
-consoleLog :: String -> Render ()
-consoleLog s = trace s $ return ()
+_consoleLog :: String -> Render ()
+_consoleLog s = trace s $ return ()

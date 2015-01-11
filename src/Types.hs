@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeFamilies, MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 module Types where
 
 import           Graphics.Rendering.Cairo (Render)
@@ -8,13 +8,161 @@ import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
 import           Control.Applicative
 
+-- -------------------
+-- CO-ORDINATE SYSTEMS
+-- -------------------
+--
+-- For the game we're going to a 4:3 aspect ratio (regardless of the screen).
+-- Preferably we get the full height of the screen but for actual screens with aspect ratio
+-- smaller than 4:3 we letter box.
+--
+--
+-- There are 4 co-ordinate systems. Because we are using OpenGL and Cairo we
+-- can use floating point values in all 3.
+--
+-- "left-handed" means x-axis goes left to right and y-axis top to bottom.
+-- "right-handed" means x-axis goes left to right and y-axis bottom to top.
+--
+--
+-- 1. Screen.
+--    Type:   integral
+--    System: left-handed
+--    Origin: top-left
+--    Width:  screen width
+--    Height: screen height
+--
+--    SDL Mouse input comes in this co-ordinate system.
+--
+-- 2. Normalized
+--    Type: fractional
+--    System: left-handed
+--    Origin: top-left
+--    Width: 1.0
+--    Height: 1.0
+--
+--    SDL Touch input comes in this system. This one is interesting because the
+--    aspect ratio is 1, not the aspect ratio of the screen. If the screen is wider than high
+--    then the the x-axis is "stretched". The distance from 0 to 1 on the x-axis is longer than
+--    the same distance on the y-axis, with respect to the screen.
+--
+-- 3. Canvas
+--    Type: fractional
+--    System: right-handed
+--    Origin: centre.
+--    Width:  (see below)
+--    Height: (see below)
+--
+--    The canvas co-ordinate system is for Cairo graphics. When rendering Cairo graphics to
+--    image files the co-ordinate system is normally a left-handed one. However, because
+--    we are rendering to OpenGL textures which use the World co-ordinate system it becomes
+--    a right-handed system.
+--
+--    The width and height of the canvas are somewhat meaningless as we are rendering
+--    to textures of arbitrary size. However, be careful. If you are not using mipmapping
+--    the texture will not look good unless the *screen* width/height of the texture.
+--    Since the OpenGL context is set to World co-ordinates you will need to scale from
+--    World co-ordinates to Screen co-ordinates.
+--
+-- 4. World (fractional)
+--
+--    The *world* is split into a *side bar* and a *game field*. The terms have a precise
+--    definition. The *world* is the *side bar* plus the *game field*.
+--    The game field has an aspect ratio of [fieldAspectRatio]. The remainder is for
+--    the side bar. The side bar is to the left of the game field.
+--
+--    If it is possible to map the full height of the world to the full height of the screen this
+--    is done. This is possible when [worldAspectRatio] < screen aspect ratio. Otherwise it is
+--    letter boxed.
+--
+--    The OpenGL context is set up to match the world co-ordinate system. The origin is
+--    the centre of the *game field* not the centre of the *game area*.
+--
+--    # Game Field
+--
+--    The game field will always have bounds
+--      (fieldLeft,       fieldRight,    fieldBottom,      fieldTop)
+--    = (-fieldWidth/2, fieldWidth/2, -fieldHeight/2, fieldHeight/2)
+--
+--    However, because of letter boxing the bounds for the OpenGL othographic bounds may be
+--    different.
+--
+--    # Side bar
+--
+--    The side bar will have bounds (sideBarLeft, fieldLeft, fieldBottom, fieldTop)
+--    where
+--      sideBarWidth = worldWidth - fieldWidth
+--      sideBarLeft = sideBarLeft - sideBarWidth
+--
+
 
 ----------------------------------------------------------------------------------------------------
--- Constants
-
+-- Constants (feel free to change)
+--
 levelCompleteColor :: Color
 levelCompleteColor = Color 0.09 0.37 0.16 1
 gameOverColor = Color 0.73 0.18 0.18 1
+
+--
+-- Game constants
+--
+fieldWidth, fieldHeight :: Double
+fieldWidth  = 100
+fieldHeight = 100
+
+-- Aspect ratio of entire game area.
+worldAspectRatio :: Double
+worldAspectRatio = 4/3 -- must be greater than [fieldAspectRatio]. Rest is for side bar
+
+initialGermSize :: Double
+initialGermSize = worldHeight / 30
+
+initialGermSizeVariance :: Double
+initialGermSizeVariance = worldHeight / 150
+
+doublingPeriod :: Double
+doublingPeriod = 3
+
+doublingPeriodVariance :: Double
+doublingPeriodVariance = 0.5
+
+resistanceIncrease :: Double
+resistanceIncrease = 1.1
+
+-- Maximum number of germs before you are "infected"
+maxGerms :: Int
+maxGerms = 50
+
+
+----------------------------------------------------------------------------------------------------
+-- Derived constants. (Do not change)
+
+worldWidth, worldHeight :: Double
+worldHeight = fieldWidth
+worldWidth  = worldAspectRatio * worldHeight
+
+sideBarWidth :: Double
+sideBarWidth = worldWidth - fieldWidth
+
+fieldAspectRatio :: Double
+fieldAspectRatio = worldWidth/worldHeight
+
+fieldLeft, fieldRight, fieldBottom, fieldTop :: Double
+fieldLeft   = -fieldWidth/2
+fieldRight  =  fieldWidth/2
+fieldBottom = -fieldHeight/2
+fieldTop    =  fieldHeight/2
+
+sideBarLeft, sideBarRight, sideBarBottom, sideBarTop :: Double
+sideBarLeft   = fieldLeft - sideBarWidth
+sideBarRight  = fieldLeft
+sideBarBottom = fieldBottom
+sideBarTop    = fieldTop
+
+worldLeft, worldRight, worldBottom, worldTop :: Double
+worldLeft   = sideBarLeft
+worldRight  = fieldRight
+worldBottom = fieldBottom
+worldTop    = fieldTop
 
 
 ----------------------------------------------------------------------------------------------------
@@ -111,11 +259,22 @@ data Germ = Germ { germMultiplyAt     :: Time
 -- to hide the IO monad. I still might do that, but for now
 --
 --
+data OrthoBounds =
+  OrthoBounds { orthoLeft    :: GLfloat
+              , orthoRight   :: GLfloat
+              , orthoBottom  :: GLfloat
+              , orthoTop     :: GLfloat
+              , screenScale  :: GLfloat -- convert from world distance to screen distance
+              } deriving (Show, Eq)
+
 data GLM a = GLM { unGLM :: GLSLState -> IO a }
 
-data GLSLState = GLSLState { glslPosition  :: AttributeIndex
-                           , glslTexcoord  :: AttributeIndex
-                           , glslProgramId :: ProgramId
+data GLSLState = GLSLState { glslPosition    :: AttributeLocation
+                           , glslTexcoord    :: AttributeLocation
+                           , glslDrawTexture :: UniformLocation
+                           , glslColor       :: UniformLocation
+                           , glslProgramId   :: ProgramId
+                           , glslOrthoBounds :: OrthoBounds
                            }
 
 instance Functor GLM where
@@ -138,12 +297,14 @@ zMin, zMax :: GLfloat
 zMin = -10000
 zMax = 10000
 
-type MipMapIndex     = GLint
-type ProgramId       = GLuint
-type ShaderId        = GLuint
-type ShaderType      = GLenum
-type AttributeIndex  = GLuint
-type TextureId       = GLuint
+type MipMapIndex       = GLint
+type ProgramId         = GLuint
+type ShaderId          = GLuint
+type ShaderType        = GLenum
+type AttributeLocation = GLuint
+type UniformLocation   = GLint
+type VariableLocation  = GLuint
+type TextureId         = GLuint
 data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> R2     -- position
                                  -> Time   -- cumulative animation time
@@ -157,10 +318,6 @@ data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
 -- The canvas might not have the same aspect ratio as the world, in which case
 -- we ensure there will be some portions of the canvas that won't be drawn to.
 --
-
-data WorldToCanvas = WorldToCanvas { worldPtToCanvasPt :: R2 -> CairoPoint
-                                   , worldLenToCanvasLen :: Double -> Double }
-
 type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int
@@ -168,7 +325,6 @@ type GermId = Int
 data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
-                           , gsWorldToCanvas :: !WorldToCanvas
                            , gsNextGermId    :: !GermId
                            , gsHipState      :: HipSpace
                            , gsSoundQueue    :: ![GameSound]

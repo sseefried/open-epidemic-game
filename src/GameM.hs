@@ -168,7 +168,7 @@ runGameM glsls gs gameM = do
         (Impure (PrintStr s p))         -> putStr s >> go' p
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
-        (Impure (RunGLM glm f))         -> runGLMIO glm glsls >>= go' . f
+        (Impure (RunGLM glm f))         -> runGLMIO glsls glm  >>= go' . f
         (Pure x)                        -> return x
 
 ----------------------------------------------------------------------------------------------------
@@ -224,5 +224,5 @@ runHipMIO space = go
       H.spaceRemove space s
 
 ----------------------------------------------------------------------------------------------------
-runGLMIO :: GLM a -> GLSLState -> IO a
-runGLMIO (GLM f) glsls = f glsls
+runGLMIO :: GLSLState -> GLM a -> IO a
+runGLMIO glsls (GLM f) = f glsls

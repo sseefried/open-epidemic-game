@@ -1,4 +1,40 @@
+# Sun 11 Jan 2015
+
+Added a uniform variable "drawTexture" to the fragment shader that chooses between drawing a
+plain color polygon or a texture mapped one.
+
+
+# Sat 10 Jan 2015
+
+Emotional: hating this today. Got slowly better over time.
+
+I came up with some more design ideas while riding on my bike to Adventure Golf today.
+  - germs take multiple hits to kill. Cell wall gets thinner or they fade.
+  - when damaged their growth rate is limited. If this is non-linear (i.e. biggest hit
+    occurs at the beginning then it might make sense to come back and mop them up later,
+    especially if by being there they perform some kind of inhibitory action.)
+
 # Fri 9 Jan 2015
+
+I've decided to shift the action of the game over to the right of the screen and put a side bar on
+the left. This is where the antibiotics and score will show. For now I have shifted the
+co-ordinate system over so that the origin is not in the centre of the screen but in the centre
+of a square on the right hand side. i.e.
+
+
+    +---+---------+
+    |   |         |
+    |   |    x    |
+    |   |         |
+    +---+---------+
+
+
+It's important that it's all one co-ordinate system since people will be dragging and dropping
+antibiotics from the side panel on top of the germs.
+
+
+
+# Thu 8 Jan 2015
 
 Today I tried to make sure that when I rendered Cairo graphics to an OpenGL texture it
 drew on top of transparent white. The problem was the Cairo graphics were anti-aliasing

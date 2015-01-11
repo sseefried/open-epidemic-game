@@ -36,6 +36,7 @@ import Platform
 import CUtil
 import Util
 import FrameRateBuffer
+import GraphicsGL (drawLetterBox)
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
@@ -60,61 +61,63 @@ data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R
 ----------------------------------------------------------------------------------------------------
 backendToWorld ::  (Int, Int) -> BackendToWorld
 backendToWorld (w,h) =
-  BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x + left)  * scale)
-                                                      ((top - fromIntegral y) * scale)
-                 , backendNormPtToWorldPt = \(fx,fy) -> R2 ((cf2d fx + nleft) * w' * scale)
-                                                           ((ntop - cf2d fy) * h' * scale)
+  BackendToWorld { backendPtToWorldPt = \(x,y) -> R2 ((fromIntegral x)  * scale + left)
+                                                      (top - (fromIntegral y) * scale)
+                 , backendNormPtToWorldPt = \(fx,fy) -> R2 ((cf2d fx * w' * scale) + left)
+                                                           (top - (cf2d fy * h' * scale))
                  }
   where
-    minor    = min w' h'
-    scale    = worldMajor / minor
+    bds      = orthoBounds (w,h)
+    left     = cf2d $ orthoLeft bds
+    top      = cf2d $ orthoTop bds
+
+    scale    = cf2d $ 1/(screenScale bds)
     w'       = fromIntegral w
     h'       = fromIntegral h
     cf2d     = cFloatToDouble
 
-    --(left,right)     = (-w'/2, w'/2)
-    --(bottom,top)     = (-h'/2, h'/2)
+----------------------------------------------------------------------------------------------------
+--
+-- Calculates the bounds of the visible screen in terms of world co-ordinates.
+--
+orthoBounds :: (Int, Int) -> OrthoBounds
+orthoBounds (w,h) =
+  OrthoBounds { orthoLeft   = realToFrac $ worldLeft   - (lbhm / scale)
+              , orthoRight  = realToFrac $ worldRight  + (lbhm / scale)
+              , orthoBottom = realToFrac $ worldBottom - (lbvm / scale)
+              , orthoTop    = realToFrac $ worldTop    + (lbvm / scale)
+              , screenScale  = realToFrac $ scale
+              }
+  where
+    aspectRatio :: Double
+    aspectRatio = w'/h'
+    w', h' :: Double
+    w' = fromIntegral w
+    h' = fromIntegral h
+    scale = realToFrac $ lbsh / worldHeight
+    letterBoxScreenHeight = if aspectRatio > worldAspectRatio
+                             then h' else h' * (aspectRatio/worldAspectRatio)
+    lbsh = letterBoxScreenHeight
+    letterBoxVertMargin = (h' - lbsh)/2
+    lbvm = letterBoxVertMargin
 
-    nleft = left/(right - left)
-    ntop = top/(top - bottom)
-
-
-    majorAxis = if w > h then HorizontalMajor else VerticalMajor
-    (left,right) = case majorAxis of
-              HorizontalMajor -> (-(w' - h'/2), h'/2)
-              VerticalMajor   -> (-w'/2, w'/2)
-    (bottom,top) = case majorAxis of
-              HorizontalMajor -> (-h'/2, h'/2)
-              VerticalMajor   -> (-(h' - w'/2), w'/2)
-
-
+    letterBoxScreenWidth = if aspectRatio > worldAspectRatio
+                            then w' * (worldAspectRatio/aspectRatio) else w'
+    lbsw = letterBoxScreenWidth
+    letterBoxHorizMargin = (w' - lbsw)/2
+    lbhm = letterBoxHorizMargin
 
 ----------------------------------------------------------------------------------------------------
-
-----------------------------------------------------------------------------------------------------
-initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
-initOpenGL window (w,h) = do
-  context <- S.glCreateContext window
-  mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
---  S.glSetSwapInterval S.SynchronizedUpdates
-  S.glSetSwapInterval S.ImmediateUpdates
-  glEnable gl_TEXTURE_2D
-  glEnable gl_BLEND
-  glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
-  glEnable gl_DEPTH_TEST
-  glDepthFunc gl_LESS
-  etVertexShader   <- loadShader vertexShaderSrc gl_VERTEX_SHADER
+compileGLSLProgram :: GLSLProgram -> IO ProgramId
+compileGLSLProgram p = do
+  etVertexShader   <- loadShader (glslVertexShader p) gl_VERTEX_SHADER
   vertexShader     <- exitOnLeft etVertexShader
-  etFragmentShader <- loadShader fragmentShaderSrc gl_FRAGMENT_SHADER
+  etFragmentShader <- loadShader (glslFragmentShader p) gl_FRAGMENT_SHADER
   fragmentShader   <- exitOnLeft etFragmentShader
   programId        <- glCreateProgram
   when (programId == 0 ) $ exitWithError "Could not create GLSL program"
-
   glAttachShader programId vertexShader
   glAttachShader programId fragmentShader
-
-  withCString "vPosition" $ \s -> glBindAttribLocation programId 0 s
-
   glLinkProgram programId
   linked <- alloca $ \ptrLinked -> do
     glGetProgramiv programId gl_LINK_STATUS ptrLinked
@@ -122,7 +125,26 @@ initOpenGL window (w,h) = do
   when (linked == 0) $ do
      errorStr <- getGLError glGetProgramiv glGetProgramInfoLog programId
      exitWithError errorStr
+  return programId
+  where
+    exitOnLeft et = case et of
+                      Left error -> putStrLn error >> exitWith (ExitFailure 1)
+                      Right val  -> return val
 
+----------------------------------------------------------------------------------------------------
+
+initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
+initOpenGL window (w,h) = do
+  context <- S.glCreateContext window
+  mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
+--  S.glSetSwapInterval S.SynchronizedUpdates
+  S.glSetSwapInterval S.ImmediateUpdates
+  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
+  glEnable gl_BLEND
+  glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
+  glEnable gl_DEPTH_TEST
+  glDepthFunc gl_LESS
+  programId <- compileGLSLProgram textureProgram
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
   glUseProgram programId
   --
@@ -130,42 +152,36 @@ initOpenGL window (w,h) = do
   -- converting for OpenGL calls
   --
   -- [ortho2D] must appear after glUseProgram programId
-  ortho2D programId left right bottom top
-  positionIdx <- getAttributeIndex programId "position"
-  texCoordIdx <- getAttributeIndex programId "texCoord"
-  let glsls = GLSLState { glslProgramId = programId
-                        , glslPosition  = positionIdx
-                        , glslTexcoord  = texCoordIdx }
+  let bds = orthoBounds (w,h)
+  ortho2D programId bds
+  positionLoc    <- getAttributeLocation programId "position"
+  texCoordLoc    <- getAttributeLocation programId "texCoord"
+  drawTextureLoc <- getUniformLocation   programId "drawTexture"
+  colorLoc       <- getUniformLocation   programId "color"
+  let glsls = GLSLState { glslProgramId   = programId
+                        , glslPosition    = positionLoc
+                        , glslTexcoord    = texCoordLoc
+                        , glslDrawTexture = drawTextureLoc
+                        , glslColor       = colorLoc
+                        , glslOrthoBounds = bds
+                        }
   return (glsls, context)
   where
-    --
-    -- Let aspect ratio be width/height. Let aspect ratio of the world be W and the aspect ratio of
-    -- the canvas be C. If W > C then there will margins at the top and bottom of C that are not drawn
-    -- to. If W < C then there will be margins on the left and right that will not be drawn to.
-    --
-    minor = min w h
-    majorAxis = if w > h then HorizontalMajor else VerticalMajor
-    scale = realToFrac $ worldMajor / fromIntegral minor
-    wd = (fromIntegral w) * scale
-    ht = (fromIntegral h) * scale
-    (left,right) = case majorAxis of
-              HorizontalMajor -> (-(wd - ht/2), ht/2)
-              VerticalMajor   -> (-wd/2, wd/2)
-    (bottom,top) = case majorAxis of
-              HorizontalMajor -> (-ht/2, ht/2)
-              VerticalMajor   -> (-(ht - wd/2), wd/2)
-    exitOnLeft et = case et of
-                      Left error -> putStrLn error >> exitWith (ExitFailure 1)
-                      Right val  -> return val
-
-data MajorAxis = HorizontalMajor | VerticalMajor deriving (Show, Eq)
+----------------------------------------------------------------------------------------------------
+getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
+                  -> IO VariableLocation
+getShaderLocation getLoc variableSort programId s = do
+  idx <- withCString s $ \str -> getLoc programId str
+  when (idx < 0) $ exitWithError (printf "%s '%s' is not in shader program" variableSort s)
+  return $ fromIntegral idx
 
 ----------------------------------------------------------------------------------------------------
-getAttributeIndex :: ProgramId -> String -> IO AttributeIndex
-getAttributeIndex programId s = do
-  idx <- withCString s $ \str -> glGetAttribLocation programId str
-  when (idx < 0) $ exitWithError (printf "Attribute '%s' is not in vertex shader" s)
-  return $ fromIntegral idx
+getAttributeLocation :: ProgramId -> String -> IO AttributeLocation
+getAttributeLocation = getShaderLocation glGetAttribLocation "Attribute"
+
+----------------------------------------------------------------------------------------------------
+getUniformLocation :: ProgramId -> String -> IO UniformLocation
+getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation "Uniform" p s
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -179,8 +195,8 @@ getAttributeIndex programId s = do
 -- 'near' is actually negative 'zMax' and 'far' is negative 'zMin'
 --
 --
-ortho2D :: ProgramId -> GLfloat -> GLfloat -> GLfloat -> GLfloat -> IO ()
-ortho2D programId left right bottom top = do
+ortho2D :: ProgramId -> OrthoBounds -> IO ()
+ortho2D programId bds = do
   modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
   when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
   allocaArray 16 $ \ortho -> do
@@ -190,6 +206,7 @@ ortho2D programId left right bottom top = do
                     , tx, ty, tz, 1 ]
     glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
   where
+    (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
     near = -zMax
     far  = -zMin
     a    =  2 / (right - left)
@@ -210,6 +227,9 @@ initialize title = do
       mode <- S.getCurrentDisplayMode 0
       return (fromIntegral (S.displayModeWidth mode), fromIntegral (S.displayModeHeight mode))
 
+  when (w < h) $ exitWithError $
+    printf "Width of screen (%d) must be greater than or equal to height (%d)" w h
+
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   (glslState, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
@@ -225,7 +245,6 @@ initialize title = do
   t     <- getCurrentTime
   frBuf <- initFRBuf
   gs    <- newGameState (w,h)
-
   newIORef $ BackendState t t glslState context gs (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
@@ -302,13 +321,30 @@ _runAndTime besRef upd io = do
 runFrameUpdate :: IORef BackendState -> IO ()
 runFrameUpdate besRef = do
   bes <- readIORef besRef
-  let gs         = besGameState bes
+  let gs  = besGameState bes
       (Color r g b a) = backgroundColor
+      glsls = besGLSLState bes
   glClearColor (realToFrac r) (realToFrac g) (realToFrac b) (realToFrac a)
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-  runGLMIO (gsRender gs) (besGLSLState bes)
+  runGLMIO glsls (gsRender gs)
+  mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
   glFlush
   S.glSwapWindow (besWindow bes)
+
+----------------------------------------------------------------------------------------------------
+type LetterBox = ((GLfloat, GLfloat), (GLfloat, GLfloat))
+letterBoxes :: OrthoBounds -> [LetterBox]
+letterBoxes b = [left, right, bottom, top]
+  where
+    screenWidth = orthoRight b - orthoLeft b
+    screenHeight = orthoTop b - orthoBottom b
+    f2f = realToFrac
+    --
+    left   = ((orthoLeft b, orthoBottom b),    (f2f worldLeft - orthoLeft b,   screenHeight))
+    right  = ((f2f worldRight, orthoBottom b), (orthoRight b - f2f worldRight, screenHeight))
+    --
+    bottom = ((orthoLeft b, orthoBottom b),    (screenWidth, f2f worldBottom - orthoBottom b))
+    top    = ((orthoLeft b, f2f worldTop),     (screenWidth,   orthoTop b - f2f worldTop))
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -470,37 +506,48 @@ loadShader src typ = do
       else return $ Right shaderId
 
 ----------------------------------------------------------------------------------------------------
-vertexShaderSrc :: String
-vertexShaderSrc =
-  concat $ intersperse "\n" [
-      "#ifdef GL_ES"
-    , "precision mediump float;        // set default precision for floats"
-    , "#endif"
-    , "attribute vec3 position;         // vertex position attribute"
-    , "attribute vec2 texCoord;         // vertex texture coordinate attribute"
-    , "uniform mat4 modelView;          // shader modelview matrix uniform"
-    , "varying vec2 texCoordVar;        // vertex texture coordinate varying"
-    , "void main()"
-    , "{"
-    , "  gl_Position = modelView * vec4(position,1); // transform vertex position with modelview matrix"
-    , "  texCoordVar = texCoord;        // assign the texture coordinate attribute to its varying"
-    , "}"
-    ]
+data GLSLProgram = GLSLProgram { glslVertexShader :: String
+                               , glslFragmentShader :: String }
 
-fragmentShaderSrc :: String
-fragmentShaderSrc = concat $ intersperse "\n" [
-      "#ifdef GL_ES"
-    , "precision mediump float;        // set default precision for floats"
-    , "#endif"
-    , "uniform sampler2D texture;      // shader texture uniform"
-    , " "
-    , "varying vec2 texCoordVar;       // fragment texture coordinate varying"
-    , " "
-    , "void main()"
-    , "{"
-    , "    // sample the texture at the interpolated texture coordinate"
-    , "    // and write it to gl_FragColor "
-    , "    vec4 color = texture2D(texture, texCoordVar);"
-    , "    gl_FragColor = color;"
-    , "}"
-    ]
+textureProgram :: GLSLProgram
+textureProgram =
+  GLSLProgram {
+      glslVertexShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "attribute vec3 position;"
+          , "attribute vec2 texCoord;"
+          , "uniform mat4 modelView;"
+          , "varying vec2 texCoordVar;"
+          , ""
+          , "void main()"
+          , "{"
+          , "  gl_Position = modelView * vec4(position,1);"
+          , "  texCoordVar = texCoord;"
+          , "}"
+          ]
+    , glslFragmentShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "uniform sampler2D texture;"
+          , "uniform bool drawTexture;"
+          , "uniform vec4 color;"
+          , " "
+          , "varying vec2 texCoordVar;"
+          , " "
+          , "void main()"
+          , "{"
+          , "  if (drawTexture) {"
+          , "    // sample the texture at the interpolated texture coordinate"
+          , "    // and write it to gl_FragColor "
+          , "    gl_FragColor = texture2D(texture, texCoordVar);"
+          , "  } else {"
+          , "    gl_FragColor = color;"
+          , "  }"
+          , "}"
+          ]
+  }

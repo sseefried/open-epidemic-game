@@ -1,5 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-module GraphicsGL where
+module GraphicsGL (
+    -- functions
+    germGfxToGermGL, drawText, drawLetterBox
+  ) where
 
 import qualified Graphics.Rendering.Cairo as C
 import           Graphics.Rendering.OpenGL.Raw
@@ -94,8 +97,8 @@ renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
 --
 -- If you're not using the texture anymore it must be freed.
 --
-renderCairoToNewTexture :: (Int, Int) -> Render () -> IO TextureId
-renderCairoToNewTexture dims r =
+_renderCairoToNewTexture :: (Int, Int) -> Render () -> IO TextureId
+_renderCairoToNewTexture dims r =
   do { tid <- genTexture; renderCairoToTexture tid Nothing dims r; return tid }
 
 ----------------------------------------------------------------------------------------------------
@@ -110,10 +113,11 @@ withNewTexture f = do
 
 ----------------------------------------------------------------------------------------------------
 --
--- Best for one-off renders that will not take very long (since we don't use mipmapping)
+-- Best for one-off renders that will not be updated regularly on the screen and keep the same
+-- size (we're not using mipmapping).
 --
-renderCairoToQuad :: (Frac, Frac) -> (Frac, Frac) -> WorldToCanvas -> Render () -> GLM ()
-renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
+renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render () -> GLM ()
+renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
   -- we take the ceiling of [w] and [h] and use that as our bounds.
@@ -121,9 +125,11 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
   --
   let positionIdx = glslPosition glslAttrs
       texCoordIdx = glslTexcoord glslAttrs
+      drawTextureLoc = glslDrawTexture glslAttrs
       (x,y,w,h) = (f2gl x', f2gl y', f2gl w', f2gl h')
-      cw        = worldLenToCanvasLen w2c $ w'
-      ch        = worldLenToCanvasLen w2c $ h'
+      scale     = realToFrac . screenScale . glslOrthoBounds $ glslAttrs
+      cw        = w' * scale
+      ch        = h' * scale
       wi        = ceiling cw
       hi        = ceiling ch
       sx        = (fromIntegral wi)/cw
@@ -131,16 +137,19 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
       ptsInPos  = 3
       ptsInTex  = 2
       ptsInQuad = 4
-      (ptsInPos', ptsInTex')  = (fromIntegral ptsInPos, fromIntegral ptsInTex)
+      (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
   withNewTexture $ \tid -> do
     renderCairoToTexture tid Nothing (wi, hi) $ do
-      C.scale sx sy
+      C.scale (sx*scale) (sy*scale)
       cairoRender
+
     glBindTexture gl_TEXTURE_2D tid
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
+    glUniform1ui drawTextureLoc 1 -- set to 'true'
+
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
@@ -155,6 +164,30 @@ renderCairoToQuad (x',y') (w',h') w2c cairoRender  = GLM $ \glslAttrs -> do
       glDrawArrays gl_QUADS 0 (fromIntegral ptsInQuad)
 
 ----------------------------------------------------------------------------------------------------
+renderQuadWithColor :: (GLfloat, GLfloat) -> (GLfloat, GLfloat) -> Color -> GLM ()
+renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
+  let positionLoc = glslPosition glslAttrs
+      drawTextureLoc = glslDrawTexture glslAttrs
+      colorLoc       = glslColor glslAttrs
+      ptsInPos  = 3
+      ptsInQuad = 4
+      i2i = fromIntegral
+      f2f = realToFrac
+
+  glUniform1ui drawTextureLoc 0 -- set to 'false'
+  glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
+  glEnableVertexAttribArray (glslPosition glslAttrs)
+  allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
+    pokeArray vs [ x, y, zMax            -- bottom left
+                 , x+w, y  , zMax  -- upper-left
+                 , x+w, y+h, zMax  -- upper-right
+                 , x  , y+h, zMax  -- bottom-right
+                 ]
+    glVertexAttribPointer positionLoc (i2i ptsInPos) gl_FLOAT (fromIntegral gl_FALSE) 0 vs
+    glDrawArrays gl_QUADS 0 (i2i ptsInQuad)
+
+----------------------------------------------------------------------------------------------------
+
 f2gl :: Double -> GLfloat
 f2gl = realToFrac
 
@@ -215,8 +248,8 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- returns the position of the point at time zero. This is used for the texture co-ordinates,
 -- while [movingPtToPt] is used for the polygon vertices.
 --
-germGfxToGLFun :: GermGfx -> GLM GermGL
-germGfxToGLFun gfx = GLM . const $ do
+germGfxToGermGL :: GermGfx -> GLM GermGL
+germGfxToGermGL gfx = GLM . const $ do
   textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
   --
   -- We pre-allocate a bunch of unboxed vectors (from Data.Vector). (Data.Vector uses
@@ -234,11 +267,16 @@ germGfxToGLFun gfx = GLM . const $ do
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
       germGLFun = \zIndex (R2 x' y') t r  -> GLM $ \glslAttrs -> do
-        let positionIdx = glslPosition glslAttrs
-            texCoordIdx = glslTexcoord glslAttrs
+        let positionIdx    = glslPosition glslAttrs
+            texCoordIdx    = glslTexcoord glslAttrs
+            drawTextureLoc = glslDrawTexture glslAttrs
+
         glBindTexture gl_TEXTURE_2D textureId
+        glUniform1ui drawTextureLoc 1 -- set to True
+
         glEnableVertexAttribArray (glslPosition glslAttrs)
         glEnableVertexAttribArray (glslTexcoord glslAttrs)
+
         -- Create a star polygon.
         let drawPolys n arrayType movingPts = do
               allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
@@ -272,13 +310,17 @@ germGfxToGLFun gfx = GLM . const $ do
   return $ GermGL germGLFun finaliser
 
 ----------------------------------------------------------------------------------------------------
-drawText :: Color -> R2 -> (Double,Double) -> WorldToCanvas -> String -> GLM ()
-drawText color (R2 x y) (w,h) w2c s =
-  renderCairoToQuad (x - w'/2, y - h'/2) (w', h') w2c $ do
-    text "Helvetica" color (cw/2,ch/2) cw s
+drawText :: Color -> R2 -> (Double,Double) -> String -> GLM ()
+drawText color (R2 x y) (w,h) s =
+  renderCairoToQuad (x - w'/2, y - h'/2) (w', h') $ do
+    text "Helvetica" color (w/2,h/2) w s
 
   where
     w' = realToFrac w
     h' = realToFrac h
-    cw = worldLenToCanvasLen w2c $  w
-    ch = worldLenToCanvasLen w2c $ h
+
+
+----------------------------------------------------------------------------------------------------
+drawLetterBox :: (GLfloat, GLfloat) -> (GLfloat, GLfloat) -> GLM ()
+drawLetterBox pos (w,h) =
+  when (w > 0 && h > 0 ) $ renderQuadWithColor pos (w,h) (Color 0 0 0 1)
