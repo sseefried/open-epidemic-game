@@ -165,6 +165,7 @@ initOpenGL window (w,h) = do
                         , glslColor       = colorLoc
                         , glslOrthoBounds = bds
                         }
+  debugLog $ show (programId, positionLoc, texCoordLoc, drawTextureLoc, colorLoc)
   return (glsls, context)
   where
 ----------------------------------------------------------------------------------------------------

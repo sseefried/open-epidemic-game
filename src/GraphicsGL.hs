@@ -70,9 +70,9 @@ clearBuffer (Color r g b a) n ptr = do
   for 0 $ \i -> do
     let pk off x = pokeByteOff ptr (i*bytesPerWord32+off) (toColorWord x)
     pk 0 r
-    pk 1 g
-    pk 2 b
-    pk 3 a
+    pk 1 g 
+    pk 2 b 
+    pk 3 a 
   where
     toColorWord :: Double -> Word8
     toColorWord x = floor (x*255.0)
@@ -148,7 +148,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
     glBindTexture gl_TEXTURE_2D tid
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
-    glUniform1ui drawTextureLoc 1 -- set to 'true'
+    glUniform1i drawTextureLoc 1 -- set to 'true'
 
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
@@ -174,8 +174,9 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
       i2i = fromIntegral
       f2f = realToFrac
 
-  glUniform1ui drawTextureLoc 0 -- set to 'false'
+  glUniform1i drawTextureLoc 0 -- set to 'false'
   glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
+
   glEnableVertexAttribArray (glslPosition glslAttrs)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
     pokeArray vs [ x, y, zMax            -- bottom left
@@ -272,7 +273,7 @@ germGfxToGermGL gfx = GLM . const $ do
             drawTextureLoc = glslDrawTexture glslAttrs
 
         glBindTexture gl_TEXTURE_2D textureId
-        glUniform1ui drawTextureLoc 1 -- set to True
+        glUniform1i drawTextureLoc 1 -- set to 'true'
 
         glEnableVertexAttribArray (glslPosition glslAttrs)
         glEnableVertexAttribArray (glslTexcoord glslAttrs)
@@ -285,18 +286,18 @@ germGfxToGermGL gfx = GLM . const $ do
                       (mx, my) = movingPtToPt t movingPt
                       vx       = (r*x + x')
                       vy       = (r*y + y')
-                      vz       = fromIntegral zIndex * (0.001) :: GLfloat
+                      vz       = fromIntegral zIndex * 0.001
                       tx       = (mx+1)/2
                       ty       = (my+1)/2
                       base     = i*perVertex*floatSize
                       texBase  = base + ptsInPos*floatSize
-                      pk :: Int -> GLfloat -> IO ()
-                      pk off x = pokeByteOff vertices off x
-                  pk base                (f2gl vx)
-                  pk (base+  floatSize)  (f2gl vy)
+                      pk :: Int -> Double -> IO ()
+                      pk off x = pokeByteOff vertices off (f2gl x)
+                  pk base                vx
+                  pk (base+  floatSize)  vy
                   pk (base+2*floatSize)  vz
-                  pk texBase             (f2gl tx)
-                  pk (texBase+floatSize) (f2gl ty)
+                  pk texBase             tx
+                  pk (texBase+floatSize) ty
                 glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride
                                       vertices
                 glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
