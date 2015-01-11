@@ -21,6 +21,7 @@ import qualified Data.Vector.Unboxed as V
 import Types
 import Graphics
 import Platform
+import CUtil 
 
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLuint
@@ -155,17 +156,18 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
       pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
                    , x+w, y  , zMax, 1, 0  -- upper-left
-                   , x+w, y+h, zMax, 1, 1  -- upper-right
                    , x  , y+h, zMax, 0, 1  -- bottom-right
+                   , x+w, y+h, zMax, 1, 1  -- upper-right
                    ]
       glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
       glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
                                     (vs `plusPtr` (ptsInPos*floatSize))
-      glDrawArrays gl_QUADS 0 (fromIntegral ptsInQuad)
+      glDrawArrays gl_TRIANGLE_STRIP 0 (fromIntegral ptsInQuad)
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (GLfloat, GLfloat) -> (GLfloat, GLfloat) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
+  let zMax = 0
   let positionLoc = glslPosition glslAttrs
       drawTextureLoc = glslDrawTexture glslAttrs
       colorLoc       = glslColor glslAttrs
@@ -179,16 +181,15 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
 
   glEnableVertexAttribArray (glslPosition glslAttrs)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
-    pokeArray vs [ x, y, zMax            -- bottom left
+    pokeArray vs [ x,   y  , zMax  -- bottom-left
                  , x+w, y  , zMax  -- upper-left
-                 , x+w, y+h, zMax  -- upper-right
                  , x  , y+h, zMax  -- bottom-right
+                 , x+w, y+h, zMax  -- upper-right
                  ]
     glVertexAttribPointer positionLoc (i2i ptsInPos) gl_FLOAT (fromIntegral gl_FALSE) 0 vs
-    glDrawArrays gl_QUADS 0 (i2i ptsInQuad)
+    glDrawArrays gl_TRIANGLE_STRIP 0 (i2i ptsInQuad)
 
 ----------------------------------------------------------------------------------------------------
-
 f2gl :: Double -> GLfloat
 f2gl = realToFrac
 

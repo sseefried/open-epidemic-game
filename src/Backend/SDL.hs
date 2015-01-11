@@ -321,11 +321,13 @@ _runAndTime besRef upd io = do
 ----------------------------------------------------------------------------------------------------
 runFrameUpdate :: IORef BackendState -> IO ()
 runFrameUpdate besRef = do
+  let f2f :: Double -> CFloat
+      f2f = realToFrac
   bes <- readIORef besRef
   let gs  = besGameState bes
       (Color r g b a) = backgroundColor
       glsls = besGLSLState bes
-  glClearColor (realToFrac r) (realToFrac g) (realToFrac b) (realToFrac a)
+  glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   runGLMIO glsls (gsRender gs)
   mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
