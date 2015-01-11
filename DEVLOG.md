@@ -4,6 +4,18 @@ Added a uniform variable "drawTexture" to the fragment shader that chooses betwe
 plain color polygon or a texture mapped one.
 
 
+----
+
+Found a bug on Android. I was using glUniformui which is not in GL ES 2.0! Had to use
+glUniformi instead.
+
+Was getting this for `adb logcat`
+
+    E/libEGL  ( 1062): called unimplemented OpenGL ES API
+
+Check for that next time things mysteriously fail.
+
+
 # Sat 10 Jan 2015
 
 Emotional: hating this today. Got slowly better over time.
