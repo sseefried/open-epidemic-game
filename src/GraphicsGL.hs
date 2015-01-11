@@ -24,10 +24,10 @@ import Platform
 import CUtil 
 
 ----------------------------------------------------------------------------------------------------
-rgbFormat :: GLuint
-rgbFormat = case platform of
-  Android -> gl_RGBA
-  _       -> gl_BGRA
+rgbFormat :: GLint
+rgbFormat = fromIntegral $ case platform of
+  Android -> gl_BGRA
+  _       -> gl_RGBA
 
 ----------------------------------------------------------------------------------------------------
 -- Resolution of largest texture for mipmap is 2^powOfTwo
@@ -88,7 +88,7 @@ renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
     C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
       C.renderWith surface cairoRender
     glBindTexture gl_TEXTURE_2D textureId
-    glTexImage2D gl_TEXTURE_2D index (fromIntegral gl_RGBA) w' h' 0 rgbFormat gl_UNSIGNED_BYTE buffer
+    glTexImage2D gl_TEXTURE_2D index rgbFormat w' h' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
   where
     w' = fromIntegral w
     h' = fromIntegral h
