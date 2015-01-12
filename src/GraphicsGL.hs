@@ -21,7 +21,6 @@ import qualified Data.Vector.Unboxed as V
 import Types
 import Graphics
 import Platform
-import CUtil 
 
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLint
@@ -71,9 +70,9 @@ clearBuffer (Color r g b a) n ptr = do
   for 0 $ \i -> do
     let pk off x = pokeByteOff ptr (i*bytesPerWord32+off) (toColorWord x)
     pk 0 r
-    pk 1 g 
-    pk 2 b 
-    pk 3 a 
+    pk 1 g
+    pk 2 b
+    pk 3 a
   where
     toColorWord :: Double -> Word8
     toColorWord x = floor (x*255.0)

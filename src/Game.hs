@@ -133,6 +133,7 @@ initGameState bounds hipSpace germs =
     hipSpace
     []
     1 -- current level
+    (M.fromList [(Penicillin,90.0)])-- FIXME should be empty  -- M.empty -- no antibiotics unlocked
   where
     germMapList = M.fromList $ zip [0..] germs
 ----------------------------------------------------------------------------------------------------

@@ -329,10 +329,13 @@ data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsHipState      :: HipSpace
                            , gsSoundQueue    :: ![GameSound]
                            , gsCurrentLevel  :: Int
+                           , gsAntibiotics   :: Map Antibiotic Double
                            }
 
 data GameSound = GameSoundLevelMusicStart -- start level music
                | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish
-----------------------------------------------------------------------------------------------------
 
+data Antibiotic = Penicillin
+                | Cyprofloxacin
+                deriving (Eq, Show, Ord)
