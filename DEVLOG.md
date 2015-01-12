@@ -1,3 +1,17 @@
+# Mon 12 Jan 2015
+
+What exactly is a tap?
+
+Up until this point I have defined a tap as a "finger down", but this isn't really accurate.
+A tap is a finger down and then a finger up in quick succession. In fact you could define it this
+way. We have two events Fd and Fu. These two events combined are a "tap" if
+  a) Fu.time - Fd.time < dt
+  b) distance(Fu.pos,Fd.pos) < dd
+
+where dt and dd are arbitrary constants.
+
+
+
 # Sun 11 Jan 2015
 
 Added a uniform variable "drawTexture" to the fragment shader that chooses between drawing a
