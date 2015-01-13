@@ -164,7 +164,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
       glDrawArrays gl_TRIANGLE_STRIP 0 (fromIntegral ptsInQuad)
 
 ----------------------------------------------------------------------------------------------------
-renderQuadWithColor :: (GLfloat, GLfloat) -> (GLfloat, GLfloat) -> Color -> GLM ()
+renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
   let zMax = 0
   let positionLoc = glslPosition glslAttrs
@@ -174,16 +174,17 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
       ptsInQuad = 4
       i2i = fromIntegral
       f2f = realToFrac
+      (x',y',w',h') = (f2f x, f2f y, f2f w, f2f h)
 
   glUniform1i drawTextureLoc 0 -- set to 'false'
   glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
 
   glEnableVertexAttribArray (glslPosition glslAttrs)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
-    pokeArray vs [ x,   y  , zMax  -- bottom-left
-                 , x+w, y  , zMax  -- upper-left
-                 , x  , y+h, zMax  -- bottom-right
-                 , x+w, y+h, zMax  -- upper-right
+    pokeArray vs [ x',    y'   , zMax  -- bottom-left
+                 , x'+w', y'   , zMax  -- upper-left
+                 , x'   , y'+h', zMax  -- bottom-right
+                 , x'+w', y'+h', zMax  -- upper-right
                  ]
     glVertexAttribPointer positionLoc (i2i ptsInPos) gl_FLOAT (fromIntegral gl_FALSE) 0 vs
     glDrawArrays gl_TRIANGLE_STRIP 0 (i2i ptsInQuad)
@@ -322,6 +323,6 @@ drawText color (R2 x y) (w,h) s =
 
 
 ----------------------------------------------------------------------------------------------------
-drawLetterBox :: (GLfloat, GLfloat) -> (GLfloat, GLfloat) -> GLM ()
+drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
 drawLetterBox pos (w,h) =
   when (w > 0 && h > 0 ) $ renderQuadWithColor pos (w,h) (Color 0 0 0 1)

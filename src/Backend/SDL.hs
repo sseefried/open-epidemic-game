@@ -68,10 +68,10 @@ backendToWorld (w,h) =
                  }
   where
     bds      = orthoBounds (w,h)
-    left     = cf2d $ orthoLeft bds
-    top      = cf2d $ orthoTop bds
+    left     = orthoLeft bds
+    top      = orthoTop bds
 
-    scale    = cf2d $ 1/(screenScale bds)
+    scale    = 1/(screenScale bds)
     w'       = fromIntegral w
     h'       = fromIntegral h
     cf2d     = cFloatToDouble
@@ -82,11 +82,11 @@ backendToWorld (w,h) =
 --
 orthoBounds :: (Int, Int) -> OrthoBounds
 orthoBounds (w,h) =
-  OrthoBounds { orthoLeft   = realToFrac $ worldLeft   - (lbhm / scale)
-              , orthoRight  = realToFrac $ worldRight  + (lbhm / scale)
-              , orthoBottom = realToFrac $ worldBottom - (lbvm / scale)
-              , orthoTop    = realToFrac $ worldTop    + (lbvm / scale)
-              , screenScale  = realToFrac $ scale
+  OrthoBounds { orthoLeft   =  worldLeft   - (lbhm / scale)
+              , orthoRight  =  worldRight  + (lbhm / scale)
+              , orthoBottom =  worldBottom - (lbvm / scale)
+              , orthoTop    =  worldTop    + (lbvm / scale)
+              , screenScale =  scale
               }
   where
     aspectRatio :: Double
@@ -199,7 +199,7 @@ ortho2D :: ProgramId -> OrthoBounds -> IO ()
 ortho2D programId bds = do
   modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
   when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
-  allocaArray 16 $ \ortho -> do
+  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
     pokeArray ortho [ a,   0,  0, 0
                     , 0,   b,  0, 0
                     , 0,   0,  c, 0
@@ -207,14 +207,16 @@ ortho2D programId bds = do
     glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
   where
     (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
-    near = -zMax
-    far  = -zMin
-    a    =  2 / (right - left)
-    b    =  2 / (top - bottom)
-    c    = -2 / (far - near)
-    tx   = - (right + left)/(right - left)
-    ty   = - (top + bottom)/(top - bottom)
-    tz   =   (far + near)/(far - near)
+    near = realToFrac $ -zMax
+    far  = realToFrac $ -zMin
+    d2gl :: Double -> GLfloat
+    d2gl = realToFrac
+    a    = d2gl $ 2 / (right - left)
+    b    = d2gl $  2 / (top - bottom)
+    c    = d2gl $ -2 / (far - near)
+    tx   = d2gl $ - (right + left)/(right - left)
+    ty   = d2gl $ - (top + bottom)/(top - bottom)
+    tz   = d2gl $   (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> IO (IORef BackendState)
@@ -334,19 +336,18 @@ runFrameUpdate besRef = do
   S.glSwapWindow (besWindow bes)
 
 ----------------------------------------------------------------------------------------------------
-type LetterBox = ((GLfloat, GLfloat), (GLfloat, GLfloat))
+type LetterBox = ((Double, Double), (Double, Double))
 letterBoxes :: OrthoBounds -> [LetterBox]
-letterBoxes b = [left, right, bottom, top]
+letterBoxes b = [ left, right, bottom, top]
   where
     screenWidth = orthoRight b - orthoLeft b
     screenHeight = orthoTop b - orthoBottom b
-    f2f = realToFrac
+
+    left   = ((orthoLeft b, orthoBottom b), (worldLeft - orthoLeft b,   screenHeight))
+    right  = ((worldRight, orthoBottom b),  (orthoRight b - worldRight, screenHeight))
     --
-    left   = ((orthoLeft b, orthoBottom b),    (f2f worldLeft - orthoLeft b,   screenHeight))
-    right  = ((f2f worldRight, orthoBottom b), (orthoRight b - f2f worldRight, screenHeight))
-    --
-    bottom = ((orthoLeft b, orthoBottom b),    (screenWidth, f2f worldBottom - orthoBottom b))
-    top    = ((orthoLeft b, f2f worldTop),     (screenWidth,   orthoTop b - f2f worldTop))
+    bottom = ((orthoLeft b, orthoBottom b), (screenWidth, worldBottom - orthoBottom b))
+    top    = ((orthoLeft b, worldTop),      (screenWidth,   orthoTop b - worldTop))
 
 ----------------------------------------------------------------------------------------------------
 --

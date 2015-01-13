@@ -260,11 +260,11 @@ data Germ = Germ { germMultiplyAt     :: Time
 --
 --
 data OrthoBounds =
-  OrthoBounds { orthoLeft    :: GLfloat
-              , orthoRight   :: GLfloat
-              , orthoBottom  :: GLfloat
-              , orthoTop     :: GLfloat
-              , screenScale  :: GLfloat -- convert from world distance to screen distance
+  OrthoBounds { orthoLeft    :: Double
+              , orthoRight   :: Double
+              , orthoBottom  :: Double
+              , orthoTop     :: Double
+              , screenScale  :: Double -- convert from world distance to screen distance
               } deriving (Show, Eq)
 
 data GLM a = GLM { unGLM :: GLSLState -> IO a }
