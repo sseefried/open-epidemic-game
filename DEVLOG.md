@@ -1,3 +1,66 @@
+# Tue 13 Jan 2015
+
+Today I want to think through tapping, selecting, dragging and dropping. I'll use the term
+"press" to denote either a mouse down or a touch down and the term "release" to denote either
+a mouse up or touch up. And I'll use the term "move" or "motion" for a mouse motion or touch motion.
+
+So, I want there to be a notion of an event known as a
+  - *tap*. A short press and release in roughly the same spot.
+  - *select*. Press in a spot and hold there.
+  - *drag*. Press in a spot and then move while staying pressed.
+  - *unselect*. Release after a *select*.
+
+The last thing I want is to present a non-atomic interface to the game. I don't want the game
+logic to have to record the fact that there was the initial "press down" and then later
+determine that it was a *select* or a *tap* based on how much time has elapsed.
+
+Perhaps we could do this:
+
+The initial press down causes a *select* event to fire immediately. If it is released within
+a small amount of time in roughly the same area then a *tap* event is sent. If a move occurs
+then a *drag* event is sent.
+
+This will require state to be kept on a press (i.e. time and location). Once a release occurs
+we can then determine whether it was a tap or not.
+
+----
+
+I have two choices
+  1. return a *select* event immediately and then a *tap* event if the release is soon enough.
+  2. return a *tap* event only and return a *select* each time events are polled and a
+     press has not be released in time.
+
+In scenario 1 the following event traces occur:
+  - germ kill:       [select', tap]
+  - germ move:       [select', drag', unselect]
+  - antibiotic drag: [select', drag', unselect]
+
+In scenario 2 the following event traces occur:
+  - germ kill:       [tap]
+  - germ move:       [drag'] or [select, drag', unselect]
+  - antibiotic drag: [drag'] or [select, drag', unselect]
+
+The events marked with primes (') would occur immediately with no delay. Those without primes
+have a 100ms (or so) delay. There is no getting around the fact that a tap has to have a delay.
+
+----
+
+Another issue that we need to consider is that of how many SDL events will be processed and emitted per frame. The current implementation can consume an arbitrary number of SDL events
+(most of which it ignores) but it will emit at most one event.
+
+I used to think this was a good idea but now I think it should be changed so that multiple events
+can be emitted each frame. This will allow a smooth multi-tap experience on touch devices.
+(i.e. players can kill more than one germ)
+
+----
+
+I've just discovered yet another problem. While rapidly clicking around the field on germs
+it is often the case that the event comes back as a *drag*! This is because a small amount of
+movement is occurring in between the press and release.
+
+The solution will have to be that a *select* event must occur before a *drag*.
+
+
 # Mon 12 Jan 2015
 
 What exactly is a tap?
