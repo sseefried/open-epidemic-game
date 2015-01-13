@@ -19,6 +19,9 @@ data PressHistory = PressHistory { phMouseDown     :: Maybe MouseDown
                                  , phTouchDowns    :: Map FingerId TouchDown
                                  }
 
+isMobile, isDesktop :: Bool
+isMobile = False
+isDesktop = not isMobile
 
 --
 -- A simplified event system
@@ -50,6 +53,14 @@ whenJust_ :: Maybe a -> (a -> IO ()) -> IO ()
 whenJust_ mb = whenJust mb ()
 
 ----------------------------------------------------------------------------------------------------
+whenLookup :: Ord k => k -> Map k a -> b -> (a -> IO b) -> IO b
+whenLookup k m b io = do
+  case M.lookup k m of
+    Just a -> io a
+    Nothing -> return b
+
+
+----------------------------------------------------------------------------------------------------
 mainLoop :: S.Window -> IORef PressHistory -> IO ()
 mainLoop w phRef = do
   evs <- eventHandler phRef
@@ -61,12 +72,19 @@ mainLoop w phRef = do
 ----------------------------------------------------------------------------------------------------
 eventHandler :: IORef PressHistory -> IO [Event]
 eventHandler phRef = do
+  evs <- selectEvents phRef
   mbSDLEvent <- S.pollEvent
-  mbEv <- whenJust mbSDLEvent Nothing $ \e -> do
-    when (checkForQuit e) $ exitWith ExitSuccess
-    decodeEvent phRef e
-  mbEv' <- selectEvents phRef
-  return $ catMaybes [mbEv, mbEv']
+  evs' <- case mbSDLEvent of
+    Just e -> do
+      when (checkForQuit e) $ exitWith ExitSuccess
+      mbEv <- decodeEvent phRef e
+      es'  <- eventHandler phRef -- loop until no more
+      return $ mbEv `consMaybe` es'
+    Nothing -> return []
+  return $ evs ++ evs'
+
+consMaybe :: Maybe a -> [a] -> [a]
+mbX `consMaybe` xs = maybe xs (:xs) mbX
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -87,19 +105,21 @@ decodeEvent phRef e = do
     -- mouse down
     S.MouseButton { S.mouseButtonState = S.Pressed
                   , S.mouseButton      = S.LeftButton
-                  , S.mouseButtonAt    = S.Position x y } -> do
+                  , S.mouseButtonAt    = S.Position x y }
+                  | isDesktop -> do
       modifyIORef' phRef $ \ph -> ph { phMouseDown = Just (MouseDown t (x,y)) }
       return Nothing
     -- mouse up
     S.MouseButton { S.mouseButtonState = S.Released
                   , S.mouseButton      = S.LeftButton
-                  , S.mouseButtonAt    = S.Position x y } -> do
+                  , S.mouseButtonAt    = S.Position x y }
+                  | isDesktop -> do
       ph <- readIORef phRef
-      whenJust (phMouseDown ph) Nothing $ \(MouseDown t' _) -> do
+      whenJust (phMouseDown ph) (Just Unselect) $ \(MouseDown t' _) -> do
         writeIORef phRef $ ph { phMouseDown = Nothing }
         return $ Just Tap
     -- mouse move
-    S.MouseMotion { S.mouseMotionState = btns } -> do
+    S.MouseMotion { S.mouseMotionState = btns } | isDesktop -> do
       ph <- readIORef phRef
       let drag = Just Drag
       if S.LeftButton `elem` btns
@@ -115,30 +135,66 @@ decodeEvent phRef e = do
     S.TouchFinger { S.touchFingerEvent = S.TouchFingerDown
                   , S.touchFingerID    = fingerIdL
                   , S.touchX           = x'
-                  , S.touchY           = y' } -> do
---      printf "Touch down: %d\n" (fromIntegral fingerIdL :: Integer)
+                  , S.touchY           = y' }
+                  |  isMobile -> do
       let fingerId = fromIntegral fingerIdL
           td = TouchDown t (x',y')
       modifyIORef' phRef $ \ph -> ph { phTouchDowns = M.insert fingerId td (phTouchDowns ph) }
       return Nothing
+    -- touch up
+    S.TouchFinger { S.touchFingerEvent = S.TouchFingerUp
+                  , S.touchFingerID    = fingerIdL
+                  , S.touchX           = x'
+                  , S.touchY           = y' }
+                  | isMobile -> do
+      ph <- readIORef phRef
+      let fingerId = fromIntegral fingerIdL
+      let tds = phTouchDowns ph
+      whenLookup fingerId tds (Just Unselect) $ \(TouchDown t' _) -> do
+        writeIORef phRef $ ph { phTouchDowns = M.delete fingerId tds }
+        return $ Just Tap
+    -- touch move
+    S.TouchFinger { S.touchFingerEvent = S.TouchFingerMotion
+                  , S.touchFingerID    = fingerIdL
+                  , S.touchX           = x'
+                  , S.touchY           = y'}
+                  | isMobile -> do
+      ph <- readIORef phRef
+      let drag     = Just Drag
+          fingerId = fromIntegral fingerIdL
+          tds      = phTouchDowns ph
+      whenLookup fingerId tds drag $ \(TouchDown t' _) -> do
+           if (t - t' > maxTapDuration)
+            then do
+              modifyIORef phRef $ \ph -> ph { phTouchDowns = M.delete fingerId tds }
+              return drag
+            else return Nothing
     _ -> return Nothing
+----------------------------------------------------------------------------------------------------
+
 
 ----------------------------------------------------------------------------------------------------
 --
 -- Checks if a certain amount of time has passed for presses and returns a "select" if this
 -- time has been exceeded.
 --
-selectEvents :: IORef PressHistory -> IO (Maybe Event)
+selectEvents :: IORef PressHistory -> IO [Event]
 selectEvents phRef = do
-  ph <- readIORef phRef
   t  <- S.getTicks
-  whenJust (phMouseDown ph) Nothing $ \(MouseDown t' (x,y)) -> do
-    if ((t - t') > maxTapDuration)
-     then do
-       writeIORef phRef $ ph { phMouseDown = Nothing }
-       return $ Just Select
-     else do
-       return Nothing
+  mbEv <- readIORef phRef >>= \ph -> do
+    whenJust (phMouseDown ph) Nothing $ \(MouseDown t' (x,y)) -> do
+      if ((t - t') > maxTapDuration)
+       then do
+         writeIORef phRef $ ph { phMouseDown = Nothing }
+         return $ Just Select
+       else do
+         return Nothing
+  evs <- readIORef phRef >>= \ph -> do
+    let (selects, nonSelects) = M.mapEither tooLong (phTouchDowns ph)
+        tooLong td@(TouchDown t' _ ) = if (t - t') > maxTapDuration then Left td else Right td
+    writeIORef phRef $ ph { phTouchDowns = nonSelects }
+    return $ map (const Select) $ M.elems selects
+  return $ mbEv `consMaybe` evs
 
 ----------------------------------------------------------------------------------------------------
 printEvent e = do
