@@ -5,7 +5,6 @@ module Backend.SDL (
 ) where
 
 import qualified Graphics.UI.SDL          as S
-import qualified Graphics.UI.SDL.Keycode  as SK
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
 import           Graphics.Rendering.OpenGL.Raw
@@ -16,8 +15,6 @@ import           Data.Time
 import           Text.Printf
 import           Control.Monad
 import           System.Exit
--- import           Foreign.C.Types (CUChar)
---import           Foreign.Marshal.Alloc (mallocBytes)
 import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.Types (CFloat)
 import           Foreign.C.String (withCString, withCStringLen, peekCString)
@@ -25,13 +22,14 @@ import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Marshal.Alloc (alloca, allocaBytes)
 import           Foreign.Storable (peek)
 import           Control.Applicative ((<$>))
-
+import qualified Data.Map as M
 
 -- friends
+import Backend.Events
 import Types
 import Game
 import GameM
-import Graphics()
+import GameEvent
 import Platform
 import CUtil
 import Util
@@ -45,6 +43,7 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besGLSLState      :: GLSLState
                                  , _besGLContext     :: S.GLContext
                                  , besGameState      :: GameState
+                                 , besPressHistory   :: IORef PressHistory
                                  , besBackendToWorld :: BackendToWorld
                                  , besFrames         :: Integer
                                  , besFRBuf          :: FRBuf
@@ -150,10 +149,11 @@ ortho2D programId bds = do
   modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
   when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
   allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
-    pokeArray ortho [ a,   0,  0, 0
-                    , 0,   b,  0, 0
-                    , 0,   0,  c, 0
-                    , tx, ty, tz, 1 ]
+    pokeArray ortho $ map d2gl
+      [ a,   0,  0, 0
+      , 0,   b,  0, 0
+      , 0,   0,  c, 0
+      , tx, ty, tz, 1 ]
     glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
   where
     (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
@@ -161,12 +161,12 @@ ortho2D programId bds = do
     far  = realToFrac $ -zMin
     d2gl :: Double -> GLfloat
     d2gl = realToFrac
-    a    = d2gl $ 2 / (right - left)
-    b    = d2gl $  2 / (top - bottom)
-    c    = d2gl $ -2 / (far - near)
-    tx   = d2gl $ - (right + left)/(right - left)
-    ty   = d2gl $ - (top + bottom)/(top - bottom)
-    tz   = d2gl $   (far + near)/(far - near)
+    a    = 2 / (right - left)
+    b    =  2 / (top - bottom)
+    c    = -2 / (far - near)
+    tx   = - (right + left)/(right - left)
+    ty   = - (top + bottom)/(top - bottom)
+    tz   =   (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> IO (IORef BackendState)
@@ -197,47 +197,12 @@ initialize title = do
   t     <- getCurrentTime
   frBuf <- initFRBuf
   gs    <- newGameState (w,h)
-  newIORef $ BackendState t t glslState context gs (backendToWorld dims) 0 frBuf (FSMLevel 1)
+  pressHistory <- newIORef $ PressHistory Nothing M.empty
+  newIORef $ BackendState t t glslState context gs pressHistory
+               (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
     wflags = [S.WindowShown]
-
-
---debugPrintKey sdlEvent = case sdlEvent of
---  S.KeyboardEvent (S.Keysym key mods unicode) ->
---    printf "Key: %s %s %s\n" (show key) (show mods) (show unicode)
---  _ -> return ()
-----------------------------------------------------------------------------------------------------
---
--- Returns Nothing if the SDL event is not understood by the game in this FSMState.
---
-sdlEventToEvent :: BackendToWorld -> FSMState -> S.Event -> Maybe Event
-sdlEventToEvent b2w fsmState sdlEvent =
-  case fsmState of -- events that occur in specific FSM states
-    FSMPlayingLevel   -> playingLevel sdlEvent
-    FSMGameOver       -> tapAnywhere sdlEvent
-    FSMLevelComplete  -> tapAnywhere sdlEvent
-    _                 -> Nothing
-  where
-    playingLevel e = case e of
-      _ | Just pt <- isMouseOrTouchDown b2w e -> Just $ Tap pt
-      _                                       -> Nothing
-    ---------------------------------------
-    tapAnywhere e = case e of
-      _ | Just _ <- isMouseOrTouchDown b2w e -> Just TapAnywhere
-      _                                      -> Nothing
-
-
---
--- True if any mouse button is down.
---
-isMouseOrTouchDown :: BackendToWorld -> S.Event -> Maybe R2
-isMouseOrTouchDown b2w e = case S.eventData e of
-  S.MouseButton { S.mouseButtonAt = p, S.mouseButtonState = S.Pressed } | not isMobile ->
-    Just $ backendPtToWorldPt b2w (S.positionX p, S.positionY p)
-  S.TouchFinger { S.touchFingerEvent = S.TouchFingerDown, S.touchX = fx, S.touchY = fy } | isMobile ->
-    Just $ backendNormPtToWorldPt b2w (fx, fy)
-  _                                              -> Nothing
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -287,6 +252,7 @@ runFrameUpdate besRef = do
 
 ----------------------------------------------------------------------------------------------------
 type LetterBox = ((Double, Double), (Double, Double))
+
 letterBoxes :: OrthoBounds -> [LetterBox]
 letterBoxes b = [ left, right, bottom, top]
   where
@@ -308,11 +274,11 @@ runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMSta
 runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let fsmState = besFSMState bes
-  mbEvent <- getEvent (besBackendToWorld bes) fsmState
+  mbEvent <- getEvent besRef
   case mbEvent of
-    Left ()         -> exitWith ExitSuccess
-    Right Nothing   -> return () -- do nothing
-    Right (Just ev) -> runOnGameState' besRef (handleEvent fsmState ev)
+    Nothing        -> exitWith ExitSuccess
+    Just []        -> return () -- do nothing
+    Just evs -> mapM_ (runOnGameState' besRef . handleEvent fsmState) evs
   where
     runOnGameState' b c = runOnGameState updFSMState b c (const $ return ())
     updFSMState fsmState bes = bes { besFSMState = fsmState }
@@ -366,41 +332,47 @@ playSoundQueue bes = case platform of
       GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------
---
--- We want to return *at most* one event per frame (as we want the finite state machine to
--- evolve by one state at most per frame). We want to skip any events that the game does
--- not understand (so that we do not have frames where nothing happened because
--- an SDL event that was not understood was processed into returning Nothing)
---
--- Left ()        = SDL quit event occurred
--- Right Nothing  = no game event
--- Right ev       = event [ev] returned
-getEvent :: BackendToWorld -> FSMState -> IO (Either () (Maybe Event))
-getEvent b2w fsmState = do
-  mbSDLEvent <- S.pollEvent
-  case mbSDLEvent of
-    Just sdlEvent -> do
-      case checkForQuit sdlEvent of
-        True -> return $ Left ()
-        False -> (case sdlEvent of
-                _ -> (case sdlEventToEvent b2w fsmState sdlEvent of
-                        Nothing -> getEvent b2w fsmState -- keep polling
-                        Just ev -> return $ Right $ Just ev))
-    Nothing -> return $ Right Nothing
-  where
-    -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
-    checkForQuit e = case S.eventData e of
-      S.Quit                    -> True
-      _ | b <- isKeyDown e qKey -> b
+----
+---- We want to return *at most* one event per frame (as we want the finite state machine to
+---- evolve by one state at most per frame). We want to skip any events that the game does
+---- not understand (so that we do not have frames where nothing happened because
+---- an SDL event that was not understood was processed into returning Nothing)
+----
+---- Left ()        = SDL quit event occurred
+---- Right Nothing  = no game event
+---- Right ev       = event [ev] returned
+--getEvent :: IORef BackendState -> FSMState -> IO (Either () (Maybe Event))
+--getEvent besRef fsmState = do
+--  b2w <- besBackendToWorld <$> readIORef besRef
+--  mbSDLEvent <- S.pollEvent
+--  case mbSDLEvent of
+--    Just sdlEvent -> do
+--      case checkForQuit sdlEvent of
+--        True -> return $ Left ()
+--        False -> (case sdlEvent of
+--                _ -> (case sdlEventToEvent besRef fsmState sdlEvent of
+--                        Nothing -> getEvent besRef fsmState -- keep polling
+--                        Just ev -> return $ Right $ Just ev))
+--    Nothing -> return $ Right Nothing
+--  where
+--    -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
+--    checkForQuit e = case S.eventData e of
+--      S.Quit                    -> True
+--      _ | b <- isKeyDown e qKey -> b
 
-qKey :: SK.Keycode
-qKey = SK.Q
+--qKey :: SK.Keycode
+--qKey = SK.Q
 
-isKeyDown :: S.Event -> SK.Keycode -> Bool
-isKeyDown e code = case S.eventData e of
-  S.Keyboard {  S.keyMovement = S.KeyDown, S.keySym = S.Keysym _ code' _ } -> code == code'
-  _ -> False
+--isKeyDown :: S.Event -> SK.Keycode -> Bool
+--isKeyDown e code = case S.eventData e of
+--  S.Keyboard {  S.keyMovement = S.KeyDown, S.keySym = S.Keysym _ code' _ } -> code == code'
+--  _ -> False
 
+----------------------------------------------------------------------------------------------------
+getEvent :: IORef BackendState -> IO (Maybe [Event])
+getEvent besRef = do
+  bes <- readIORef besRef
+  eventHandler (besPressHistory bes) (besBackendToWorld bes)
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState

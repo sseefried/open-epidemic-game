@@ -15,6 +15,7 @@ import qualified Data.Map as M
 
 -- friends
 import Types
+import GameEvent
 import GameM
 import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
@@ -60,36 +61,6 @@ data FSMState = FSMLevel Int -- level number
               | FSMGameOver
               deriving (Show, Eq, Ord)
 
-----------------------------------------------------------------------------------------------------
---
--- Events
--- ~~~~~~
---
--- This game may be implemented on a variety of backends, some which have mice/touchpads,
--- some which have touch screens, some which have keyboards and some that don't. One approach
--- would be for the game logic to understand the basic concepts of 'keypress', 'mouse click',
--- 'touch event', etc, but a more abstract way to do things is simply to have a notion of
--- "game events" such as "germ squash", "quit", "continue to next level", etc.
--- It is then the backend's job to correctly translate its events to these game events.
---
--- This actually saves me a lot of work. For instance, were we to have a notion of 'keypress'
--- in the game logic then you would have to account for every different kind of key that could
--- be pressed, which is not only a large number of keys but would likely be different between
--- the different backends. (Some would leave out certain keys not common on all keyboards, some
--- would have them. I'd have to choose a subset that worked for all of them, etc.)
---
-
-{-
-TODO: I would really like it if there was some (fairly easy) way of associating a particular
-data type with each constructor of the FSM. As it stands I could easily make a mistake in my
-code and have backend code that returned an event that wasn't handled by a particular FSM
-state. At this point these errors can only be caught at run-time.
--}
-data Event = Tap R2       -- location at which tap occurred.
-           | TapAnywhere  -- tap occurred but anywhere.
-           | Reset
-           | Physics Time -- how much time the last frame took
-           deriving (Show, Eq, Ord)
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -144,7 +115,7 @@ handleEvent :: FSMState -> Event -> GameM FSMState
 handleEvent fsmState ev = do
   -- events that can occur in any FSM State
   case ev of
-    Reset   -> resetGameState >> (return $ FSMLevel 1)
+    Reset  -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
              FSMLevel i            -> fsmLevel i
              FSMPlayingLevel       -> fsmPlayingLevel
@@ -178,14 +149,14 @@ handleEvent fsmState ev = do
           Physics duration -> do
             physics duration
             return fsmState
-          _ -> error $ printf "Event '%s' not handled by fsmLevel" (show ev)
+          _ -> return fsmState -- error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     --------------------------------------
     fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
     --------------------------------------
     fsmLevelComplete      = do
       gs <- get
       case ev of
-        TapAnywhere -> return $ FSMLevel (gsCurrentLevel gs + 1)
+        Tap _ -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
           let render = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
                          "Epidemic averted!"
@@ -194,7 +165,7 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmGameOver           = do
       case ev of
-        TapAnywhere -> return $ FSMLevel 1
+        Tap _ -> return $ FSMLevel 1
         _ -> do
           modify $ \gs ->
            gs { gsRender = do

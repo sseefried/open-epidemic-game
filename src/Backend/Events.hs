@@ -1,48 +1,35 @@
+module Backend.Events (
+  -- data types
+  PressHistory(..)
+  -- functions
+  , eventHandler
+) where
+
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Keycode  as SK
-import           Control.Monad
-import           Text.Printf
-import           System.Exit
+-- import           Control.Monad
+-- import           Text.Printf
+-- import           System.Exit
 import           Data.Map (Map)
 import qualified Data.Map as M
 import           GHC.Word (Word32)
 import           Foreign.C.Types (CFloat)
 import           Data.IORef
-import           Data.Maybe
+
+-- friends
+import GameEvent
+import Platform
+import Coordinate
 
 data MouseDown = MouseDown Word32 (Int, Int)
 data TouchDown = TouchDown Word32 (CFloat, CFloat)
 
 type FingerId = Integer
 
-data PressHistory = PressHistory { phMouseDown     :: Maybe MouseDown
-                                 , phTouchDowns    :: Map FingerId TouchDown
+data PressHistory = PressHistory { phMouseDown      :: Maybe MouseDown
+                                 , phTouchDowns     :: Map FingerId TouchDown
                                  }
 
-isMobile, isDesktop :: Bool
-isMobile = False
-isDesktop = not isMobile
-
---
--- A simplified event system
---
-data Event = Tap
-           | Select
-           | Unselect
-           | Drag deriving (Show, Eq)
-----------------------------------------------------------------------------------------------------
-data BackendToWorld = BackendToWorld { backendPtToWorldPt     :: (Int, Int) -> R2
-                                     , backendNormPtToWorldPt :: (CFloat, CFloat) -> R2 }
-----------------------------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  S.init [S.InitVideo, S.InitAudio]
-  window <- S.createWindow "SDL Test" (S.Position 0 0) (S.Size 300 300) wflags
-  phRef  <- newIORef $ PressHistory Nothing M.empty
-  let b2w =
-  mainLoop window phRef
-  where
-    wflags = [S.WindowShown]
 
 ----------------------------------------------------------------------------------------------------
 whenJust :: Maybe a -> b -> (a -> IO b) -> IO b
@@ -52,8 +39,8 @@ whenJust mb b io = do
     Nothing -> return b
 
 ----------------------------------------------------------------------------------------------------
-whenJust_ :: Maybe a -> (a -> IO ()) -> IO ()
-whenJust_ mb = whenJust mb ()
+_whenJust_ :: Maybe a -> (a -> IO ()) -> IO ()
+_whenJust_ mb = whenJust mb ()
 
 ----------------------------------------------------------------------------------------------------
 whenLookup :: Ord k => k -> Map k a -> b -> (a -> IO b) -> IO b
@@ -64,45 +51,43 @@ whenLookup k m b io = do
 
 
 ----------------------------------------------------------------------------------------------------
-mainLoop :: S.Window -> IORef PressHistory -> IO ()
-mainLoop w phRef = do
-  evs <- eventHandler phRef
-  case evs of
-    [] -> return ()
-    _  -> putStrLn $ show evs
-  mainLoop w phRef
+--mainLoop :: S.Window -> IORef PressHistory -> IO ()
+--mainLoop w phRef = do
+--  evs <- eventHandler phRef
+--  case evs of
+--    [] -> return ()
+--    _  -> putStrLn $ show evs
+--  mainLoop w phRef
 
 ----------------------------------------------------------------------------------------------------
-eventHandler :: IORef PressHistory -> IO [Event]
-eventHandler phRef = do
-  evs <- selectEvents phRef
+-- Nothing = quit game
+-- Just _  = events (maybe empty)
+
+eventHandler :: IORef PressHistory -> BackendToWorld -> IO (Maybe [Event])
+eventHandler phRef b2w = do
+  evs <- selectEvents phRef b2w
   mbSDLEvent <- S.pollEvent
-  evs' <- case mbSDLEvent of
+  mbEvs <- case mbSDLEvent of
     Just e -> do
-      when (checkForQuit e) $ exitWith ExitSuccess
-      mbEv <- decodeEvent phRef e
-      es'  <- eventHandler phRef -- loop until no more
-      return $ mbEv `consMaybe` es'
-    Nothing -> return []
-  return $ evs ++ evs'
+      case checkForQuit e of
+        True -> return Nothing
+        False -> do
+          mbEv   <- decodeEvent phRef b2w e
+          mbEvs' <- eventHandler phRef b2w -- loop until no more
+          return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
+    Nothing -> return $ Just []
+  return $ maybe Nothing (Just . (evs++)) mbEvs
 
 consMaybe :: Maybe a -> [a] -> [a]
 mbX `consMaybe` xs = maybe xs (:xs) mbX
-
-----------------------------------------------------------------------------------------------------
---
--- Like [modifyIORef] but takes a monadic action.
---
-withIORef :: IORef a -> (a -> IO a) -> IO ()
-withIORef ioRef io = do { a <- readIORef ioRef; a' <- io (seq a a); writeIORef ioRef a' }
 
 ----------------------------------------------------------------------------------------------------
 maxTapDuration :: Word32
 maxTapDuration = 200
 
 ----------------------------------------------------------------------------------------------------
-decodeEvent :: IORef PressHistory -> S.Event -> IO (Maybe Event)
-decodeEvent phRef e = do
+decodeEvent :: IORef PressHistory -> BackendToWorld -> S.Event -> IO (Maybe Event)
+decodeEvent phRef b2w e = do
   let t = S.eventTimestamp e
   case S.eventData e of
     -- mouse down
@@ -118,13 +103,19 @@ decodeEvent phRef e = do
                   , S.mouseButtonAt    = S.Position x y }
                   | isDesktop -> do
       ph <- readIORef phRef
-      whenJust (phMouseDown ph) (Just Unselect) $ \(MouseDown t' _) -> do
+      let unselect = Just $ Unselect $ backendPtToWorldPt b2w (x,y)
+      whenJust (phMouseDown ph) unselect $ \(MouseDown _ pt) -> do
         writeIORef phRef $ ph { phMouseDown = Nothing }
-        return $ Just Tap
+        return $ Just $ Tap $ backendPtToWorldPt b2w pt
     -- mouse move
-    S.MouseMotion { S.mouseMotionState = btns } | isDesktop -> do
+    S.MouseMotion { S.mouseMotionState = btns
+                  , S.mouseMotionPosition = S.Position x y
+                  , S.mouseMotionXRelMotion = dx
+                  , S.mouseMotionYRelMotion = dy }
+                  | isDesktop -> do
       ph <- readIORef phRef
-      let drag = Just Drag
+      let (dx', dy') = (fromIntegral dx, fromIntegral dy)
+          drag = Just $ Drag (backendPtToWorldPt b2w (x,y)) (backendPtToWorldPt b2w (x+dx', y+dy'))
       if S.LeftButton `elem` btns
        then do
          whenJust (phMouseDown ph) drag $ \(MouseDown t' _) -> do
@@ -147,60 +138,65 @@ decodeEvent phRef e = do
     -- touch up
     S.TouchFinger { S.touchFingerEvent = S.TouchFingerUp
                   , S.touchFingerID    = fingerIdL
-                  , S.touchX           = x'
-                  , S.touchY           = y' }
+                  , S.touchX           = x
+                  , S.touchY           = y }
+
                   | isMobile -> do
       ph <- readIORef phRef
       let fingerId = fromIntegral fingerIdL
-      let tds = phTouchDowns ph
-      whenLookup fingerId tds (Just Unselect) $ \(TouchDown t' _) -> do
+          tds = phTouchDowns ph
+          unselect = Just $ Unselect $ backendNormPtToWorldPt b2w (x,y)
+      whenLookup fingerId tds unselect $ \(TouchDown _ pt) -> do
         writeIORef phRef $ ph { phTouchDowns = M.delete fingerId tds }
-        return $ Just Tap
+        return $ Just $ Tap (backendNormPtToWorldPt b2w pt)
     -- touch move
     S.TouchFinger { S.touchFingerEvent = S.TouchFingerMotion
                   , S.touchFingerID    = fingerIdL
-                  , S.touchX           = x'
-                  , S.touchY           = y'}
+                  , S.touchX           = x
+                  , S.touchY           = y
+                  , S.touchDx          = dx
+                  , S.touchDy          = dy }
                   | isMobile -> do
       ph <- readIORef phRef
-      let drag     = Just Drag
+      let drag     = Just $ Drag (backendNormPtToWorldPt b2w (x,y))
+                                 (backendNormPtToWorldPt b2w (x+dx,y+dy))
           fingerId = fromIntegral fingerIdL
           tds      = phTouchDowns ph
       whenLookup fingerId tds drag $ \(TouchDown t' _) -> do
-           if (t - t' > maxTapDuration)
+           if t - t' > maxTapDuration
             then do
               modifyIORef phRef $ \ph -> ph { phTouchDowns = M.delete fingerId tds }
               return drag
             else return Nothing
     _ -> return Nothing
 ----------------------------------------------------------------------------------------------------
-
-
-----------------------------------------------------------------------------------------------------
 --
 -- Checks if a certain amount of time has passed for presses and returns a "select" if this
 -- time has been exceeded.
 --
-selectEvents :: IORef PressHistory -> IO [Event]
-selectEvents phRef = do
+selectEvents :: IORef PressHistory -> BackendToWorld -> IO [Event]
+selectEvents phRef b2w = do
   t  <- S.getTicks
   mbEv <- readIORef phRef >>= \ph -> do
-    whenJust (phMouseDown ph) Nothing $ \(MouseDown t' (x,y)) -> do
+    whenJust (phMouseDown ph) Nothing $ \(MouseDown t' pt) -> do
       if ((t - t') > maxTapDuration)
        then do
          writeIORef phRef $ ph { phMouseDown = Nothing }
-         return $ Just Select
+         return . Just . Select $ backendPtToWorldPt b2w pt
        else do
          return Nothing
   evs <- readIORef phRef >>= \ph -> do
-    let (selects, nonSelects) = M.mapEither tooLong (phTouchDowns ph)
-        tooLong td@(TouchDown t' _ ) = if (t - t') > maxTapDuration then Left td else Right td
+    let (selectPts, nonSelects) = M.mapEither tooLong (phTouchDowns ph)
+        tooLong td@(TouchDown t' pt) =
+            if (t - t') > maxTapDuration
+              then Left $ backendNormPtToWorldPt b2w pt
+              else Right td
     writeIORef phRef $ ph { phTouchDowns = nonSelects }
-    return $ map (const Select) $ M.elems selects
+    return $ map Select $ M.elems selectPts
   return $ mbEv `consMaybe` evs
 
 ----------------------------------------------------------------------------------------------------
-printEvent e = do
+_printEvent e = do
   let p = putStrLn $ show e
   case S.eventData e of
     S.MouseMotion { S.mouseMotionState = btns } | not (null btns) ->
