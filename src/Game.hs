@@ -10,7 +10,7 @@ module Game where
 import           Control.Monad.Random hiding (getRandom, evalRand)
 import           Control.Monad (replicateM)
 import           Control.Applicative
-import           Text.Printf
+-- import           Text.Printf
 import qualified Data.Map as M
 
 -- friends
@@ -155,8 +155,10 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmLevelComplete      = do
       gs <- get
+      let nextLevel = return $ FSMLevel (gsCurrentLevel gs + 1)
       case ev of
-        Tap _ -> return $ FSMLevel (gsCurrentLevel gs + 1)
+        Tap _    -> nextLevel
+        Select _ -> nextLevel
         _ -> do
           let render = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
                          "Epidemic averted!"
@@ -164,8 +166,10 @@ handleEvent fsmState ev = do
           return $ FSMLevelComplete
     --------------------------------------
     fsmGameOver           = do
+      let restart = return $ FSMLevel 1
       case ev of
-        Tap _ -> return $ FSMLevel 1
+        Tap _    -> restart
+        Select _ -> restart
         _ -> do
           modify $ \gs ->
            gs { gsRender = do
