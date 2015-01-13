@@ -21,13 +21,6 @@ import Types
 -- the different backends. (Some would leave out certain keys not common on all keyboards, some
 -- would have them. I'd have to choose a subset that worked for all of them, etc.)
 --
-
-{-
-TODO: I would really like it if there was some (fairly easy) way of associating a particular
-data type with each constructor of the FSM. As it stands I could easily make a mistake in my
-code and have backend code that returned an event that wasn't handled by a particular FSM
-state. At this point these errors can only be caught at run-time.
--}
 data Event = Tap R2       -- location at which tap occurred.
            | Select R2
            | Unselect R2
@@ -36,12 +29,3 @@ data Event = Tap R2       -- location at which tap occurred.
            | Reset
            deriving (Show, Eq, Ord)
 
-
---data Event = Tap        -- location at which tap occurred.
---           | Select
---           | Unselect
---           | Drag
---           | TapAnywhere  -- tap occurred but anywhere.
---           | Reset
---           | Physics Time -- how much time the last frame took
---           deriving (Show, Eq, Ord)
