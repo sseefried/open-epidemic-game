@@ -14,3 +14,4 @@ dist/
 *.ps
 run.sh
 sounds/
+extra-src/Events
