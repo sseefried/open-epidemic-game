@@ -282,7 +282,10 @@ physics duration = do
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
   let drawOneGerm :: (Int, Germ) -> GLM ()
       drawOneGerm (i,g) = do
-        (germGLFun . germGL $ g) i (germPos g) (germAnimTime g) (germSizeFun g (germCumulativeTime g))
+        let ampScale = 1.0 -- FIXME: Make it depend on whether germ is selected or not
+            timeScale = 1.0 -- FIXME: Make it depend on whether germ is selected or not
+        (germGLFun . germGL $ g) i (germPos g) (germAnimTime g * timeScale)
+            (germSizeFun g (germCumulativeTime g)) ampScale
   modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
 

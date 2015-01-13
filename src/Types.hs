@@ -309,6 +309,7 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> R2     -- position
                                  -> Time   -- cumulative animation time
                                  -> Double -- radius
+                                 -> Double -- amplitude scale
                                  -> GLM ()
                      , germGLFinaliser :: GLM () }
 

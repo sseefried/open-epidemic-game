@@ -268,7 +268,7 @@ germGfxToGermGL gfx = GLM . const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-      germGLFun = \zIndex (R2 x' y') t r  -> GLM $ \glslAttrs -> do
+      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \glslAttrs -> do
         let positionIdx    = glslPosition glslAttrs
             texCoordIdx    = glslTexcoord glslAttrs
             drawTextureLoc = glslDrawTexture glslAttrs
@@ -284,7 +284,7 @@ germGfxToGermGL gfx = GLM . const $ do
               allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
                 forMi_ movingPts $ \i movingPt -> do
                   let (x,y)    = movingPtToStaticPt movingPt
-                      (mx, my) = movingPtToPt t movingPt
+                      (mx, my) = movingPtToPt t scale movingPt
                       vx       = (r*x + x')
                       vy       = (r*y + y')
                       vz       = fromIntegral zIndex * 0.001

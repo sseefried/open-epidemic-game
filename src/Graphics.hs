@@ -72,12 +72,12 @@ cosU   = cos . (2*pi*)
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE movingPtToPt #-}
-movingPtToPt :: Time -> MovingPoint -> (Double, Double)
-movingPtToPt t ((r, pf),(a, pf')) =
+movingPtToPt :: Time ->  Double -> MovingPoint -> (Double, Double)
+movingPtToPt t scale ((r, pf),(a, pf')) =
   polarPtToPt (P2 r' a')
   where
-    r' = r + periodicValue t pf
-    a' = a + periodicValue t pf'
+    r' = r + scale * periodicValue t pf
+    a' = a + scale * periodicValue t pf'
 ----------------------------------------------------------------------------------------------------
 --
 -- [movingPtToStaticPt] throws away the perturbations.
