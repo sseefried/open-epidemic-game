@@ -1,6 +1,11 @@
 TODO
 
-[ ] Refactor runPhysicsHandler. Was previously updating state with
+[ ] Make the type Either Quit [Event] not Maybe [Event]
+
+[ ] When handling multiple events Step as far as FSM state change and then
+    wipe the rest.
+
+[X] Refactor runPhysicsHandler. Was previously updating state with
     old state. Pattern
 
      bes <- readIORef besRef
