@@ -148,6 +148,7 @@ handleEvent fsmState ev = do
           Tap p            -> playingLevelTap p
           Select p         -> playingLevelSelect p
           Unselect p       -> playingLevelUnselect p
+          Drag p p'        -> playingLevelDrag p p'
           Physics duration -> do
             physics duration
             return fsmState
@@ -350,3 +351,15 @@ playingLevelUnselect p = do
   let unselect g = g { germSelected = False }
   mapM_ (updateGerm unselect) germsToUnselect
   return FSMPlayingLevel
+
+----------------------------------------------------------------------------------------------------
+playingLevelDrag :: R2 -> R2 -> GameM FSMState
+playingLevelDrag p p' = do
+  germsToDrag <- germsSatisfying (pointCollides p)
+  case germsToDrag of
+    []         -> return ()
+    gp@(_,g):_ -> do
+      updateGerm (\g -> g { germPos = p'}) gp
+      runOnHipState $ setHipCircPosVel (germHipCirc g) p' (R2 0 0)
+  return FSMPlayingLevel
+

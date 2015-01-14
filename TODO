@@ -1,7 +1,12 @@
 TODO
 
+[ ] Change the z-index on the germ being dragged!
+
+[ ] Consider not caching the germ's position
+
 [ ] Make the type Either Quit [Event] not Maybe [Event]
 
+-- IMPORTANT!
 [ ] When handling multiple events Step as far as FSM state change and then
     wipe the rest.
 

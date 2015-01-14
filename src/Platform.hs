@@ -23,7 +23,7 @@ platform = MacOSX
 #endif /* ANDROID */
 
 isMobile, isDesktop :: Bool
-isMobile = platform `elem` [IOSPlatform, Android]
+isMobile = platform `elem` [IOSPlatform, Android, MacOSX]
 
 isDesktop = not isMobile
 
