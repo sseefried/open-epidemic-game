@@ -209,12 +209,12 @@ initialize title = do
 -- Reads the current backend state, runs [f], writes the backend state back with modified GameState,
 -- and then runs the continuation [cont] with the latest GameState
 --
-runOnGameState :: (a -> BackendState -> BackendState)
+_runOnGameState :: (a -> BackendState -> BackendState)
                -> IORef BackendState
                -> GameM a
                -> (GameState -> IO ())
                -> IO ()
-runOnGameState upd besRef gameM cont  = do
+_runOnGameState upd besRef gameM cont  = do
   bes     <- readIORef besRef
   (a, gs) <- runGameM (besGLSLState bes) (besGameState bes) gameM
   writeIORef besRef $ upd a $ bes { besGameState = gs }
@@ -272,16 +272,28 @@ letterBoxes b = [ left, right, bottom, top]
 --
 runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runInputEventHandler besRef handleEvent = do
-  bes <- readIORef besRef
-  let fsmState = besFSMState bes
   mbEvent <- getEvents besRef
   case mbEvent of
     Quit        -> exitWith ExitSuccess
-    Events []        -> return () -- do nothing
-    Events evs -> mapM_ (runOnGameState' besRef . handleEvent fsmState) evs
+    Events []   -> return () -- do nothing
+    Events evs  -> runUntilFSMStateChange evs
   where
-    runOnGameState' b c = runOnGameState updFSMState b c (const $ return ())
-    updFSMState fsmState bes = bes { besFSMState = fsmState }
+    --
+    -- Multiple events can be returned. It's possible that one of those events
+    -- could cause a level to finish. When such a FSM state change occurs we must flush
+    -- the rest of the events.
+    --
+    runUntilFSMStateChange :: [Event] -> IO ()
+    runUntilFSMStateChange [] = return ()
+    runUntilFSMStateChange (ev:evs) = do
+        bes <- readIORef besRef
+        let fsmState = besFSMState bes
+            gs = besGameState bes
+        (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState ev)
+        writeIORef besRef $ bes { besGameState = gs', besFSMState = fsmState' }
+        if fsmState == fsmState' then runUntilFSMStateChange evs else return ()
+
+
 
 ----------------------------------------------------------------------------------------------------
 --
