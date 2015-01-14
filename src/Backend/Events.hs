@@ -7,7 +7,7 @@ module Backend.Events (
 
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Keycode  as SK
--- import           Control.Monad
+import           Control.Monad
 -- import           Text.Printf
 -- import           System.Exit
 import           Data.Map (Map)
@@ -15,6 +15,7 @@ import qualified Data.Map as M
 import           GHC.Word (Word32)
 import           Foreign.C.Types (CFloat)
 import           Data.IORef
+import           Data.Maybe (isJust, fromJust)
 
 -- friends
 import GameEvent
@@ -29,7 +30,8 @@ type FingerId = Integer
 data PressHistory = PressHistory { phMouseDown      :: Maybe MouseDown
                                  , phTouchDowns     :: Map FingerId TouchDown
                                  }
-
+----------------------------------------------------------------------------------------------------
+debug = False
 
 ----------------------------------------------------------------------------------------------------
 whenJust :: Maybe a -> b -> (a -> IO b) -> IO b
@@ -76,7 +78,10 @@ eventHandler phRef b2w = do
           mbEvs' <- eventHandler phRef b2w -- loop until no more
           return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
     Nothing -> return $ Just []
-  return $ maybe Nothing (Just . (evs++)) mbEvs
+  let retval = maybe Nothing (Just . (evs++)) mbEvs
+  when (debug && isJust retval && (not $ null $ fromJust retval)) $ putStrLn $ show retval
+  return retval
+  where
 
 consMaybe :: Maybe a -> [a] -> [a]
 mbX `consMaybe` xs = maybe xs (:xs) mbX

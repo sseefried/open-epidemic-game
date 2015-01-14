@@ -1,6 +1,6 @@
 module FrameRateBuffer (
   FRBuf,
-  initFRBuf, addTick, averageTick
+  initFRBuf, addTick, averageTick, frBufWindowSize
 ) where
 
 import Data.Array.IO
@@ -16,12 +16,12 @@ data FR = FR { tickIndex   :: Int
 
 type FRBuf = IORef FR
 
-windowSize :: Int
-windowSize = 100
+frBufWindowSize :: Int
+frBufWindowSize = 100
 
 initFRBuf :: IO FRBuf
 initFRBuf = do
-  a <- newArray (0,windowSize - 1) 0
+  a <- newArray (0,frBufWindowSize - 1) 0
   newIORef $ FR 0 a 0 0
 
 addTick :: FRBuf -> Double -> IO ()
@@ -30,10 +30,10 @@ addTick frRef tick = do
   let i = tickIndex fr
   oldTick <- readArray (ticks fr) i
   writeArray (ticks fr) i tick
-  let tickIndex' = if i == windowSize - 1 then 0 else i + 1
+  let tickIndex' = if i == frBufWindowSize - 1 then 0 else i + 1
   let tickSum' = tickSum fr - oldTick + tick
   writeIORef frRef $ fr { tickIndex = tickIndex', tickSum = tickSum'
-                        , tickSamples = min windowSize (tickSamples fr + 1) }
+                        , tickSamples = min frBufWindowSize (tickSamples fr + 1) }
 
 averageTick :: FRBuf -> IO Double
 averageTick frRef = readIORef frRef >>= \fr -> return $ tickSum fr / (fromIntegral $ tickSamples fr)

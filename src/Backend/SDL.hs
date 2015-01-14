@@ -390,7 +390,8 @@ mainLoop besRef handleEvent = loop $ do
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
   bes <- readIORef besRef
-  when (besFrames bes `mod` 30 == 0 && besFSMState bes == FSMPlayingLevel) $ do
+  let sz = fromIntegral frBufWindowSize
+  when (besFrames bes `mod` sz == 0 && besFSMState bes == FSMPlayingLevel) $ do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s" (1/avTick)
 
