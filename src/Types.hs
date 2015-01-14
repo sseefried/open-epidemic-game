@@ -245,7 +245,6 @@ type MovingPoint = ((Frac, PeriodicFun),(Frac, PeriodicFun))
 data Germ = Germ { germMultiplyAt     :: Time
                  , germSizeFun        :: Time -> Double
                  , germHipCirc        :: HipCirc
-                 , germPos            :: R2 -- cached pos
                  , germGfx            :: GermGfx
                  , germGL             :: GermGL
                  , germCumulativeTime :: Time

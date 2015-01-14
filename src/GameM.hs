@@ -22,6 +22,10 @@ module GameM (
   setHipCircRadius,
   addHipStaticPoly,
   removeHipCirc,
+  -- helpers
+  runOnHipState,
+  germPos,
+
   -- to run the GL monad
   runGLM,
   -- to run the GameM monad
@@ -156,6 +160,22 @@ removeHipCirc :: HipCirc -> HipM ()
 removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
 ----------------------------------------------------------------------------------------------------
+-- Helper functions
+--
+-- Runs in the HipM monad. Gets the new state. Sets it.
+--
+runOnHipState :: HipM a -> GameM a
+runOnHipState hipM = do
+  gs <- get
+  runHipM (gsHipState gs) hipM
+
+germPos :: Germ -> GameM R2
+germPos g = runOnHipState $ getHipCircPos (germHipCirc g)
+
+
+----------------------------------------------------------------------------------------------------
+
+
 
 runGameM :: GLSLState -> GameState -> GameM b -> IO (b, GameState)
 runGameM glsls gs gameM = do

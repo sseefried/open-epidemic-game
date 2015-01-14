@@ -12,6 +12,7 @@ import           Control.Monad (replicateM)
 import           Control.Applicative
 -- import           Text.Printf
 import qualified Data.Map as M
+import           Control.Monad (filterM)
 
 -- friends
 import Types
@@ -29,16 +30,14 @@ import GraphicsGL -- GL graphics
 germSizeFunForParams :: Double -> Double -> (Time -> Double)
 germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 
--- precondition: position of HipCirc must be the same as [pos]
-createGerm :: Double -> R2 -> HipCirc -> GameM Germ
-createGerm initSize pos hipCirc = do
+createGerm :: Double -> HipCirc -> GameM Germ
+createGerm initSize hipCirc = do
   gfx        <- evalRand $ randomGermGfx
   multiplyAt <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
   germGL     <- runGLM $ germGfxToGermGL gfx
   return $ Germ { germMultiplyAt     = multiplyAt
                 , germSizeFun        = germSizeFunForParams initSize multiplyAt
                 , germHipCirc        = hipCirc
-                , germPos            = pos
                 , germGfx            = gfx
                 , germGL             = germGL
                 , germCumulativeTime = 0
@@ -131,7 +130,7 @@ handleEvent fsmState ev = do
                  y <- getRandom (-fieldHeight/8, fieldHeight/8)
                  initSize <- evalRand $ randomValWithVariance initialGermSize initialGermSizeVariance
                  hc <- runOnHipState $ addHipCirc initSize (R2 x y)
-                 createGerm initSize (R2 x y) hc
+                 createGerm initSize hc
       modify $ \gs -> gs { gsGerms        = M.fromList (zip [0..] germs)
                          , gsNextGermId   = length germs
                          , gsSoundQueue   = [GameSoundLevelMusicStart]
@@ -200,8 +199,7 @@ playingLevelTap p = do
 --
 killGerm :: R2 -> GameM ()
 killGerm p = do
-  gs <- get
-  let germsToKill = M.toList $ M.filter (pointCollides p) (gsGerms gs)
+  germsToKill <- germsSatisfyingM (pointCollides p)
   let kkk (germId, germ) = do
         runOnHipState $ removeHipCirc (germHipCirc germ)
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
@@ -211,21 +209,11 @@ killGerm p = do
   where
 
 ----------------------------------------------------------------------------------------------------
-pointCollides :: R2 -> Germ -> Bool
-pointCollides (R2 x y) g = let sz       = germSizeFun g (germCumulativeTime g)
-                               R2 x' y' = germPos g
-                           in (x' - x)**2 + (y' - y)**2 < sz*sz
-
-
---
--- Runs in the HipM monad. Gets the new state. Sets it.
---
-runOnHipState :: HipM a -> GameM a
-runOnHipState hipM = do
-  gs <- get
-  runHipM (gsHipState gs) hipM
-
-
+pointCollides :: R2 -> Germ -> GameM Bool
+pointCollides (R2 x y) g = do
+  let sz   = germSizeFun g (germCumulativeTime g)
+  R2 x' y' <- runOnHipState $ getHipCircPos (germHipCirc g)
+  return $ (x' - x)**2 + (y' - y)**2 < sz*sz
 ----------------------------------------------------------------------------------------------------
 --
 -- As mentioned above, the [germCumulativeTime] grows inversely proportional to
@@ -255,15 +243,14 @@ growGerm duration germId = do
       hc' <- runOnHipState $ do
         setHipCircRadius hc (sz/2)
         addHipCirc (sz/2) (R2 x' y')
-      ng <- createGerm (sz/2) (R2 x' y') hc'
+      ng <- createGerm (sz/2) hc'
       insertGerm i ng -- insert new germ
       -- update first germ
-      insertGerm germId $ g { germCumulativeTime = 0, germPos = R2 x y }
+      insertGerm germId $ g { germCumulativeTime = 0 }
       modify $ \gs -> gs { gsNextGermId = i + 1 }
     else do
       runOnHipState $ setHipCircRadius hc sz -- update the size in the physics
       let g' = g { germCumulativeTime = duration + t
-                 , germPos            = R2 x y
                  , germAnimTime       = (sqrt (fieldHeight / sz) * duration) + animT }
       insertGerm germId g'
 
@@ -302,6 +289,15 @@ germsSatisfying f = do
   return . M.toList . M.filter f $ gsGerms gs
 
 ----------------------------------------------------------------------------------------------------
+germsSatisfyingM :: (Germ -> GameM Bool) -> GameM [(GermId, Germ)]
+germsSatisfyingM f = do
+  gs <- get
+  let germPs = M.toList $ gsGerms gs
+      f' :: (GermId, Germ) -> GameM Bool
+      f' (_, g) = f g
+  filterM f' germPs
+
+----------------------------------------------------------------------------------------------------
 --
 -- Physics is reponsible for updating the [gsRender] field of the GameState.
 --
@@ -325,13 +321,14 @@ physics duration = do
   let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
   mapM_ setPos poses
   ----
-  let drawOneGerm :: (Int, Germ) -> GLM ()
+  let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
       drawOneGerm (i,g) = do
+        pos <- germPos g
         let (ampScale, timeScale) = scales g
-        (germGLFun . germGL $ g) i (germPos g) (germAnimTime g * timeScale)
-            (germSizeFun g (germCumulativeTime g)) ampScale
-  modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
-                  in  gs { gsRender = render }
+        return $ (germGLFun . germGL $ g) i pos (germAnimTime g * timeScale)
+                 (germSizeFun g (germCumulativeTime g)) ampScale
+  render <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
+  modify $ \gs -> gs { gsRender = render }
   where
     -- germ gets angrier when selected
     scales g = if germSelected g then (1.2, 2.0) else (1.0, 1.0)
@@ -339,7 +336,7 @@ physics duration = do
 ----------------------------------------------------------------------------------------------------
 playingLevelSelect :: R2 -> GameM FSMState
 playingLevelSelect p = do
-  germsToSelect <- germsSatisfying (pointCollides p)
+  germsToSelect <- germsSatisfyingM (pointCollides p)
   let select g = g { germSelected = True }
   mapM_ (updateGerm select) germsToSelect
   return FSMPlayingLevel
@@ -347,7 +344,8 @@ playingLevelSelect p = do
 ----------------------------------------------------------------------------------------------------
 playingLevelUnselect :: R2 -> GameM FSMState
 playingLevelUnselect p = do
-  germsToUnselect <- germsSatisfying (\g -> pointCollides p g && germSelected g)
+  let collideSelected g = do { b <- pointCollides p g; return $ germSelected g && b }
+  germsToUnselect <- germsSatisfyingM collideSelected
   let unselect g = g { germSelected = False }
   mapM_ (updateGerm unselect) germsToUnselect
   return FSMPlayingLevel
@@ -355,11 +353,10 @@ playingLevelUnselect p = do
 ----------------------------------------------------------------------------------------------------
 playingLevelDrag :: R2 -> R2 -> GameM FSMState
 playingLevelDrag p p' = do
-  germsToDrag <- germsSatisfying (pointCollides p)
+  germsToDrag <- germsSatisfyingM (pointCollides p)
   case germsToDrag of
     []         -> return ()
-    gp@(_,g):_ -> do
-      updateGerm (\g -> g { germPos = p'}) gp
+    (_,g):_ -> do
       runOnHipState $ setHipCircPosVel (germHipCirc g) p' (R2 0 0)
   return FSMPlayingLevel
 
