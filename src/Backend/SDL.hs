@@ -274,11 +274,11 @@ runInputEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMSta
 runInputEventHandler besRef handleEvent = do
   bes <- readIORef besRef
   let fsmState = besFSMState bes
-  mbEvent <- getEvent besRef
+  mbEvent <- getEvents besRef
   case mbEvent of
-    Nothing        -> exitWith ExitSuccess
-    Just []        -> return () -- do nothing
-    Just evs -> mapM_ (runOnGameState' besRef . handleEvent fsmState) evs
+    Quit        -> exitWith ExitSuccess
+    Events []        -> return () -- do nothing
+    Events evs -> mapM_ (runOnGameState' besRef . handleEvent fsmState) evs
   where
     runOnGameState' b c = runOnGameState updFSMState b c (const $ return ())
     updFSMState fsmState bes = bes { besFSMState = fsmState }
@@ -332,8 +332,8 @@ playSoundQueue bes = case platform of
       GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------
-getEvent :: IORef BackendState -> IO (Maybe [Event])
-getEvent besRef = do
+getEvents :: IORef BackendState -> IO (MaybeEvents)
+getEvents besRef = do
   bes <- readIORef besRef
   eventHandler (besPressHistory bes) (besBackendToWorld bes)
 

@@ -1,13 +1,17 @@
 module Backend.Events (
   -- data types
-  PressHistory(..)
+    MaybeEvents(..)
+  , PressHistory(..)
   -- functions
   , eventHandler
+
+
 ) where
 
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Keycode  as SK
 import           Control.Monad
+import           Control.Applicative
 -- import           Text.Printf
 -- import           System.Exit
 import           Data.Map (Map)
@@ -16,6 +20,7 @@ import           GHC.Word (Word32)
 import           Foreign.C.Types (CFloat)
 import           Data.IORef
 import           Data.Maybe (isJust, fromJust)
+
 
 -- friends
 import GameEvent
@@ -30,6 +35,12 @@ type FingerId = Integer
 data PressHistory = PressHistory { phMouseDown      :: Maybe MouseDown
                                  , phTouchDowns     :: Map FingerId TouchDown
                                  }
+
+-- synonym for [Maybe]. Using Maybe everywhere else was getting too confusing.
+data MaybeEvents = Events [Event]
+                 | Quit
+
+
 ----------------------------------------------------------------------------------------------------
 debug = False
 
@@ -51,37 +62,34 @@ whenLookup k m b io = do
     Just a -> io a
     Nothing -> return b
 
-
 ----------------------------------------------------------------------------------------------------
---mainLoop :: S.Window -> IORef PressHistory -> IO ()
---mainLoop w phRef = do
---  evs <- eventHandler phRef
---  case evs of
---    [] -> return ()
---    _  -> putStrLn $ show evs
---  mainLoop w phRef
-
-----------------------------------------------------------------------------------------------------
--- Nothing = quit game
--- Just _  = events (maybe empty)
-
-eventHandler :: IORef PressHistory -> BackendToWorld -> IO (Maybe [Event])
-eventHandler phRef b2w = do
-  evs <- selectEvents phRef b2w
-  mbSDLEvent <- S.pollEvent
-  mbEvs <- case mbSDLEvent of
-    Just e -> do
-      case checkForQuit e of
-        True -> return Nothing
-        False -> do
-          mbEv   <- decodeEvent phRef b2w e
-          mbEvs' <- eventHandler phRef b2w -- loop until no more
-          return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
-    Nothing -> return $ Just []
-  let retval = maybe Nothing (Just . (evs++)) mbEvs
-  when (debug && isJust retval && (not $ null $ fromJust retval)) $ putStrLn $ show retval
-  return retval
+eventHandler :: IORef PressHistory -> BackendToWorld -> IO MaybeEvents
+eventHandler phRef b2w = toMaybeEvents <$> go
   where
+    go :: IO (Maybe [Event])
+    go = do
+      evs <- selectEvents phRef b2w
+      mbSDLEvent <- S.pollEvent
+      mbEvs <- case mbSDLEvent of
+        Just e -> do
+          case checkForQuit e of
+            True -> return Nothing
+            False -> do
+              mbEv   <- decodeEvent phRef b2w e
+              mbEvs' <- go -- loop until no more events
+              return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
+        Nothing -> return $ Just []
+      let retval = maybe Nothing (Just . (evs++)) mbEvs
+      when (debug && isJust retval && (not $ null $ fromJust retval)) $ putStrLn $ show retval
+      return retval
+
+----------------------------------------------------------------------------------------------------
+toMaybeEvents :: Maybe [Event] -> MaybeEvents
+toMaybeEvents mb = case mb of
+  Nothing -> Quit
+  Just evs -> Events evs
+
+----------------------------------------------------------------------------------------------------
 
 consMaybe :: Maybe a -> [a] -> [a]
 mbX `consMaybe` xs = maybe xs (:xs) mbX
