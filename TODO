@@ -1,8 +1,10 @@
 TODO
 
+[ ] Make sure germ being dragged stays in bounds!
+
 [ ] Change the z-index on the germ being dragged!
 
-[ ] Consider not caching the germ's position
+
 
 [ ] Make the type Either Quit [Event] not Maybe [Event]
 
@@ -10,13 +12,6 @@ TODO
 [ ] When handling multiple events Step as far as FSM state change and then
     wipe the rest.
 
-[X] Refactor runPhysicsHandler. Was previously updating state with
-    old state. Pattern
-
-     bes <- readIORef besRef
-     writeIORef $ ...
-
-     is inherently dangerous
 
 [ ] Rename Physics event to Idle event.
 
@@ -25,13 +20,8 @@ TODO
 
 [ ] Turn GLScript into a free monad too.
 
-[X] Build and deploy to Android. Have a look at this:
-     https://github.com/neurocyte/ghc-android
-    (Took approximately a week of hell. Perhaps 70+ hours)
 
 [ ] Speed up the algorithm to search and kill germs
-
-[ ] Switch to using sdlUpdateTexture instead of lock/unlock texture
 
 [ ] I need to get the radii of the germs right, which I think is going
    to be a bit of a chore. The problem is that the edges of the germs are
@@ -61,3 +51,17 @@ TODO
    antibiotics get less potent they fade in colour until they become
    clear eventually.
 
+------
+
+[X] Refactor runPhysicsHandler. Was previously updating state with
+    old state. Pattern
+
+     bes <- readIORef besRef
+     writeIORef $ ...
+
+     is inherently dangerous
+[X] Don't cache the germ's position
+
+[X] Build and deploy to Android. Have a look at this:
+     https://github.com/neurocyte/ghc-android
+    (Took approximately a week of hell. Perhaps 70+ hours)
