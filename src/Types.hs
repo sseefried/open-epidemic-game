@@ -194,8 +194,6 @@ data Color = Color !Double !Double !Double !Double deriving Show
 
 type CairoPoint = (Double, Double)
 
-
-
 white, blue, green, black, whiteT :: Color
 white = Color 1 1 1 1
 blue  = Color 0 0 1 1
@@ -252,6 +250,7 @@ data Germ = Germ { germMultiplyAt     :: Time
                  , germGL             :: GermGL
                  , germCumulativeTime :: Time
                  , germAnimTime       :: Time
+                 , germSelected       :: Bool
                  }
 ----------------------------------------------------------------------------------------------------
 --
@@ -315,10 +314,6 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
 
 ----------------------------------------------------------------------------------------------------
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
---
--- The canvas might not have the same aspect ratio as the world, in which case
--- we ensure there will be some portions of the canvas that won't be drawn to.
---
 type HipSpace = H.Space
 ----------------------------------------------------------------------------------------------------
 type GermId = Int

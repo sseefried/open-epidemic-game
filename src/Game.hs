@@ -29,7 +29,6 @@ import GraphicsGL -- GL graphics
 germSizeFunForParams :: Double -> Double -> (Time -> Double)
 germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 
--- TODO: Remove magic numbers
 -- precondition: position of HipCirc must be the same as [pos]
 createGerm :: Double -> R2 -> HipCirc -> GameM Germ
 createGerm initSize pos hipCirc = do
@@ -44,6 +43,7 @@ createGerm initSize pos hipCirc = do
                 , germGL             = germGL
                 , germCumulativeTime = 0
                 , germAnimTime       = 0
+                , germSelected       = False
                 }
 
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
@@ -146,6 +146,8 @@ handleEvent fsmState ev = do
        else do
         case ev of
           Tap p            -> playingLevelTap p
+          Select p         -> playingLevelSelect p
+          Unselect p       -> playingLevelUnselect p
           Physics duration -> do
             physics duration
             return fsmState
@@ -155,10 +157,8 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmLevelComplete      = do
       gs <- get
-      let nextLevel = return $ FSMLevel (gsCurrentLevel gs + 1)
       case ev of
-        Tap _    -> nextLevel
-        Select _ -> nextLevel
+        _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
           let render = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
                          "Epidemic averted!"
@@ -166,10 +166,8 @@ handleEvent fsmState ev = do
           return $ FSMLevelComplete
     --------------------------------------
     fsmGameOver           = do
-      let restart = return $ FSMLevel 1
       case ev of
-        Tap _    -> restart
-        Select _ -> restart
+        _ | isContinue ev -> return $ FSMLevel 1
         _ -> do
           modify $ \gs ->
            gs { gsRender = do
@@ -181,6 +179,13 @@ handleEvent fsmState ev = do
           return FSMGameOver
 
 ----------------------------------------------------------------------------------------------------
+isContinue :: Event -> Bool
+isContinue s = case s of
+  Tap _    -> True
+  Select _ -> True
+  _        -> False
+
+----------------------------------------------------------------------------------------------------
 playingLevelTap ::  R2 -> GameM FSMState
 playingLevelTap p = do
   killGerm p
@@ -188,7 +193,6 @@ playingLevelTap p = do
   return $ case M.size (gsGerms gs) of
     0 -> FSMLevelComplete
     _ -> FSMPlayingLevel
-
 ----------------------------------------------------------------------------------------------------
 --
 -- FIXME: Make this more efficient. Brute force searches through germs to kill them.
@@ -196,7 +200,7 @@ playingLevelTap p = do
 killGerm :: R2 -> GameM ()
 killGerm p = do
   gs <- get
-  let germsToKill = M.toList $ M.filter (tapCollides p) (gsGerms gs)
+  let germsToKill = M.toList $ M.filter (pointCollides p) (gsGerms gs)
   let kkk (germId, germ) = do
         runOnHipState $ removeHipCirc (germHipCirc germ)
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
@@ -204,10 +208,12 @@ killGerm p = do
         runGLM . germGLFinaliser . germGL $ germ
   mapM_ kkk germsToKill
   where
-    tapCollides :: R2 -> Germ -> Bool
-    tapCollides (R2 x y) g = let sz       = germSizeFun g (germCumulativeTime g)
-                                 R2 x' y' = germPos g
-                             in (x' - x)**2 + (y' - y)**2 < sz*sz
+
+----------------------------------------------------------------------------------------------------
+pointCollides :: R2 -> Germ -> Bool
+pointCollides (R2 x y) g = let sz       = germSizeFun g (germCumulativeTime g)
+                               R2 x' y' = germPos g
+                           in (x' - x)**2 + (y' - y)**2 < sz*sz
 
 
 --
@@ -224,6 +230,9 @@ runOnHipState hipM = do
 -- As mentioned above, the [germCumulativeTime] grows inversely proportional to
 -- the size of the germ. I found that visually it works better if it grows as (1 / sqrt size)
 -- but I have yet to determine why this looks so natural.
+--
+-- I have a suspicion that is has something to do with the area of the germ.
+
 --
 growGerm :: Time -> GermId -> GameM ()
 growGerm duration germId = do
@@ -268,8 +277,28 @@ whenGerm germId f = do
     Just germ -> f gs germ
     Nothing   -> return ()
 
+----------------------------------------------------------------------------------------------------
 insertGerm :: GermId -> Germ -> GameM ()
 insertGerm germId germ = modify $ \gs -> gs { gsGerms = M.insert germId germ (gsGerms gs) }
+
+----------------------------------------------------------------------------------------------------
+updateGerm :: (Germ -> Germ) -> (GermId, Germ) -> GameM ()
+updateGerm upd (germId, g) = insertGerm germId (upd g)
+
+----------------------------------------------------------------------------------------------------
+updateGermWithId :: (a -> Germ -> Germ) -> (GermId, a) -> GameM ()
+updateGermWithId f (germId, val) = do
+  gs <- get
+  let germs = gsGerms gs
+  case M.lookup germId germs of
+    Just germ -> insertGerm germId (f val germ)
+    Nothing -> return ()
+
+----------------------------------------------------------------------------------------------------
+germsSatisfying :: (Germ -> Bool) -> GameM [(GermId, Germ)]
+germsSatisfying f = do
+  gs<- get
+  return . M.toList . M.filter f $ gsGerms gs
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -278,21 +307,46 @@ insertGerm germId germ = modify $ \gs -> gs { gsGerms = M.insert germId germ (gs
 physics :: Time -> GameM ()
 physics duration = do
   gs <- get
+  -- grow the germs. This updates their position in Hipmunk
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
+
+  -- selected germs stay where they are.
+  let getPos (_, g) = do
+        let hc = germHipCirc g
+        pos <- runOnHipState $ getHipCircPos hc
+        return (hc, pos)
+  selected <- germsSatisfying germSelected
+  poses <- mapM getPos selected
+  ----
   runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
+  ----
+  -- reset position of those germs
+  let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
+  mapM_ setPos poses
+  ----
   let drawOneGerm :: (Int, Germ) -> GLM ()
       drawOneGerm (i,g) = do
-        let ampScale = 1.0 -- FIXME: Make it depend on whether germ is selected or not
-            timeScale = 1.0 -- FIXME: Make it depend on whether germ is selected or not
+        let (ampScale, timeScale) = scales g
         (germGLFun . germGL $ g) i (germPos g) (germAnimTime g * timeScale)
             (germSizeFun g (germCumulativeTime g)) ampScale
   modify $ \gs -> let render = mapM_ drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
                   in  gs { gsRender = render }
+  where
+    -- germ gets angrier when selected
+    scales g = if germSelected g then (1.2, 2.0) else (1.0, 1.0)
 
 ----------------------------------------------------------------------------------------------------
+playingLevelSelect :: R2 -> GameM FSMState
+playingLevelSelect p = do
+  germsToSelect <- germsSatisfying (pointCollides p)
+  let select g = g { germSelected = True }
+  mapM_ (updateGerm select) germsToSelect
+  return FSMPlayingLevel
 
---drawText :: WorldToCanvas -> Color -> R2 -> Double -> String -> Render ()
---drawText w2c c pos w s = do
---  let wl2cl = worldLenToCanvasLen w2c
---      wp2cp = worldPtToCanvasPt w2c
---  text "Helvetica" c (wp2cp pos) (wl2cl w) s
+----------------------------------------------------------------------------------------------------
+playingLevelUnselect :: R2 -> GameM FSMState
+playingLevelUnselect p = do
+  germsToUnselect <- germsSatisfying (\g -> pointCollides p g && germSelected g)
+  let unselect g = g { germSelected = False }
+  mapM_ (updateGerm unselect) germsToUnselect
+  return FSMPlayingLevel

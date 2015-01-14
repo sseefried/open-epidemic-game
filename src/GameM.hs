@@ -18,6 +18,7 @@ module GameM (
   hipStep,
   addHipCirc,
   getHipCircPos,
+  setHipCircPosVel,
   setHipCircRadius,
   addHipStaticPoly,
   removeHipCirc,
@@ -41,6 +42,7 @@ import           Control.Monad.Free
 import qualified Physics.Hipmunk as H
 import qualified Physics.Hipmunk.Unsafe as H
 import qualified Data.StateVar as H
+import           Data.StateVar (($=))
 import           Data.IORef
 
 -- friends
@@ -62,6 +64,7 @@ data HipScript next =
     HipStep          !Double next
   | AddHipCirc       !Double !R2 (HipCirc -> next)
   | GetHipCircPos    !HipCirc (R2 -> next)
+  | SetHipCircPosVel !HipCirc R2{-pos-} R2{-velocity-} next
   | SetHipCircRadius !HipCirc !Double next
   | AddHipStaticPoly ![R2] next
   | RemoveHipCirc    !HipCirc next
@@ -87,12 +90,13 @@ instance Functor GameScript where
 
 instance Functor HipScript where
   fmap f _hs = case _hs of
-    HipStep dt hs           -> HipStep dt (f hs)
-    AddHipCirc a b g        -> AddHipCirc a b (f . g)
-    GetHipCircPos a g       -> GetHipCircPos a (f . g)
-    SetHipCircRadius a b hs -> SetHipCircRadius a b (f hs)
-    AddHipStaticPoly a hs   -> AddHipStaticPoly a (f hs)
-    RemoveHipCirc a hs      -> RemoveHipCirc a (f hs)
+    HipStep dt hs             -> HipStep dt (f hs)
+    AddHipCirc a b g          -> AddHipCirc a b (f . g)
+    GetHipCircPos a g         -> GetHipCircPos a (f . g)
+    SetHipCircPosVel a b c hs -> SetHipCircPosVel a b c (f hs)
+    SetHipCircRadius a b hs   -> SetHipCircRadius a b (f hs)
+    AddHipStaticPoly a hs     -> AddHipStaticPoly a (f hs)
+    RemoveHipCirc a hs        -> RemoveHipCirc a (f hs)
 
 
 ----------------------------------------------------------------------------------------------------
@@ -139,6 +143,9 @@ addHipCirc r pos = Impure (AddHipCirc r pos Pure)
 getHipCircPos :: HipCirc -> HipM R2
 getHipCircPos c = Impure (GetHipCircPos c Pure)
 
+setHipCircPosVel :: HipCirc -> R2 -> R2 -> HipM ()
+setHipCircPosVel c p v = Impure (SetHipCircPosVel c p v (Pure ()))
+
 setHipCircRadius :: HipCirc -> Double -> HipM ()
 setHipCircRadius c r = Impure (SetHipCircRadius c r (Pure ()))
 
@@ -181,6 +188,8 @@ runHipMIO space = go
       (Impure (HipStep dt p))                 -> H.step space dt >> go p
       (Impure (AddHipCirc r pos f))           -> runAddHipCirc r pos >>= go . f
       (Impure (GetHipCircPos hipCirc f))      -> runGetHipCircPos hipCirc >>= go . f
+      (Impure (SetHipCircPosVel hipCirc pos vel p))
+                                              -> runSetHipCircPosVel hipCirc pos vel >> go p
       (Impure (SetHipCircRadius hipCirc r p)) -> runSetHipCircRadius hipCirc r >> go p
       (Impure (AddHipStaticPoly pts p))       -> runAddHipStaticPoly pts >> go p
       (Impure (RemoveHipCirc hipCirc p))      -> runRemoveHipCirc hipCirc >> go p
@@ -191,7 +200,7 @@ runHipMIO space = go
       let pos = H.Vector x y
       b <- H.newBody 1 H.infinity
       H.spaceAdd space b
-      H.position b H.$= pos
+      H.position b $= pos
       s <- H.newShape b (H.Circle r) (H.Vector 0 0) -- (0,0) offset
       H.spaceAdd space s
       return $ HipCirc s
@@ -200,6 +209,15 @@ runHipMIO space = go
     runGetHipCircPos (HipCirc s) = do
       H.Vector x y <- H.get $ H.position $ H.body s
       return $ R2 x y
+
+    runSetHipCircPosVel :: HipCirc -> R2 -> R2 -> IO ()
+    runSetHipCircPosVel (HipCirc s) (R2 x y) (R2 vx vy) = do
+      let pos = H.Vector x y
+          vel = H.Vector vx vy
+          b   = H.body s
+      H.position b $= pos
+      H.velocity b $= vel
+      return ()
 
     runSetHipCircRadius :: HipCirc -> Double -> IO ()
     runSetHipCircRadius (HipCirc s) r = do
