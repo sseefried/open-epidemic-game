@@ -231,6 +231,9 @@ repEven :: [a] -> [a]
 repEven [] = []
 repEven (x:xs) = x:repOdd xs
 
+--
+-- Maps over a vector providing the index of the vector element to the mapping function.
+--
 forMi_ :: (Monad m, Unbox a) => Vector a -> (Int -> a -> m b) -> m ()
 forMi_ v f = V.foldM' f' 0 v >> return ()
   where
