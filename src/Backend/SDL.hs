@@ -332,43 +332,6 @@ playSoundQueue bes = case platform of
       GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
 
 ----------------------------------------------------------------------------------------------------
-----
----- We want to return *at most* one event per frame (as we want the finite state machine to
----- evolve by one state at most per frame). We want to skip any events that the game does
----- not understand (so that we do not have frames where nothing happened because
----- an SDL event that was not understood was processed into returning Nothing)
-----
----- Left ()        = SDL quit event occurred
----- Right Nothing  = no game event
----- Right ev       = event [ev] returned
---getEvent :: IORef BackendState -> FSMState -> IO (Either () (Maybe Event))
---getEvent besRef fsmState = do
---  b2w <- besBackendToWorld <$> readIORef besRef
---  mbSDLEvent <- S.pollEvent
---  case mbSDLEvent of
---    Just sdlEvent -> do
---      case checkForQuit sdlEvent of
---        True -> return $ Left ()
---        False -> (case sdlEvent of
---                _ -> (case sdlEventToEvent besRef fsmState sdlEvent of
---                        Nothing -> getEvent besRef fsmState -- keep polling
---                        Just ev -> return $ Right $ Just ev))
---    Nothing -> return $ Right Nothing
---  where
---    -- Checks for a Quit event (caused by closing the window) or whether the Q key is pressed
---    checkForQuit e = case S.eventData e of
---      S.Quit                    -> True
---      _ | b <- isKeyDown e qKey -> b
-
---qKey :: SK.Keycode
---qKey = SK.Q
-
---isKeyDown :: S.Event -> SK.Keycode -> Bool
---isKeyDown e code = case S.eventData e of
---  S.Keyboard {  S.keyMovement = S.KeyDown, S.keySym = S.Keysym _ code' _ } -> code == code'
---  _ -> False
-
-----------------------------------------------------------------------------------------------------
 getEvent :: IORef BackendState -> IO (Maybe [Event])
 getEvent besRef = do
   bes <- readIORef besRef
