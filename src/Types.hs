@@ -132,6 +132,8 @@ resistanceIncrease = 1.1
 maxGerms :: Int
 maxGerms = 50
 
+startingAntibioticEffectiveness :: Double
+startingAntibioticEffectiveness = 0.9 -- percentage
 
 ----------------------------------------------------------------------------------------------------
 -- Derived constants. (Do not change)
@@ -195,11 +197,11 @@ data Color = Color !Double !Double !Double !Double deriving Show
 type CairoPoint = (Double, Double)
 
 white, blue, green, black, whiteT :: Color
-white = Color 1 1 1 1
-blue  = Color 0 0 1 1
-green = Color 0 1 0 1
-black = Color 0 0 0 1
-whiteT = Color 1 1 1 0 -- T means transparent
+white           = Color 1 1 1 1
+blue            = Color 0 0 1 1
+green           = Color 0 1 0 1
+black           = Color 0 0 0 1
+whiteT          = Color 1 1 1 0 -- T means transparent
 backgroundColor = whiteT
 
 
@@ -250,6 +252,7 @@ data Germ = Germ { germMultiplyAt     :: Time
                  , germCumulativeTime :: Time
                  , germAnimTime       :: Time
                  , germSelected       :: Bool
+                 , germResistances    :: [Antibiotic]
                  }
 ----------------------------------------------------------------------------------------------------
 --
@@ -323,14 +326,25 @@ data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsNextGermId    :: !GermId
                            , gsHipState      :: HipSpace
                            , gsSoundQueue    :: ![GameSound]
-                           , gsCurrentLevel  :: Int
-                           , gsAntibiotics   :: Map Antibiotic Double
+                           , gsCurrentLevel  :: !Int
+                           , gsAntibiotics   :: Map Antibiotic AntibioticData
                            }
+data AntibioticData = AntibioticData { abEffectiveness :: Double
+                                     , abEnabled       :: Bool
+                                     }
+
 
 data GameSound = GameSoundLevelMusicStart -- start level music
                | GameSoundLevelMusicStop  -- stop level music
                | GameSoundSquish
 
+----------------------------------------------------------------------------------------------------
 data Antibiotic = Penicillin
                 | Cyprofloxacin
-                deriving (Eq, Show, Ord)
+                deriving (Eq, Show, Ord, Enum)
+
+allAntibiotics :: [Antibiotic]
+allAntibiotics = let p = Penicillin in [p..]
+
+numAntibiotics :: Int
+numAntibiotics = length allAntibiotics

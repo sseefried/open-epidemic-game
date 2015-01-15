@@ -1,5 +1,11 @@
 TODO
 
+[ ] Start using lenses. e.g. for enabling antibiotics
+
+[ ] Solve the problem of the "action bar" showing on the game.
+
+[ ] Add a "dirty screen" effect via a shader
+
 [ ] Make sure germ being dragged stays in bounds!
 
 [ ] Change the z-index on the germ being dragged!

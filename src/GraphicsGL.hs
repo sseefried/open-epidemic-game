@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GraphicsGL (
     -- functions
-    germGfxToGermGL, drawText, drawLetterBox
+    germGfxToGermGL, drawText, drawLetterBox, drawAntibiotic
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -12,6 +12,7 @@ import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Word (Word8)
 import           Control.Monad
+import           Text.Printf
 
 
 import           Data.Vector.Unboxed (Vector, Unbox)
@@ -116,6 +117,11 @@ withNewTexture f = do
 -- Best for one-off renders that will not be updated regularly on the screen and keep the same
 -- size (we're not using mipmapping).
 --
+--
+-- The quad will be *centred* at (x',y')
+-- The relative co-ordinate system for the Cairo graphics will have its origin at the
+-- *centre* of the quad.
+--
 renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render () -> GLM ()
 renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
   --
@@ -126,7 +132,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
   let positionIdx = glslPosition glslAttrs
       texCoordIdx = glslTexcoord glslAttrs
       drawTextureLoc = glslDrawTexture glslAttrs
-      (x,y,w,h) = (f2gl x', f2gl y', f2gl w', f2gl h')
+      (x,y,w,h) = (f2gl (x' - w'/2), f2gl (y' - h'/2), f2gl w', f2gl h')
       scale     = realToFrac . screenScale . glslOrthoBounds $ glslAttrs
       cw        = w' * scale
       ch        = h' * scale
@@ -143,6 +149,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
   withNewTexture $ \tid -> do
     renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
+      C.translate (w'/2) (h'/2)
       cairoRender
 
     glBindTexture gl_TEXTURE_2D tid
@@ -315,15 +322,27 @@ germGfxToGermGL gfx = GLM . const $ do
   return $ GermGL germGLFun finaliser
 
 ----------------------------------------------------------------------------------------------------
+--
+-- Draw antibiotic *centred* at (x, y)
+--
+drawAntibiotic :: R2 -> Double -> GLM ()
+drawAntibiotic (R2 x y) resistance = do
+  let s = sideBarWidth*0.5
+      r = s/2
+  renderCairoToQuad (x,y) (s,s) $ do
+    C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
+    circle (0,0) r
+    C.fill
+    text "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
+
+----------------------------------------------------------------------------------------------------
 drawText :: Color -> R2 -> (Double,Double) -> String -> GLM ()
 drawText color (R2 x y) (w,h) s =
-  renderCairoToQuad (x - w'/2, y - h'/2) (w', h') $ do
-    text "Helvetica" color (w/2,h/2) w s
-
+  renderCairoToQuad (x, y) (w', h') $ do
+    text "Helvetica" color (0,0) w s
   where
     w' = realToFrac w
     h' = realToFrac h
-
 
 ----------------------------------------------------------------------------------------------------
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()

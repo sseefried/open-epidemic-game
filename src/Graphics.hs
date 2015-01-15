@@ -3,7 +3,9 @@ module Graphics (
   GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
-  movingPtToPt, movingPtToStaticPt
+  movingPtToPt, movingPtToStaticPt,
+  --
+  circle
 
 
 ) where
@@ -194,8 +196,8 @@ _clear r = inContext $ do
   r
 
 ----------------------------------------------------------------------------------------------------
-_circle :: CairoPoint -> Double -> Render ()
-_circle (x,y) r = arc x y r 0 (2*pi)
+circle :: CairoPoint -> Double -> Render ()
+circle (x,y) r = arc x y r 0 (2*pi)
 
 ----------------------------------------------------------------------------------------------------
 _polygon :: [CairoPoint] -> Render ()

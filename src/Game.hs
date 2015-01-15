@@ -12,7 +12,9 @@ import           Control.Monad (replicateM)
 import           Control.Applicative
 -- import           Text.Printf
 import qualified Data.Map as M
-import           Control.Monad (filterM)
+import           Data.Map (Map)
+import           Control.Monad (filterM, when)
+import           Data.Maybe (catMaybes)
 
 -- friends
 import Types
@@ -32,9 +34,11 @@ germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 
 createGerm :: Double -> HipCirc -> GameM Germ
 createGerm initSize hipCirc = do
-  gfx        <- evalRand $ randomGermGfx
-  multiplyAt <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
-  germGL     <- runGLM $ germGfxToGermGL gfx
+  gs              <- get
+  gfx             <- evalRand $ randomGermGfx
+  multiplyAt      <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
+  germGL          <- runGLM $ germGfxToGermGL gfx
+  germResistances <- evalRand $ randomGermResistances $ gsAntibiotics gs
   return $ Germ { germMultiplyAt     = multiplyAt
                 , germSizeFun        = germSizeFunForParams initSize multiplyAt
                 , germHipCirc        = hipCirc
@@ -43,11 +47,21 @@ createGerm initSize hipCirc = do
                 , germCumulativeTime = 0
                 , germAnimTime       = 0
                 , germSelected       = False
+                , germResistances    = germResistances
                 }
 
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
 randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
+----------------------------------------------------------------------------------------------------
 
+randomGermResistances :: RandomGen g => Map Antibiotic AntibioticData -> Rand g [Antibiotic]
+randomGermResistances m = catMaybes <$> (mapM immunity $ M.toList m)
+  where
+    immunity :: RandomGen g => (Antibiotic, AntibioticData) -> Rand g (Maybe Antibiotic)
+    immunity (ab, abd) = do
+      let immunityChance = 1 - abEffectiveness abd
+      d <- getRandomR (0, 1)
+      return $ if d <= immunityChance then Just ab else Nothing
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -95,17 +109,20 @@ addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
 
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
-  GameState
-    (return ())
-    bounds
-    germMapList
-    (length germs)
-    hipSpace
-    []
-    1 -- current level
-    (M.fromList [(Penicillin,90.0)])-- FIXME should be empty  -- M.empty -- no antibiotics unlocked
+  GameState {
+      gsRender        = (return ())
+    , gsBounds        = bounds
+    , gsGerms         = germMapList
+    , gsNextGermId    = (length germs)
+    , gsHipState      = hipSpace
+    , gsSoundQueue    = []
+    , gsCurrentLevel  = 1 -- current level
+    , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
+    }
   where
     germMapList = M.fromList $ zip [0..] germs
+    initAntibiotic ab = (ab, AntibioticData { abEffectiveness = startingAntibioticEffectiveness
+                                            , abEnabled = False })
 ----------------------------------------------------------------------------------------------------
 --
 -- The game as a Finite State Machine
@@ -136,6 +153,8 @@ handleEvent fsmState ev = do
                          , gsSoundQueue   = [GameSoundLevelMusicStart]
                          , gsCurrentLevel = i
                          }
+      -- FIXME: Remove. Penicillin should not be enabled initially.
+      enableAntibiotic Penicillin
       return $ FSMPlayingLevel
     --------------------------------------
     fsmPlayingLevel = do
@@ -327,7 +346,18 @@ physics duration = do
         let (ampScale, timeScale) = scales g
         return $ (germGLFun . germGL $ g) i pos (germAnimTime g * timeScale)
                  (germSizeFun g (germCumulativeTime g)) ampScale
-  render <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
+  renderGerms <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
+  --
+  let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
+      drawOneAntibiotic (ab, abd) = do
+        when (abEnabled abd) $ do
+          let dy = (sideBarTop - sideBarBottom) / (fromIntegral n)
+              n = numAntibiotics + 1
+              abN = fromIntegral (fromEnum ab + 1)
+          drawAntibiotic (R2 (sideBarLeft + sideBarWidth/2) (sideBarTop - (abN * dy)))
+                         (abEffectiveness abd)
+      renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
+      render = renderGerms >> renderAntibiotics
   modify $ \gs -> gs { gsRender = render }
   where
     -- germ gets angrier when selected
@@ -359,4 +389,28 @@ playingLevelDrag p p' = do
     (_,g):_ -> do
       runOnHipState $ setHipCircPosVel (germHipCirc g) p' (R2 0 0)
   return FSMPlayingLevel
+
+----------------------------------------------------------------------------------------------------
+-- FIXME: Use a bloody lens!
+enableAntibiotic :: Antibiotic -> GameM ()
+enableAntibiotic ab = do
+  let enable abd = abd { abEnabled = True }
+  modifyAntibiotic enable ab
+
+
+-- FIXME: use a bloody lens!
+modifyAntibioticEffectiveness :: (Double -> Double) -> Antibiotic -> GameM ()
+modifyAntibioticEffectiveness f ab = do
+  let mod abd = abd  { abEffectiveness = f (abEffectiveness abd) }
+  modifyAntibiotic mod ab
+
+modifyAntibiotic :: (AntibioticData -> AntibioticData) -> Antibiotic -> GameM ()
+modifyAntibiotic f ab = do
+  gs <- get
+  let m = gsAntibiotics gs
+  case M.lookup ab m of
+    Just abd -> do
+      let m' = M.insert ab (f abd) m
+      put $ gs { gsAntibiotics = m' }
+    Nothing -> return ()
 
