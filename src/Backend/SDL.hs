@@ -34,14 +34,16 @@ import Platform
 import CUtil
 import Util
 import FrameRateBuffer
-import GraphicsGL (drawLetterBox)
+import GraphicsGL
 import Coordinate
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besLastTime       :: UTCTime
+                                 , _besDims          :: (Int, Int)
                                  , besGLSLState      :: GLSLState
                                  , _besGLContext     :: S.GLContext
+
                                  , besGameState      :: GameState
                                  , besPressHistory   :: IORef PressHistory
                                  , besBackendToWorld :: BackendToWorld
@@ -198,7 +200,7 @@ initialize title = do
   frBuf <- initFRBuf
   gs    <- newGameState (w,h)
   pressHistory <- newIORef $ PressHistory Nothing M.empty
-  newIORef $ BackendState t t glslState context gs pressHistory
+  newIORef $ BackendState t t dims glslState context gs pressHistory
                (backendToWorld dims) 0 frBuf (FSMLevel 1)
                window levelMusic squishSound
   where
@@ -241,14 +243,22 @@ runFrameUpdate besRef = do
       f2f = realToFrac
   bes <- readIORef besRef
   let gs  = besGameState bes
-      (Color r g b a) = backgroundColor
+      (Color r g b a) = backgroundColor -- FIXME: Shouldn't be transparent
       glsls = besGLSLState bes
   glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   runGLMIO glsls (gsRender gs)
   mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
+  when debugInfo $ renderDebugInfo besRef
   glFlush
   S.glSwapWindow (besWindow bes)
+
+renderDebugInfo :: IORef BackendState -> IO ()
+renderDebugInfo besRef = do
+  bes <- readIORef besRef
+  let glsls = besGLSLState bes
+  runGLMIO glsls $ drawText (Color 0 0 0 1) (R2 0 0) (fieldWidth/4,fieldHeight/8)
+                            (show $ _besDims bes)
 
 ----------------------------------------------------------------------------------------------------
 type LetterBox = ((Double, Double), (Double, Double))

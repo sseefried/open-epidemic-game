@@ -135,6 +135,15 @@ maxGerms = 50
 startingAntibioticEffectiveness :: Double
 startingAntibioticEffectiveness = 0.9 -- percentage
 
+--
+-- Whether to render debug info to the screen.
+--
+-- This is useful when you want to discover information about someone's device and they are
+-- not too tech savvy. They can just read the information off the screen.
+--
+debugInfo :: Bool
+debugInfo = False
+
 ----------------------------------------------------------------------------------------------------
 -- Derived constants. (Do not change)
 
