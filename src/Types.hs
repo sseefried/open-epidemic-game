@@ -135,6 +135,10 @@ maxGerms = 50
 startingAntibioticEffectiveness :: Double
 startingAntibioticEffectiveness = 0.9 -- percentage
 
+-- Amount we multiply effectiveness by each time antibiotic is used
+effectivenessDilutionFactor :: Double
+effectivenessDilutionFactor = 0.97
+
 --
 -- Whether to render debug info to the screen.
 --
@@ -175,6 +179,7 @@ worldRight  = fieldRight
 worldBottom = fieldBottom
 worldTop    = fieldTop
 
+antibioticWidth = sideBarWidth * 0.8
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -337,9 +342,13 @@ data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsSoundQueue    :: ![GameSound]
                            , gsCurrentLevel  :: !Int
                            , gsAntibiotics   :: Map Antibiotic AntibioticData
+                           , gsScore         :: Int
                            }
 data AntibioticData = AntibioticData { abEffectiveness :: Double
                                      , abEnabled       :: Bool
+                                     , abInitPos       :: R2     -- init position on screen
+                                     , abPos           :: R2     -- actual position on screen
+                                     , abSelected      :: Bool
                                      }
 
 

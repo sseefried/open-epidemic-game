@@ -92,6 +92,14 @@ resetGameState = do
   addBoundsToHipSpace hipSpace
   put $ initGameState (gsBounds gs) hipSpace []
 
+resetHipState :: GameM ()
+resetHipState = do
+  hipSpace <- newHipSpace
+  addBoundsToHipSpace hipSpace
+  modify $ \gs -> gs { gsHipState = hipSpace }
+
+
+
 addBoundsToHipSpace :: HipSpace -> GameM ()
 addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
   -- bottom
@@ -118,11 +126,22 @@ initGameState bounds hipSpace germs =
     , gsSoundQueue    = []
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
+    , gsScore         = 0
     }
   where
     germMapList = M.fromList $ zip [0..] germs
-    initAntibiotic ab = (ab, AntibioticData { abEffectiveness = startingAntibioticEffectiveness
-                                            , abEnabled = False })
+    initAntibiotic ab =
+      let dy = (sideBarTop - sideBarBottom) / (fromIntegral n)
+          n  = numAntibiotics + 1
+          abN = fromIntegral (fromEnum ab + 1)
+          pos = R2 (sideBarLeft + sideBarWidth/2) (sideBarTop - (abN * dy))
+      in (ab, AntibioticData { abEffectiveness = startingAntibioticEffectiveness
+                             , abEnabled       = False
+                             , abInitPos       = pos
+                             , abPos           = pos
+                             , abSelected      = False
+                              })
+
 ----------------------------------------------------------------------------------------------------
 --
 -- The game as a Finite State Machine
@@ -140,7 +159,7 @@ handleEvent fsmState ev = do
              FSMGameOver           -> fsmGameOver)
   where
     fsmLevel i = do
-      resetGameState
+      resetHipState
       -- create [n] germs randomly
       germs <- replicateM i $ do
                  x <- getRandom (-fieldWidth/8, fieldWidth/8)
@@ -186,7 +205,9 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmGameOver           = do
       case ev of
-        _ | isContinue ev -> return $ FSMLevel 1
+        _ | isContinue ev -> do
+          resetGameState
+          return $ FSMLevel 1
         _ -> do
           modify $ \gs ->
            gs { gsRender = do
@@ -208,6 +229,7 @@ isContinue s = case s of
 playingLevelTap ::  R2 -> GameM FSMState
 playingLevelTap p = do
   killGerm p
+  applyAntibiotics p
   gs <- get
   return $ case M.size (gsGerms gs) of
     0 -> FSMLevelComplete
@@ -222,10 +244,26 @@ killGerm p = do
   let kkk (germId, germ) = do
         runOnHipState $ removeHipCirc (germHipCirc germ)
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
-                           , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
+                           , gsSoundQueue = GameSoundSquish:gsSoundQueue gs
+                           , gsScore = gsScore gs + 1 }
         runGLM . germGLFinaliser . germGL $ germ
   mapM_ kkk germsToKill
-  where
+----------------------------------------------------------------------------------------------------
+applyAntibiotics :: R2 -> GameM ()
+applyAntibiotics (R2 x y)= do
+  gs <- get
+  let abClicked abd =
+        let R2 x' y' = abPos abd
+            w        = antibioticWidth
+        in x >= x' - w/2 && x <= x' + w/2 && y >= y' - w/2 && y <= y' + w/2
+      killWithAB ab gs = M.filter (\g -> ab `elem` germResistances g) (gsGerms gs)
+  case (M.toList . M.filter abClicked $ gsAntibiotics gs) of
+    []         -> return ()
+    (ab,_):_ -> do
+      let germs' = killWithAB ab gs
+      modify $ \gs -> gs { gsGerms      = germs'
+                         , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
+      modifyAntibioticEffectiveness (effectivenessDilutionFactor*) ab -- FIXME: magic number
 
 ----------------------------------------------------------------------------------------------------
 pointCollides :: R2 -> Germ -> GameM Bool
@@ -349,13 +387,8 @@ physics duration = do
   renderGerms <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
   --
   let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
-      drawOneAntibiotic (ab, abd) = do
-        when (abEnabled abd) $ do
-          let dy = (sideBarTop - sideBarBottom) / (fromIntegral n)
-              n = numAntibiotics + 1
-              abN = fromIntegral (fromEnum ab + 1)
-          drawAntibiotic (R2 (sideBarLeft + sideBarWidth/2) (sideBarTop - (abN * dy)))
-                         (abEffectiveness abd)
+      drawOneAntibiotic (_, abd) =
+        when (abEnabled abd) $ drawAntibiotic (abPos abd) (abEffectiveness abd)
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
       render = renderGerms >> renderAntibiotics
   modify $ \gs -> gs { gsRender = render }
@@ -402,6 +435,7 @@ enableAntibiotic ab = do
 modifyAntibioticEffectiveness :: (Double -> Double) -> Antibiotic -> GameM ()
 modifyAntibioticEffectiveness f ab = do
   let mod abd = abd  { abEffectiveness = f (abEffectiveness abd) }
+
   modifyAntibiotic mod ab
 
 modifyAntibiotic :: (AntibioticData -> AntibioticData) -> Antibiotic -> GameM ()
@@ -410,6 +444,7 @@ modifyAntibiotic f ab = do
   let m = gsAntibiotics gs
   case M.lookup ab m of
     Just abd -> do
+      printStrLn "Antibiotic modifed\n"
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()

@@ -40,5 +40,5 @@ screenDimensions :: Maybe (Int,Int)
 screenDimensions = case platform of
   Android     -> Nothing
   IOSPlatform -> Nothing
-  _           -> Just (1920, 1080)
+  _           -> Just (1280, 720)
 

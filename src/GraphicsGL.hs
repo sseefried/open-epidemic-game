@@ -327,7 +327,7 @@ germGfxToGermGL gfx = GLM . const $ do
 --
 drawAntibiotic :: R2 -> Double -> GLM ()
 drawAntibiotic (R2 x y) resistance = do
-  let s = sideBarWidth*0.5
+  let s = antibioticWidth
       r = s/2
   renderCairoToQuad (x,y) (s,s) $ do
     C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
