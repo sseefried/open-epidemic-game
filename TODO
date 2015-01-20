@@ -1,5 +1,9 @@
 TODO
 
+[ ] Art. Make it looks like we're looking through a microscope.
+
+[ ] Only kill germs affected by antibiotic
+
 [ ] Start using lenses. e.g. for enabling antibiotics
 
 [ ] Solve the problem of the "action bar" showing on the game.
@@ -11,21 +15,11 @@ TODO
 [ ] Change the z-index on the germ being dragged!
 
 
-
-[ ] Make the type Either Quit [Event] not Maybe [Event]
-
 -- IMPORTANT!
-[ ] When handling multiple events Step as far as FSM state change and then
-    wipe the rest.
-
 
 [ ] Rename Physics event to Idle event.
 
-[ ] Fix GLFun type to use pre-defined attribute locations instead of
-    re-calculating each time. (See GraphicsGL.hs)
-
 [ ] Turn GLScript into a free monad too.
-
 
 [ ] Speed up the algorithm to search and kill germs
 
@@ -46,18 +40,21 @@ TODO
    a Guassian blur but rather to use a more sophisticated depth of field
    effect or "bokeh" effect.
 
-[ ] I need to create a playground in which Rauri can make the germs look
-   better.
-      - Docker
-      - blog posts to teach him about Haskell
-      - crib the Cairo wrapper from Helm.
-
 [ ] I want the antibiotics to be dragged and dropped on top of the germs
    and to have an area of effect that is not the complete screen. As the
    antibiotics get less potent they fade in colour until they become
    clear eventually.
 
 ------
+[X] Fix GLFun type to use pre-defined attribute locations instead of
+    re-calculating each time. (See GraphicsGL.hs)
+
+[X] When handling multiple events Step as far as FSM state change and then
+    wipe the rest.
+
+
+[X] Make the type Either Quit [Event] not Maybe [Event]
+
 
 [X] Refactor runPhysicsHandler. Was previously updating state with
     old state. Pattern
