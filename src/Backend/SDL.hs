@@ -231,7 +231,7 @@ _runAndTime besRef upd io = do
   t <- getCurrentTime
   result <- io
   t' <- getCurrentTime
-  writeIORef besRef $ upd (toDouble $ diffUTCTime t' t) bes
+  writeIORef besRef $ upd (realToFrac $ diffUTCTime t' t) bes
   return result
   where
 
@@ -320,7 +320,7 @@ projIORef f ioRef = do { s <- readIORef ioRef; return $ f s }
 runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMState) -> IO ()
 runPhysicsEventHandler besRef handleEvent = do
   t <- getCurrentTime
-  duration <- (toDouble . diffUTCTime t) <$> projIORef besLastTime besRef
+  duration <- (realToFrac . diffUTCTime t) <$> projIORef besLastTime besRef
   withIORef besRef $ \bes -> do
     let gs = besGameState bes
         fsmState = besFSMState bes

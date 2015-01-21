@@ -1,3 +1,6 @@
+--
+-- Just a grab-bag of useful utilities.
+--
 module Util where
 
 import System.Exit
@@ -10,16 +13,24 @@ import Platform
 exitWithError :: String -> IO a
 exitWithError errorStr = debugLog errorStr >> exitWith (ExitFailure 1)
 
-toDouble :: Real a => a -> Double
-toDouble = fromRational . toRational
+--
+-- Specialised instances of a few conversion functions.
+-- Helps me with type inference and also in choosing implementations.
+--
 
+{-# INLINE x2i #-}
+x2i :: Integral a => a -> Int
+x2i = fromIntegral
 
-toInt :: Integral a => a -> Int
-toInt = fromIntegral
+{-# INLINE x2d #-}
+x2d :: Real a => a -> Double
+x2d = realToFrac
 
+{-# INLINE d2f #-}
 d2f :: Double -> Float
-d2f = uncurry encodeFloat . decodeFloat
+d2f = realToFrac
 
+{-# INLINE f2d #-}
 f2d :: Float -> Double
 f2d = cFloatToDouble . CFloat
 
