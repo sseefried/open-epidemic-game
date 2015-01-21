@@ -13,7 +13,11 @@ know whether this is stupid or not, but providing a larger playing area on certa
 just because they have a larger aspect ratio means that you have a distinct gameplay experience
 (and probably an advantage over those playing on devices with a smaller aspect ratio).
 
-You'll notice in the pic that the "Infected!" message only covers the game area. I might
+The game area is divided into a *side bar* and a *game field*. The side bar takes up 1/3 of the 4:3
+aspect ratio and the game field takes up the remaining 3/3. This makes the side bar big enough
+to contain the antibiotics that players will unlock while provide a square game field.
+
+You'll notice in the pic that the "Infected!" message only covers the game field. I might
 change this in the future.
 
 ## 2015-01-21-antibiotics.png
