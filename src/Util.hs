@@ -46,3 +46,6 @@ alternate (x:xs) (y:ys) = x:y:alternate xs ys
 --
 fmod :: RealFrac a => a -> a -> a
 fmod a b = snd (properFraction (a / b)) * b
+
+clamp :: Ord a => a -> a -> a -> a
+clamp minVal maxVal x = (minVal `max` x) `min` maxVal

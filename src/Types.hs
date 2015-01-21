@@ -139,6 +139,11 @@ startingAntibioticEffectiveness = 0.9 -- percentage
 effectivenessDilutionFactor :: Double
 effectivenessDilutionFactor = 0.97
 
+-- the maximum amount that a component of a Color (R,G,B) can
+-- mutate by (either up or down)
+gradientColorMutationMax :: Double
+gradientColorMutationMax = 0.15
+
 --
 -- Whether to render debug info to the screen.
 --

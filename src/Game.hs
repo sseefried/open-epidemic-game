@@ -32,10 +32,19 @@ import GraphicsGL -- GL graphics
 germSizeFunForParams :: Double -> Double -> (Time -> Double)
 germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 
+----------------------------------------------------------------------------------------------------
+birthGerm :: Germ -> Double -> HipCirc -> GameM Germ
+birthGerm g = generateGerm $ Just g
+
 createGerm :: Double -> HipCirc -> GameM Germ
-createGerm initSize hipCirc = do
+createGerm = generateGerm Nothing
+
+generateGerm :: Maybe Germ -> Double -> HipCirc -> GameM Germ
+generateGerm mbGerm initSize hipCirc = do
   gs              <- get
-  gfx             <- evalRand $ randomGermGfx
+  gfx <- evalRand $ case mbGerm of
+           Just germ -> mutateGermGfx (germGfx germ)
+           Nothing   -> randomGermGfx
   multiplyAt      <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
   germGL          <- runGLM $ germGfxToGermGL gfx
   germResistances <- evalRand $ randomGermResistances $ gsAntibiotics gs
@@ -300,7 +309,7 @@ growGerm duration germId = do
       hc' <- runOnHipState $ do
         setHipCircRadius hc (sz/2)
         addHipCirc (sz/2) (R2 x' y')
-      ng <- createGerm (sz/2) hc'
+      ng <- birthGerm g (sz/2) hc'
       insertGerm i ng -- insert new germ
       -- update first germ
       insertGerm germId $ g { germCumulativeTime = 0 }

@@ -3,7 +3,7 @@ module Graphics (
   GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
-  movingPtToPt, movingPtToStaticPt,
+  movingPtToPt, movingPtToStaticPt, mutateGermGfx,
   --
   circle
 
@@ -17,6 +17,7 @@ import           Debug.Trace
 
 -- friends
 import Types
+import Util
 
 {-
 
@@ -281,6 +282,32 @@ randomGermGfx = do
     , germGfxNucleus     = nucleusPts'
     , germGfxSpikes      = n }
   where
+----------------------------------------------------------------------------------------------------
+mutateGermGfx :: RandomGen g => GermGfx  -> Rand g GermGfx
+mutateGermGfx gfx = do
+  bodyGrad <- mutateGradient $ germGfxBodyGrad gfx
+  nucleusGrad <- mutateGradient $ germGfxNucleusGrad gfx
+  dn <- getRandomR (-1,1) -- -1,0,1
+  let n'      = uncurry clamp germSpikeRange (dn + germGfxSpikes gfx)
+      bodyPts = starPolyPoints n' spikyInnerRadius spikyOuterRadius
+  bodyPts' <- mapM polarPtToMovingPt bodyPts
+  nucleusPts  <- randomRadialPoints2 numNucleusPoints
+  nucleusPts' <- mapM polarPtToMovingPt nucleusPts
+  return $ GermGfx
+    { germGfxBodyGrad    = bodyGrad
+    , germGfxNucleusGrad = nucleusGrad
+    , germGfxBody        = bodyPts'
+    , germGfxNucleus     = nucleusPts'
+    , germGfxSpikes      = n'
+    }
+  where
+
+    mutateGradient :: RandomGen g => GermGradient -> Rand g GermGradient
+    mutateGradient (Color r g b _, Color r' g' b' _) = do
+      let cl = clamp 0 1
+      (dr:dg:db:dr':dg':db':_) <- getRandomRs (-gradientColorMutationMax, gradientColorMutationMax)
+      return $ (Color (cl $ r+dr)   (cl $ g+dg)   (cl $ b+db)  1,
+                Color (cl $ r'+dr') (cl $ g'+dg') (cl $ b'+db') 1)
 
 ----------------------------------------------------------------------------------------------------
 randomRadialPoints2 :: RandomGen g => Int -> Rand g [PolarPoint]
