@@ -2,8 +2,9 @@ module Graphics (
   -- types
   GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
   -- functions
-  randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text,
+  randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text, text_,
   movingPtToPt, movingPtToStaticPt, mutateGermGfx,
+  runWithoutRender,
   --
   circle
 
@@ -14,6 +15,7 @@ import           Graphics.Rendering.Cairo
 import qualified Graphics.Rendering.Cairo.Matrix as M
 import           Control.Monad.Random
 import           Debug.Trace
+import           Foreign.Marshal.Alloc (allocaBytes)
 
 -- friends
 import Types
@@ -220,8 +222,8 @@ setColor :: Color -> Render ()
 setColor (Color r g b a) = setSourceRGBA r g b a
 
 ----------------------------------------------------------------------------------------------------
-inContext :: Render () -> Render ()
-inContext r = save >> r >> restore
+inContext :: Render a -> Render a
+inContext r = do { save; res <- r ; restore; return res }
 
 ----------------------------------------------------------------------------------------------------
 _withColor :: Color -> Render () -> Render ()
@@ -378,17 +380,43 @@ asGroup r = do
 -- [text fontFamily c (x,y) w  s] renders the text [s] at location [(x,y)] with width [w].
 -- The text is centered at [(x,y)] and the height of the text depends on the [fontFamily].
 --
-text :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+-- [text] returns the height of the rendered text.
+--
+text :: String -> Color -> CairoPoint -> Double -> String -> Render Double
 text fontFamily c (x,y) w s = inContext $ do
   setColor c
   setFontSize 1
   selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  (TextExtents bx by tw _ _ _) <- textExtents s
+  (TextExtents bx by tw th _ _) <- textExtents s
   let scale = w/tw
   setFontSize scale
   transform $ M.Matrix 1 0 0 (-1) 0 0
   moveTo (-bx*scale + x - w/2) (-((by/2)*scale + y))
   showText s
+  return (th - by)
+
+--
+-- A version of [text] where we don't care about the height
+--
+text_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+text_ fontFamily c (x,y) w s =  text fontFamily c (x,y) w s >> return ()
+
+----------------------------------------------------------------------------------------------------
+--
+-- This function is a bit of a hack. The use case is [textExtents] which returns
+-- a data structure describing the dimensions of some rendered text.
+-- The problem I had is that there's no way to get it out of the [Render] monad!
+--
+-- This sneaky little function will render the text to a 1x1 buffer in memory and return the
+-- data structure inside the IO monad.
+--
+runWithoutRender :: Render a -> IO a
+runWithoutRender r =
+  allocaBytes bytesPerWord32 $ \buffer -> do
+    withImageSurfaceForData buffer FormatARGB32 1 1 bytesPerWord32 $ \surface -> do
+      renderWith surface r
+  where
+    bytesPerWord32 = 4
 
 ----------------------------------------------------------------------------------------------------
 --

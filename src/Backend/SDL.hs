@@ -257,7 +257,7 @@ renderDebugInfo :: IORef BackendState -> IO ()
 renderDebugInfo besRef = do
   bes <- readIORef besRef
   let glsls = besGLSLState bes
-  runGLMIO glsls $ drawText (Color 0 0 0 1) (R2 0 0) (fieldWidth/4,fieldHeight/8)
+  runGLMIO glsls $ drawText (Color 0 0 0 1) (R2 0 0) (fieldWidth/4)
                             (show $ _besDims bes)
 
 ----------------------------------------------------------------------------------------------------

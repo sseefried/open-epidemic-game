@@ -311,6 +311,12 @@ instance Applicative GLM where
 
 
 --
+-- Lifts an [IO] in to the [GLM] monad.
+--
+liftGLM :: IO a -> GLM a
+liftGLM io = GLM . const $ io
+
+--
 -- Magnitude of near and far planes in orthographic project
 --
 zMin, zMax :: GLfloat

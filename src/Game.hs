@@ -217,7 +217,7 @@ handleEvent fsmState ev = do
       case ev of
         _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
-          let textRender = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
+          let textRender = drawText levelCompleteColor (R2 0 0) fieldWidth
                          "Epidemic averted!"
           clearRender
           sideBarRender
@@ -233,7 +233,7 @@ handleEvent fsmState ev = do
           modify $ \gs ->
            gs { gsRender = do
                   gsRender gs -- draw what we had before
-                  drawText gameOverColor (R2 0 0) (fieldWidth,fieldHeight/2)
+                  drawText gameOverColor (R2 0 0) fieldWidth
                     "Infected!"
               , gsSoundQueue = [GameSoundLevelMusicStop]
               }
@@ -444,7 +444,7 @@ sideBarRender = do
   let renderScore = do
         let x = sideBarLeft + sideBarWidth/2
             y = sideBarTop  - worldHeight/10
-        drawText levelCompleteColor (R2 x y) (sideBarWidth,worldHeight/10) $
+        drawText levelCompleteColor (R2 x y) sideBarWidth $
           printf "Score: %d" (gsScore gs)
   --
   addRender (renderAntibiotics >> renderScore)

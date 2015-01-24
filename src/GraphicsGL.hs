@@ -80,15 +80,16 @@ clearBuffer (Color r g b a) n ptr = do
 
 
 ----------------------------------------------------------------------------------------------------
-renderCairoToTexture :: TextureId -> Maybe MipMapIndex -> (Int, Int) -> Render () -> IO ()
+renderCairoToTexture :: TextureId -> Maybe MipMapIndex -> (Int, Int) -> Render a -> IO a
 renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
   allocaBytes (w*h*bytesPerWord32) $ \buffer -> do
     -- zero the buffer
     clearBuffer backgroundColor (w*h) buffer
-    C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
+    res <- C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
       C.renderWith surface cairoRender
     glBindTexture gl_TEXTURE_2D textureId
     glTexImage2D gl_TEXTURE_2D index rgbFormat w' h' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
+    return res
   where
     w' = fromIntegral w
     h' = fromIntegral h
@@ -106,11 +107,12 @@ _renderCairoToNewTexture dims r =
 --
 -- Generates a new texture, does something with it, frees it.
 --
-withNewTexture :: (TextureId -> IO ()) -> IO ()
+withNewTexture :: (TextureId -> IO a) -> IO a
 withNewTexture f = do
   textureId <- genTexture
-  f textureId
+  res <- f textureId
   delTexture textureId
+  return res
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -122,7 +124,7 @@ withNewTexture f = do
 -- The relative co-ordinate system for the Cairo graphics will have its origin at the
 -- *centre* of the quad.
 --
-renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render () -> GLM ()
+renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
 renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
@@ -147,7 +149,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
   withNewTexture $ \tid -> do
-    renderCairoToTexture tid Nothing (wi, hi) $ do
+    res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
       C.translate (w'/2) (h'/2)
       cairoRender
@@ -169,6 +171,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
       glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
                                     (vs `plusPtr` (ptsInPos*floatSize))
       glDrawArrays gl_TRIANGLE_STRIP 0 (fromIntegral ptsInQuad)
+      return res
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
@@ -333,16 +336,23 @@ drawAntibiotic (R2 x y) resistance = do
     C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
     circle (0,0) r
     C.fill
-    text "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
+    text_ "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
 
 ----------------------------------------------------------------------------------------------------
-drawText :: Color -> R2 -> (Double,Double) -> String -> GLM ()
-drawText color (R2 x y) (w,h) s =
-  renderCairoToQuad (x, y) (w', h') $ do
-    text "Helvetica" color (0,0) w s
+drawText :: Color -> R2 -> Double -> String -> GLM ()
+drawText color (R2 x y) w s = do
+  let textR :: Render Double
+      textR = text "Helvetica" color (0,0) w s
+  h' <- GLM $ \glsls -> do
+         ht <- runWithoutRender textR
+         let scale = screenScale . glslOrthoBounds $ glsls
+         return $ ht*scale
+  renderCairoToQuad (x, y) (w',h') $ do
+    textR
+    return ()
   where
     w' = realToFrac w
-    h' = realToFrac h
+
 
 ----------------------------------------------------------------------------------------------------
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
