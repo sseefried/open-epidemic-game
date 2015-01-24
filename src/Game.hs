@@ -217,9 +217,11 @@ handleEvent fsmState ev = do
       case ev of
         _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
-          let render = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
+          let textRender = drawText levelCompleteColor (R2 0 0) (fieldWidth,fieldHeight/2)
                          "Epidemic averted!"
-          modify $ \gs -> gs { gsRender = render }
+          clearRender
+          sideBarRender
+          addRender textRender
           return $ FSMLevelComplete
     --------------------------------------
     fsmGameOver           = do
@@ -253,6 +255,7 @@ playingLevelTap p = do
   return $ case M.size (gsGerms gs) of
     0 -> FSMLevelComplete
     _ -> FSMPlayingLevel
+
 ----------------------------------------------------------------------------------------------------
 --
 -- FIXME: Make this more efficient. Brute force searches through germs to kill them.
@@ -382,7 +385,6 @@ physics duration = do
   gs <- get
   -- grow the germs. This updates their position in Hipmunk
   mapM_ (growGerm duration) (M.keys $ gsGerms gs)
-
   -- selected germs stay where they are.
   let getPos (_, g) = do
         let hc = germHipCirc g
@@ -397,14 +399,25 @@ physics duration = do
   let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
   mapM_ setPos poses
   ----
-  drawFrame
+  clearRender
+  gameFieldRender
+  sideBarRender
 
+----------------------------------------------------------------------------------------------------
+addRender :: GLM () -> GameM ()
+addRender glm = modify $ \gs -> gs { gsRender = gsRender gs >> glm }
 
+----------------------------------------------------------------------------------------------------
+
+clearRender :: GameM ()
+clearRender = modify $ \gs -> gs { gsRender = return () }
+
+----------------------------------------------------------------------------------------------------
 --
 -- Update [gsRender] field of [GameState]
 --
-drawFrame :: GameM ()
-drawFrame = do
+gameFieldRender :: GameM ()
+gameFieldRender = do
   gs <- get
   let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
       drawOneGerm (i,g) = do
@@ -414,6 +427,15 @@ drawFrame = do
                  (germSizeFun g (germCumulativeTime g)) ampScale
   renderGerms <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
   --
+  addRender renderGerms
+  where
+    -- germ gets angrier when selected
+    scales g = if germSelected g then (1.2, 2.0) else (1.0, 1.0)
+
+----------------------------------------------------------------------------------------------------
+sideBarRender :: GameM ()
+sideBarRender = do
+  gs <- get
   let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
       drawOneAntibiotic (_, abd) =
         when (abEnabled abd) $ drawAntibiotic (abPos abd) (abEffectiveness abd)
@@ -424,16 +446,8 @@ drawFrame = do
             y = sideBarTop  - worldHeight/10
         drawText levelCompleteColor (R2 x y) (sideBarWidth,worldHeight/10) $
           printf "Score: %d" (gsScore gs)
-
   --
-  let render = do
-        renderGerms
-        renderAntibiotics
-        renderScore
-  modify $ \gs -> gs { gsRender = render }
-  where
-    -- germ gets angrier when selected
-    scales g = if germSelected g then (1.2, 2.0) else (1.0, 1.0)
+  addRender (renderAntibiotics >> renderScore)
 
 ----------------------------------------------------------------------------------------------------
 playingLevelSelect :: R2 -> GameM FSMState
