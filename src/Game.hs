@@ -36,9 +36,16 @@ germSizeFunForParams initSize multiplyAt t = initSize * (2**(t/multiplyAt))
 birthGerm :: Germ -> Double -> HipCirc -> GameM Germ
 birthGerm g = generateGerm $ Just g
 
+----------------------------------------------------------------------------------------------------
 createGerm :: Double -> HipCirc -> GameM Germ
 createGerm = generateGerm Nothing
 
+----------------------------------------------------------------------------------------------------
+--
+-- [generateGerm] either creates a germ from scratch (when you pass it [Nothing]) as the first
+-- argument or creates a mutated germ that inherents from [Just germ] (if you pass it as the first
+-- argument)
+--
 generateGerm :: Maybe Germ -> Double -> HipCirc -> GameM Germ
 generateGerm mbGerm initSize hipCirc = do
   gs              <- get
