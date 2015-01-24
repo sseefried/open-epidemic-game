@@ -145,7 +145,7 @@ initGameState bounds hipSpace germs =
     , gsSoundQueue    = []
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
-    , gsScore         = 0
+    , gsScore         = 999 -- FIXME: Should be zero
     }
   where
     germMapList = M.fromList $ zip [0..] germs
@@ -217,8 +217,8 @@ handleEvent fsmState ev = do
       case ev of
         _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
         _ -> do
-          let textRender = drawText levelCompleteColor (R2 0 0) fieldWidth
-                         "Epidemic averted!"
+          let textRender = drawTextOfWidth_ levelCompleteColor (R2 0 0) fieldWidth
+                            "Epidemic averted!"
           clearRender
           sideBarRender
           addRender textRender
@@ -233,8 +233,7 @@ handleEvent fsmState ev = do
           modify $ \gs ->
            gs { gsRender = do
                   gsRender gs -- draw what we had before
-                  drawText gameOverColor (R2 0 0) fieldWidth
-                    "Infected!"
+                  drawTextOfWidth_ gameOverColor (R2 0 0) fieldWidth "Infected!"
               , gsSoundQueue = [GameSoundLevelMusicStop]
               }
           return FSMGameOver
@@ -442,10 +441,11 @@ sideBarRender = do
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
   --
   let renderScore = do
-        let x = sideBarLeft + sideBarWidth/2
+        let x = sideBarLeft + sideBarWidth/3
             y = sideBarTop  - worldHeight/10
-        drawText levelCompleteColor (R2 x y) sideBarWidth $
-          printf "Score: %d" (gsScore gs)
+            x' = sideBarLeft + sideBarWidth*5/6
+        h <- drawTextOfWidth scoreColor (R2 x y) (sideBarWidth*2/3*0.8) "Score:"
+        drawTextOfHeight_ scoreColor (R2 x' y) h $ printf "%4d" $ gsScore gs
   --
   addRender (renderAntibiotics >> renderScore)
 

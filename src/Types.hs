@@ -98,9 +98,10 @@ import           Control.Applicative
 ----------------------------------------------------------------------------------------------------
 -- Constants (feel free to change)
 --
-levelCompleteColor :: Color
+levelCompleteColor, gameOverColor, scoreColor :: Color
 levelCompleteColor = Color 0.09 0.37 0.16 1
 gameOverColor = Color 0.73 0.18 0.18 1
+scoreColor = Color 0.0 0.0 0.7 1
 
 --
 -- Game constants

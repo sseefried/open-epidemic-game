@@ -257,8 +257,8 @@ renderDebugInfo :: IORef BackendState -> IO ()
 renderDebugInfo besRef = do
   bes <- readIORef besRef
   let glsls = besGLSLState bes
-  runGLMIO glsls $ drawText (Color 0 0 0 1) (R2 0 0) (fieldWidth/4)
-                            (show $ _besDims bes)
+  runGLMIO glsls $ drawTextOfWidth_ (Color 0 0 0 1) (R2 0 0) (fieldWidth/4)
+                     (show $ _besDims bes)
 
 ----------------------------------------------------------------------------------------------------
 type LetterBox = ((Double, Double), (Double, Double))

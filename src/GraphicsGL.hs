@@ -1,7 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module GraphicsGL (
     -- functions
-    germGfxToGermGL, drawText, drawLetterBox, drawAntibiotic
+    germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
+    drawLetterBox, drawAntibiotic
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -336,23 +337,29 @@ drawAntibiotic (R2 x y) resistance = do
     C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
     circle (0,0) r
     C.fill
-    text_ "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
+    textOfWidth_ "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
 
 ----------------------------------------------------------------------------------------------------
-drawText :: Color -> R2 -> Double -> String -> GLM ()
-drawText color (R2 x y) w s = do
+drawText :: TextConstraint -> Color -> R2 -> Double -> String -> GLM Double
+drawText tc color (R2 x y) len s = do
   let textR :: Render Double
-      textR = text "Helvetica" color (0,0) w s
-  h' <- GLM $ \glsls -> do
-         ht <- runWithoutRender textR
-         let scale = screenScale . glslOrthoBounds $ glsls
-         return $ ht*scale
-  renderCairoToQuad (x, y) (w',h') $ do
-    textR
-    return ()
-  where
-    w' = realToFrac w
+      textR = textConstrainedBy tc "Helvetica" color (0,0) len s
+  lenD <- liftGLM $ runWithoutRender textR
+  let (w',h') = case tc of
+                  Width  -> (len,  lenD)
+                  Height -> (lenD, len)
+  renderCairoToQuad (x, y) (w',h') $ textR
 
+
+----------------------------------------------------------------------------------------------------
+drawTextOfWidth, drawTextOfHeight :: Color -> R2 -> Double -> String -> GLM Double
+drawTextOfWidth  = drawText Width
+drawTextOfHeight = drawText Height
+
+----------------------------------------------------------------------------------------------------
+drawTextOfWidth_, drawTextOfHeight_ :: Color -> R2 -> Double -> String -> GLM ()
+drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
+drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()

@@ -1,8 +1,9 @@
 module Graphics (
   -- types
-  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render,
+  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render, TextConstraint(..),
   -- functions
-  randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm, text, text_,
+  randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm,
+  textOfWidth, textOfHeight, textConstrainedBy, textOfWidth_, textOfHeight_,
   movingPtToPt, movingPtToStaticPt, mutateGermGfx,
   runWithoutRender,
   --
@@ -377,29 +378,53 @@ asGroup r = do
 ----------------------------------------------------------------------------------------------------
 
 --
--- [text fontFamily c (x,y) w  s] renders the text [s] at location [(x,y)] with width [w].
+-- [textOfWidth fontFamily c (x,y) w s] renders the text [s] at location [(x,y)] with width [w].
 -- The text is centered at [(x,y)] and the height of the text depends on the [fontFamily].
+-- It returns the height of the rendered text
 --
--- [text] returns the height of the rendered text.
+-- [textOfHeight] is the same except that it ensures the text is of a particular height and
+-- returns the width of the rendered text.
 --
-text :: String -> Color -> CairoPoint -> Double -> String -> Render Double
-text fontFamily c (x,y) w s = inContext $ do
-  setColor c
-  setFontSize 1
-  selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  (TextExtents bx by tw th _ _) <- textExtents s
-  let scale = w/tw
-  setFontSize scale
-  transform $ M.Matrix 1 0 0 (-1) 0 0
-  moveTo (-bx*scale + x - w/2) (-((by/2)*scale + y))
-  showText s
-  return (th - by)
+textOfWidth, textOfHeight :: String -> Color -> CairoPoint -> Double -> String -> Render Double
+
+textOfWidth  = textConstrainedBy Width
+textOfHeight = textConstrainedBy Height
 
 --
--- A version of [text] where we don't care about the height
+-- Versions of [textOfWidth] and [textOfHeight] where we don't care about the return value
 --
-text_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
-text_ fontFamily c (x,y) w s =  text fontFamily c (x,y) w s >> return ()
+
+textOfWidth_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+textOfWidth_ fontFamily c (x,y) w s =  textOfWidth fontFamily c (x,y) w s >> return ()
+
+--
+-- A version of [textOfWidth] where we don't care about the height
+--
+textOfHeight_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+textOfHeight_ fontFamily c (x,y) h s =  textOfHeight fontFamily c (x,y) h s >> return ()
+
+
+----------------------------------------------------------------------------------------------------
+data TextConstraint = Width | Height
+
+textConstrainedBy :: TextConstraint -> String -> Color -> CairoPoint -> Double -> String
+                  -> Render Double
+textConstrainedBy tc fontFamily c (x,y) len s = do
+  setColor c
+  setFontSize 1
+
+  selectFontFace fontFamily FontSlantNormal FontWeightNormal
+  (TextExtents bx by tw th _ _) <- textExtents s
+  let rth = th - by
+      rtw = tw + bx
+      (len', lenD') = case tc of Width  -> (rtw, rth); Height -> (rth, rtw)
+      scale = len/len'
+      w     = tw*scale
+  setFontSize scale
+  transform $ M.Matrix 1 0 0 (-1) 0 0
+  moveTo (-bx*scale + x - w/2) (-(by/2*scale + y))
+  showText s
+  return (lenD'*scale)
 
 ----------------------------------------------------------------------------------------------------
 --
