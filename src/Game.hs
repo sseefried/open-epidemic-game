@@ -47,7 +47,10 @@ generateGerm mbGerm initSize hipCirc = do
            Nothing   -> randomGermGfx
   multiplyAt      <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
   germGL          <- runGLM $ germGfxToGermGL gfx
-  germResistances <- evalRand $ randomGermResistances $ gsAntibiotics gs
+  germResistances <-
+    case mbGerm of
+      Just g  -> return $ germResistances g
+      Nothing -> evalRand $ randomGermResistances $ gsAntibiotics gs
   return $ Germ { germMultiplyAt     = multiplyAt
                 , germSizeFun        = germSizeFunForParams initSize multiplyAt
                 , germHipCirc        = hipCirc
@@ -413,7 +416,7 @@ drawFrame = do
         let x = sideBarLeft + sideBarWidth/2
             y = sideBarTop  - worldHeight/10
         drawText levelCompleteColor (R2 x y) (sideBarWidth,worldHeight/10) $
-          printf "Score: %4d" (gsScore gs)
+          printf "Score: %d" (gsScore gs)
 
   --
   let render = do
