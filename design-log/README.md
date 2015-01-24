@@ -40,3 +40,8 @@ somehow the area of effect.
 
 The germs now mutate and inherit from each other.
 
+## 2015-01-24-score.png
+
+**Git commit**: 42cc56818e663d36ddc45e273807850571e6e794
+
+Score has been added.
