@@ -1,4 +1,10 @@
 TODO
+----
+
+
+[ ] Get iOS build going. Update for TestFlight
+
+[ ] Update Android build for TestFlight
 
 [ ] Keep antibiotics showing when you've finished the level
 
@@ -8,7 +14,7 @@ TODO
 
 [ ] Start using lenses. e.g. for enabling antibiotics
 
-[ ] Solve the problem of the "action bar" showing on the game.
+[ ] BUG: Solve the problem of the "action bar" showing on the game.
 
 [ ] Add a "dirty screen" effect via a shader
 
@@ -16,8 +22,6 @@ TODO
 
 [ ] Change the z-index on the germ being dragged!
 
-
--- IMPORTANT!
 
 [ ] Rename Physics event to Idle event.
 
@@ -47,7 +51,10 @@ TODO
    antibiotics get less potent they fade in colour until they become
    clear eventually.
 
-------
+----
+DONE
+----
+
 [X] Fix GLFun type to use pre-defined attribute locations instead of
     re-calculating each time. (See GraphicsGL.hs)
 

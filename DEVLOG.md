@@ -1,3 +1,15 @@
+# Thu 22 Jan 2015
+
+Why, oh why didn't I come to this co-working space immediately?
+
+Immediate benefits.
+
+1. I can see what other people are doing and raise my development to that level.
+2. People would see my game almost immediately and they would have some idea about whether it
+   sucked or not. Immediate feedback.
+3. I can go to others for technical discussion and troubleshooting.
+4. I can get help with publishing and marketing.
+
 # Tue 13 Jan 2015
 
 Today I want to think through tapping, selecting, dragging and dropping. I'll use the term

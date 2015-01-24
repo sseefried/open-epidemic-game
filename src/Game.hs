@@ -10,7 +10,7 @@ module Game where
 import           Control.Monad.Random hiding (getRandom, evalRand)
 import           Control.Monad (replicateM)
 import           Control.Applicative
--- import           Text.Printf
+import           Text.Printf
 import qualified Data.Map as M
 import           Data.Map (Map)
 import           Control.Monad (filterM, when)
@@ -387,6 +387,15 @@ physics duration = do
   let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
   mapM_ setPos poses
   ----
+  drawFrame
+
+
+--
+-- Update [gsRender] field of [GameState]
+--
+drawFrame :: GameM ()
+drawFrame = do
+  gs <- get
   let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
       drawOneGerm (i,g) = do
         pos <- germPos g
@@ -399,7 +408,18 @@ physics duration = do
       drawOneAntibiotic (_, abd) =
         when (abEnabled abd) $ drawAntibiotic (abPos abd) (abEffectiveness abd)
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
-      render = renderGerms >> renderAntibiotics
+  --
+  let renderScore = do
+        let x = sideBarLeft + sideBarWidth/2
+            y = sideBarTop  - worldHeight/10
+        drawText levelCompleteColor (R2 x y) (sideBarWidth,worldHeight/10) $
+          printf "Score: %4d" (gsScore gs)
+
+  --
+  let render = do
+        renderGerms
+        renderAntibiotics
+        renderScore
   modify $ \gs -> gs { gsRender = render }
   where
     -- germ gets angrier when selected
@@ -457,4 +477,3 @@ modifyAntibiotic f ab = do
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()
-
