@@ -43,7 +43,6 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , _besDims          :: (Int, Int)
                                  , besGLSLState      :: GLSLState
                                  , _besGLContext     :: S.GLContext
-
                                  , besGameState      :: GameState
                                  , besPressHistory   :: IORef PressHistory
                                  , besBackendToWorld :: BackendToWorld
