@@ -45,3 +45,11 @@ The germs now mutate and inherit from each other.
 **Git commit**: 42cc56818e663d36ddc45e273807850571e6e794
 
 Score has been added.
+
+## 2015-01-25-gradient.png
+
+**Git commit**: eaa5f33065a1e4eb0da51215ef4e201fe02b5841
+
+Gradients to text added. "Tap to continue" message added. This appears a small time after
+the "Epidemic averted!" or "Infected!" message so that people don't inadvertently tap into the
+next level without seeing that they completed a level or died.
