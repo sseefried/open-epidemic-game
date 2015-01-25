@@ -9,6 +9,9 @@ import           Data.Map (Map)
 import qualified Data.Map as M
 import           Control.Applicative
 
+-- friends
+import Platform
+
 -- -------------------
 -- CO-ORDINATE SYSTEMS
 -- -------------------
@@ -165,7 +168,9 @@ debugInfo :: Bool
 debugInfo = False
 
 unlockAntibioticsMap :: Map Int Antibiotic
-unlockAntibioticsMap = M.fromList $ [(5, Penicillin), (10, Cyprofloxacin)]
+unlockAntibioticsMap = M.fromList $ case debugGame of
+  True  -> [(5, Penicillin), (10, Cyprofloxacin)]
+  False -> [(25, Penicillin), (100, Cyprofloxacin)]
 
 ----------------------------------------------------------------------------------------------------
 -- Derived constants. (Do not change)
