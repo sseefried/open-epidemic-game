@@ -349,7 +349,8 @@ drawText tc grad (R2 x y) len s = do
   let (w',h') = case tc of
                   Width  -> (len,  lenD)
                   Height -> (lenD, len)
-  renderCairoToQuad (x, y) (w',h') $ textR
+  -- FIXME: Hack. On android the height of text is not right.
+  renderCairoToQuad (x, y) (w',h'*1.2) $ textR
 
 
 ----------------------------------------------------------------------------------------------------
@@ -368,7 +369,8 @@ drawTextLinesOfWidth color (R2 x y) w ss = do
   let textR :: Render Double
       textR = textLinesOfWidth "Helvetica" color (0,0) w ss
   h <- liftGLM $ runWithoutRender textR
-  renderCairoToQuad (x, y) (w,h) $ textR
+  -- FIXME: Hack. On android the height of text is not right.
+  renderCairoToQuad (x, y) (w,h*1.2) $ textR
 
 ----------------------------------------------------------------------------------------------------
 drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM ()
