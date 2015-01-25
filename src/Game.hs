@@ -14,7 +14,7 @@ import           Text.Printf
 import qualified Data.Map as M
 import           Data.Map (Map)
 import           Control.Monad (filterM, when)
-import           Data.Maybe (catMaybes)
+import           Data.Maybe (catMaybes, isJust, fromJust)
 
 -- friends
 import Types
@@ -87,9 +87,9 @@ randomGermResistances m = catMaybes <$> (mapM immunity $ M.toList m)
 --
 -- Finite State Machine states for this game.
 --
-data FSMState = FSMLevel Int -- level number
+data FSMState = FSMLevel              Int -- level number
               | FSMPlayingLevel
-              | FSMAntibioticUnlocked UTCTime
+              | FSMAntibioticUnlocked UTCTime Antibiotic
               | FSMLevelComplete      UTCTime
               | FSMGameOver           UTCTime
               deriving (Show, Eq, Ord)
@@ -172,11 +172,11 @@ handleEvent fsmState ev = do
   case ev of
     Reset  -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
-             FSMLevel i              -> fsmLevel i
-             FSMPlayingLevel         -> fsmPlayingLevel
-             FSMAntibioticUnlocked t -> fsmAntibioticUnlocked t
-             FSMLevelComplete      t -> fsmLevelComplete t
-             FSMGameOver           t -> fsmGameOver t)
+             FSMLevel i                 -> fsmLevel i
+             FSMPlayingLevel            -> fsmPlayingLevel
+             FSMAntibioticUnlocked t ab -> fsmAntibioticUnlocked (t,ab)
+             FSMLevelComplete      t    -> fsmLevelComplete t
+             FSMGameOver           t    -> fsmGameOver t)
   where
     fsmLevel i = do
       resetHipState
@@ -193,7 +193,6 @@ handleEvent fsmState ev = do
                          , gsCurrentLevel = i
                          }
       -- FIXME: Remove. Penicillin should not be enabled initially.
-      enableAntibiotic Penicillin
       return $ FSMPlayingLevel
     --------------------------------------
     fsmPlayingLevel :: GameM FSMState
@@ -212,8 +211,27 @@ handleEvent fsmState ev = do
             return fsmState
           _ -> return fsmState -- error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     --------------------------------------
-    fsmAntibioticUnlocked :: UTCTime -> GameM FSMState
-    fsmAntibioticUnlocked _ = error "fsmAntibioticUnlocked not implemented"
+    fsmAntibioticUnlocked :: (UTCTime, Antibiotic) -> GameM FSMState
+    fsmAntibioticUnlocked (t,ab) = do
+      let unlockedMsg = do
+            clearRender
+            sideBarRender
+            gameFieldRender
+            addRender $ drawTextLinesOfWidth_ black (R2 0 0) fieldWidth
+                            [printf "You clever thing! You unlocked %s" (show ab)]
+            return $ FSMAntibioticUnlocked t ab
+      whenEventsMutedOtherwise t unlockedMsg $ do
+        case ev of
+          _ | isContinue ev -> do
+            --
+            -- There's a small chance that the antibiotic was unlocked while killing the last
+            -- germ
+            --
+            gs <- get
+            t <- getTime
+            return $ if M.size (gsGerms gs) == 0 then FSMLevelComplete t else FSMPlayingLevel
+          _                 -> unlockedMsg *>> tapToContinue
+
     --------------------------------------
     fsmLevelComplete :: UTCTime -> GameM FSMState
     fsmLevelComplete t    = do
@@ -252,7 +270,6 @@ tapToContinue :: GameM ()
 tapToContinue = addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
                   "Tap to continue"
 
-
 ----------------------------------------------------------------------------------------------------
 isContinue :: Event -> Bool
 isContinue s = case s of
@@ -263,27 +280,47 @@ isContinue s = case s of
 ----------------------------------------------------------------------------------------------------
 playingLevelTap ::  R2 -> GameM FSMState
 playingLevelTap p = do
-  killGerm p
+  germKilled <- killGerm p
   applyAntibiotics p
   gs <- get
-  case M.size (gsGerms gs) of
-    0 -> do { t <- getTime; return $ FSMLevelComplete t }
-    _ -> return FSMPlayingLevel
+  mbAB <- antibioticUnlocked
+  case True of
+    _ | germKilled && isJust mbAB -> do
+          t <- getTime
+          let ab = fromJust mbAB
+          enableAntibiotic ab
+          return $ FSMAntibioticUnlocked t ab
+    _ | M.size (gsGerms gs) == 0 -> do
+          t <- getTime
+          return $ FSMLevelComplete t
+    _  -> return FSMPlayingLevel
+
+----------------------------------------------------------------------------------------------------
+antibioticUnlocked :: GameM (Maybe Antibiotic)
+antibioticUnlocked = do
+  gs <- get
+  return $ M.lookup (gsScore gs) unlockAntibioticsMap
 
 ----------------------------------------------------------------------------------------------------
 --
 -- FIXME: Make this more efficient. Brute force searches through germs to kill them.
 --
-killGerm :: R2 -> GameM ()
+killGerm :: R2 -> GameM Bool
 killGerm p = do
   germsToKill <- germsSatisfyingM (pointCollides p)
   let kkk (germId, germ) = do
+        gs <- get
         runOnHipState $ removeHipCirc (germHipCirc germ)
+        let germs    = gsGerms gs
+            newGerms = M.delete germId germs
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
                            , gsSoundQueue = GameSoundSquish:gsSoundQueue gs
                            , gsScore = gsScore gs + 1 }
         runGLM . germGLFinaliser . germGL $ germ
-  mapM_ kkk germsToKill
+        return $ M.size newGerms < M.size germs
+  bs <- mapM kkk germsToKill
+  return $ any id bs -- were any germs killed?
+
 ----------------------------------------------------------------------------------------------------
 applyAntibiotics :: R2 -> GameM ()
 applyAntibiotics (R2 x y)= do

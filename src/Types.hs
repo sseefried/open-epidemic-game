@@ -6,6 +6,7 @@ import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum, GLfloat)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
 import           Data.Map (Map)
+import qualified Data.Map as M
 import           Control.Applicative
 
 -- -------------------
@@ -152,7 +153,7 @@ gradientColorMutationMax = 0.15
 -- send the player to the next level before they've even notice they finished the level.
 --
 eventMuteTime :: Double
-eventMuteTime = 0.75 -- seconds
+eventMuteTime = 0.5 -- seconds
 
 --
 -- Whether to render debug info to the screen.
@@ -162,6 +163,9 @@ eventMuteTime = 0.75 -- seconds
 --
 debugInfo :: Bool
 debugInfo = False
+
+unlockAntibioticsMap :: Map Int Antibiotic
+unlockAntibioticsMap = M.fromList $ [(5, Penicillin), (10, Cyprofloxacin)]
 
 ----------------------------------------------------------------------------------------------------
 -- Derived constants. (Do not change)
@@ -235,6 +239,9 @@ backgroundColor = whiteT
 
 
 type Gradient = (Color, Color)
+
+uniformGrad :: Color -> Gradient
+uniformGrad c = (c,c)
 
 -- polar point (r,a) that lies inside a unit circle. Invariant: r < 1, 0 <= a < 1
 data PolarPoint = P2 Frac Frac -- radius and angle
@@ -387,3 +394,4 @@ allAntibiotics = let p = Penicillin in [p..]
 
 numAntibiotics :: Int
 numAntibiotics = length allAntibiotics
+

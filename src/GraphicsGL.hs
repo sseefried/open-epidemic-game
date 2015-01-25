@@ -2,7 +2,7 @@
 module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
-    drawTextLinesOfWidth,  drawLetterBox, drawAntibiotic
+    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -361,6 +361,7 @@ drawTextOfHeight = drawText Height
 drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM ()
 drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
+
 ----------------------------------------------------------------------------------------------------
 drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
@@ -369,7 +370,9 @@ drawTextLinesOfWidth color (R2 x y) w ss = do
   h <- liftGLM $ runWithoutRender textR
   renderCairoToQuad (x, y) (w,h) $ textR
 
-
+----------------------------------------------------------------------------------------------------
+drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM ()
+drawTextLinesOfWidth_ a b c d = drawTextLinesOfWidth a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
