@@ -5,6 +5,7 @@ module Util where
 
 import System.Exit
 import Foreign.C.Types (CFloat(..))
+import Data.Char (toUpper)
 
 -- friends
 import CUtil
@@ -60,3 +61,6 @@ fmod a b = snd (properFraction (a / b)) * b
 
 clamp :: Ord a => a -> a -> a -> a
 clamp minVal maxVal x = (minVal `max` x) `min` maxVal
+
+uppercase :: String -> String
+uppercase = map toUpper

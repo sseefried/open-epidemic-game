@@ -145,7 +145,7 @@ initGameState bounds hipSpace germs =
     , gsSoundQueue    = []
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
-    , gsScore         = 999 -- FIXME: Should be zero
+    , gsScore         = 0
     }
   where
     germMapList = M.fromList $ zip [0..] germs

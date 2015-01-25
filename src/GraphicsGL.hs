@@ -2,7 +2,7 @@
 module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
-    drawLetterBox, drawAntibiotic
+    drawTextLinesOfWidth,  drawLetterBox, drawAntibiotic
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -337,13 +337,14 @@ drawAntibiotic (R2 x y) resistance = do
     C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
     circle (0,0) r
     C.fill
-    textOfWidth_ "Helvetica" (Color 0 0 0 1) (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
+    textOfWidth_ "Helvetica" (Color 0 0 0 1, Color 1 1 1 1) -- FIXME: Make a constant
+      (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
 
 ----------------------------------------------------------------------------------------------------
-drawText :: TextConstraint -> Color -> R2 -> Double -> String -> GLM Double
-drawText tc color (R2 x y) len s = do
+drawText :: TextConstraint -> GermGradient -> R2 -> Double -> String -> GLM Double
+drawText tc grad (R2 x y) len s = do
   let textR :: Render Double
-      textR = textConstrainedBy tc "Helvetica" color (0,0) len s
+      textR = textConstrainedBy tc "Helvetica" grad (0,0) len s
   lenD <- liftGLM $ runWithoutRender textR
   let (w',h') = case tc of
                   Width  -> (len,  lenD)
@@ -352,14 +353,23 @@ drawText tc color (R2 x y) len s = do
 
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth, drawTextOfHeight :: Color -> R2 -> Double -> String -> GLM Double
+drawTextOfWidth, drawTextOfHeight :: GermGradient -> R2 -> Double -> String -> GLM Double
 drawTextOfWidth  = drawText Width
 drawTextOfHeight = drawText Height
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth_, drawTextOfHeight_ :: Color -> R2 -> Double -> String -> GLM ()
+drawTextOfWidth_, drawTextOfHeight_ :: GermGradient -> R2 -> Double -> String -> GLM ()
 drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
+----------------------------------------------------------------------------------------------------
+drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
+drawTextLinesOfWidth color (R2 x y) w ss = do
+  let textR :: Render Double
+      textR = textLinesOfWidth "Helvetica" color (0,0) w ss
+  h <- liftGLM $ runWithoutRender textR
+  renderCairoToQuad (x, y) (w,h) $ textR
+
+
 
 ----------------------------------------------------------------------------------------------------
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()

@@ -4,7 +4,7 @@ module Graphics (
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm,
   textOfWidth, textOfHeight, textConstrainedBy, textOfWidth_, textOfHeight_,
-  movingPtToPt, movingPtToStaticPt, mutateGermGfx,
+  textLinesOfWidth, movingPtToPt, movingPtToStaticPt, mutateGermGfx,
   runWithoutRender,
   --
   circle
@@ -17,6 +17,7 @@ import qualified Graphics.Rendering.Cairo.Matrix as M
 import           Control.Monad.Random
 import           Debug.Trace
 import           Foreign.Marshal.Alloc (allocaBytes)
+import           Data.List (maximumBy)
 
 -- friends
 import Types
@@ -140,8 +141,6 @@ withGermGradient (Color r g b a, Color r' g' b' a') radius drawing = do
     setSource p
     drawing
     fill
-
-----------------------------------------------------------------------------------------------------
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE polarPtToPt #-}
@@ -385,7 +384,7 @@ asGroup r = do
 -- [textOfHeight] is the same except that it ensures the text is of a particular height and
 -- returns the width of the rendered text.
 --
-textOfWidth, textOfHeight :: String -> Color -> CairoPoint -> Double -> String -> Render Double
+textOfWidth, textOfHeight :: String -> GermGradient -> CairoPoint -> Double -> String -> Render Double
 
 textOfWidth  = textConstrainedBy Width
 textOfHeight = textConstrainedBy Height
@@ -394,37 +393,77 @@ textOfHeight = textConstrainedBy Height
 -- Versions of [textOfWidth] and [textOfHeight] where we don't care about the return value
 --
 
-textOfWidth_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+textOfWidth_ :: String -> GermGradient -> CairoPoint -> Double -> String -> Render ()
 textOfWidth_ fontFamily c (x,y) w s =  textOfWidth fontFamily c (x,y) w s >> return ()
 
 --
 -- A version of [textOfWidth] where we don't care about the height
 --
-textOfHeight_ :: String -> Color -> CairoPoint -> Double -> String -> Render ()
+textOfHeight_ :: String -> GermGradient -> CairoPoint -> Double -> String -> Render ()
 textOfHeight_ fontFamily c (x,y) h s =  textOfHeight fontFamily c (x,y) h s >> return ()
 
 
 ----------------------------------------------------------------------------------------------------
 data TextConstraint = Width | Height
 
-textConstrainedBy :: TextConstraint -> String -> Color -> CairoPoint -> Double -> String
+textConstrainedBy :: TextConstraint -> String -> GermGradient -> CairoPoint -> Double -> String
                   -> Render Double
-textConstrainedBy tc fontFamily c (x,y) len s = do
-  setColor c
+textConstrainedBy tc fontFamily (Color r g b a, Color r' g' b' a') (x,y) len s = do
+  let us = uppercase s
   setFontSize 1
-
-  selectFontFace fontFamily FontSlantNormal FontWeightNormal
-  (TextExtents bx by tw th _ _) <- textExtents s
-  let rth = th - by
+  selectFontFace fontFamily FontSlantNormal FontWeightBold
+  (TextExtents bx by tw th _ _) <- textExtents us
+  let rth = th
+      bl = th + by
       rtw = tw + bx
       (len', lenD') = case tc of Width  -> (rtw, rth); Height -> (rth, rtw)
       scale = len/len'
       w     = tw*scale
+      x'    = -bx*scale + x - w/2
+      y'    = y + (th/2-bl)*scale
+  withLinearPattern 0 y' 0 (y'+th*scale) $ \p -> do
+    patternSetExtend p ExtendRepeat
+    patternAddColorStopRGBA p 0   r  g  b  a
+    patternAddColorStopRGBA p 0.5 r' g' b' a'
+    setFontSize scale
+    transform $ M.Matrix 1 0 0 (-1) 0 0
+    moveTo x' y'
+    textPath us
+    setSource p
+    fillPreserve
+    --setSourceRGBA 0 0 0 1
+    --setLineWidth (th*scale/100)
+    --stroke
+    return (lenD'*scale)
+----------------------------------------------------------------------------------------------------
+
+textLinesOfWidth :: String -> Color -> CairoPoint -> Double -> [String] -> Render Double
+textLinesOfWidth fontFamily c (x,y) w ss = do
+  setFontSize 1
+  selectFontFace fontFamily FontSlantNormal FontWeightNormal
+  -- find the longest line
+  let wid (TextExtents _ _ tw _ _ _) = tw
+      ssLen = length ss
+  tes <- mapM textExtents ss
+  let (TextExtents bx by tw th _ _) = maximumBy (\te te' -> compare (wid te) (wid te')) tes
+      lines = zipWith3 (,,) tes ss [0..]
+      lineH = th
+      lineW = tw + bx
+      bl    = th + by
+      h     = lineH*(fromIntegral ssLen)
+      scale = w/lineW
+      showLine (te,s,i) = do
+        moveTo (-bx*scale + x - (wid te*scale/2))
+               (y + (-h/2-bl)*scale + (i+1)*(lineH*scale))
+        showText s
+  --setColor (Color 0.5 0.5 0.5 1)
+  --rectangle  (-1000) (-1000) 2000 2000
+  --fill
+  setColor c
   setFontSize scale
   transform $ M.Matrix 1 0 0 (-1) 0 0
-  moveTo (-bx*scale + x - w/2) (-(by/2*scale + y))
-  showText s
-  return (lenD'*scale)
+  mapM_ showLine lines
+  return (lineH*scale*(fromIntegral ssLen))
 
 ----------------------------------------------------------------------------------------------------
 --

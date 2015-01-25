@@ -98,10 +98,10 @@ import           Control.Applicative
 ----------------------------------------------------------------------------------------------------
 -- Constants (feel free to change)
 --
-levelCompleteColor, gameOverColor, scoreColor :: Color
-levelCompleteColor = Color 0.09 0.37 0.16 1
-gameOverColor = Color 0.73 0.18 0.18 1
-scoreColor = Color 0.0 0.0 0.7 1
+levelCompleteColor, gameOverColor, scoreColor :: GermGradient
+levelCompleteColor = (Color 0.09 0.37 0.16 1, Color 0.09 0.80 0.16 1)
+gameOverColor = (Color 0.53 0.18 0.18 1, Color 0.73 0.18 0.18 1)
+scoreColor = (Color 0.0 0.0 0.5 1, Color 0.0 0.0 1.0 1)
 
 --
 -- Game constants

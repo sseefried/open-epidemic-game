@@ -41,4 +41,3 @@ screenDimensions = case platform of
   Android     -> Nothing
   IOSPlatform -> Nothing
   _           -> Just (1280, 720)
-
