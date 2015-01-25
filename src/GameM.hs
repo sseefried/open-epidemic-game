@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -Wall #-}
 module GameM (
   -- opaque types
-  GameM, HipM, HipSpace,
+  GameM, HipM, HipSpace, UTCTime,
   -- functions
   -- GameM smart constructors
   getRandom,
@@ -12,6 +12,8 @@ module GameM (
   put,
   printStr,
   printStrLn,
+  getTime,
+  timeSince,
   newHipSpace,
   runHipM,
   -- HipM smart constructors
@@ -48,6 +50,8 @@ import qualified Physics.Hipmunk.Unsafe as H
 import qualified Data.StateVar as H
 import           Data.StateVar (($=))
 import           Data.IORef
+import           Data.Time (getCurrentTime, diffUTCTime, UTCTime)
+
 
 -- friends
 import Types
@@ -60,6 +64,8 @@ data GameScript next =
   |                       Modify       (GameState -> GameState) next
   |                       Put          !GameState next
   |                       PrintStr     !String next
+  |                       GetTime      (UTCTime -> next)
+  |                       TimeSince    UTCTime (Double -> next)
   | forall a.             RunGLM       (GLM a) (a -> next)
   |                       NewHipSpace  (HipSpace -> next)
   | forall a.             RunHipM      !HipSpace (HipM a) (a -> next)
@@ -88,6 +94,8 @@ instance Functor GameScript where
     Modify a gs'   -> Modify a (f gs')
     Put a gs'      -> Put a (f gs')
     PrintStr a gs' -> PrintStr a (f gs')
+    GetTime g      -> GetTime (f . g)
+    TimeSince a g  -> TimeSince a (f . g)
     RunGLM a g     -> RunGLM a (f . g)
     NewHipSpace g  -> NewHipSpace (f . g)
     RunHipM a b g  -> RunHipM a b (f . g)
@@ -126,6 +134,12 @@ printStr s = Impure (PrintStr s (Pure ()))
 
 printStrLn :: String -> GameM ()
 printStrLn s = Impure (PrintStr (s++"\n") (Pure ()))
+
+getTime :: GameM UTCTime
+getTime = Impure (GetTime Pure)
+
+timeSince :: UTCTime -> GameM Double
+timeSince t = Impure (TimeSince t Pure)
 
 newHipSpace :: GameM HipSpace
 newHipSpace = Impure (NewHipSpace Pure)
@@ -194,10 +208,16 @@ runGameM glsls gs gameM = do
         (Impure (Modify f p))           -> modifyIORef gsRef f >> go' p
         (Impure (Put gs' p))            -> writeIORef gsRef gs' >> go' p
         (Impure (PrintStr s p))         -> debugLog s >> go' p
+        (Impure (GetTime f))            -> getCurrentTime >>= go' . f
+        (Impure (TimeSince t f))        -> timeSince' t >>= go' . f
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
         (Impure (RunGLM glm f))         -> runGLMIO glsls glm  >>= go' . f
         (Pure x)                        -> return x
+    timeSince' :: UTCTime -> IO Double
+    timeSince' t = do
+      t' <- getCurrentTime
+      return . realToFrac $ diffUTCTime t' t
 
 ----------------------------------------------------------------------------------------------------
 runHipMIO :: HipSpace -> HipM a -> IO a
