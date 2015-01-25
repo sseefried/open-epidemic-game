@@ -23,6 +23,7 @@ import GameM
 import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
 import Util
+
 ----------------------------------------------------------------------------------------------------
 --
 -- Given an initial size [initSize] and a time that the germ should multiply at [multiplyAt]
@@ -215,10 +216,21 @@ handleEvent fsmState ev = do
     fsmAntibioticUnlocked (t,ab) = do
       let unlockedMsg = do
             clearRender
-            sideBarRender
             gameFieldRender
             addRender $ drawTextLinesOfWidth_ black (R2 0 0) fieldWidth
-                            [printf "You clever thing! You unlocked %s" (show ab)]
+                            [ printf "You unlocked %s!" (show ab)
+                            , ""
+                            , printf "It starts out at %.0f%% effectiveness"
+                                (startingAntibioticEffectiveness * 100.0)
+                            , printf "This means each germ has a %.0f%% chance"
+                                ((1 - startingAntibioticEffectiveness) * 100.0)
+                            , "of being immune"
+                            , "Germs inherit their immunity from"
+                            , "their parents"
+                            , ""
+                            , "Careful! Each time you use an antibiotic"
+                            , "its effectiveness goes down"]
+            sideBarRender
             return $ FSMAntibioticUnlocked t ab
       whenEventsMutedOtherwise t unlockedMsg $ do
         case ev of
