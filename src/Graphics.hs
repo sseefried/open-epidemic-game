@@ -1,6 +1,6 @@
 module Graphics (
   -- types
-  GermGfx(..), Time, Color, GermGradient, CairoPoint, Render, TextConstraint(..),
+  GermGfx(..), Time, Color, Gradient, CairoPoint, Render, TextConstraint(..),
   -- functions
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm,
   textOfWidth, textOfHeight, textConstrainedBy, textOfWidth_, textOfHeight_,
@@ -114,7 +114,7 @@ germGfxRenderNucleus gg r = do
    asGroup $ do
      scale r r
      translate 0.5 0.5
-     withGermGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
+     withGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
        blob . map (ptToCairoPt . movingPtToStaticPt) . germGfxNucleus $ gg
      -- scale to radius [r]
 
@@ -124,7 +124,7 @@ germGfxRenderBody gg r = do
    asGroup $ do
      scale r r
      translate 1 1
-     withGermGradient (germGfxBodyGrad gg) 1 $ do
+     withGradient (germGfxBodyGrad gg) 1 $ do
        blob . map (ptToCairoPt . movingPtToStaticPt) . germGfxBody $ gg
      -- scale to radius [r]
 
@@ -133,8 +133,8 @@ germGfxRenderGerm :: GermGfx -> Double -> Render ()
 germGfxRenderGerm gg r = germGfxRenderBody gg r >> germGfxRenderNucleus gg r
 
 ----------------------------------------------------------------------------------------------------
-withGermGradient :: GermGradient -> Double -> Render () -> Render ()
-withGermGradient (Color r g b a, Color r' g' b' a') radius drawing = do
+withGradient :: Gradient -> Double -> Render () -> Render ()
+withGradient (Color r g b a, Color r' g' b' a') radius drawing = do
   withRadialPattern 0 0 0 0 0 radius $ \p -> do
     patternAddColorStopRGBA p 0 r  g  b  a
     patternAddColorStopRGBA p 1 r' g' b' a'
@@ -259,7 +259,7 @@ randomColor = do
 -- We want the two colours to be a minimum distance apart
 --
 --
-randomGradient :: RandomGen g => Rand g GermGradient
+randomGradient :: RandomGen g => Rand g Gradient
 randomGradient = do
   c@(Color r g b _) <- randomColor
   (dr:dg:db:_)   <- getRandomRs (0.1,0.5)
@@ -304,7 +304,7 @@ mutateGermGfx gfx = do
     }
   where
 
-    mutateGradient :: RandomGen g => GermGradient -> Rand g GermGradient
+    mutateGradient :: RandomGen g => Gradient -> Rand g Gradient
     mutateGradient (Color r g b _, Color r' g' b' _) = do
       let cl = clamp 0 1
       (dr:dg:db:dr':dg':db':_) <- getRandomRs (-gradientColorMutationMax, gradientColorMutationMax)
@@ -384,7 +384,7 @@ asGroup r = do
 -- [textOfHeight] is the same except that it ensures the text is of a particular height and
 -- returns the width of the rendered text.
 --
-textOfWidth, textOfHeight :: String -> GermGradient -> CairoPoint -> Double -> String -> Render Double
+textOfWidth, textOfHeight :: String -> Gradient -> CairoPoint -> Double -> String -> Render Double
 
 textOfWidth  = textConstrainedBy Width
 textOfHeight = textConstrainedBy Height
@@ -393,20 +393,20 @@ textOfHeight = textConstrainedBy Height
 -- Versions of [textOfWidth] and [textOfHeight] where we don't care about the return value
 --
 
-textOfWidth_ :: String -> GermGradient -> CairoPoint -> Double -> String -> Render ()
+textOfWidth_ :: String -> Gradient -> CairoPoint -> Double -> String -> Render ()
 textOfWidth_ fontFamily c (x,y) w s =  textOfWidth fontFamily c (x,y) w s >> return ()
 
 --
 -- A version of [textOfWidth] where we don't care about the height
 --
-textOfHeight_ :: String -> GermGradient -> CairoPoint -> Double -> String -> Render ()
+textOfHeight_ :: String -> Gradient -> CairoPoint -> Double -> String -> Render ()
 textOfHeight_ fontFamily c (x,y) h s =  textOfHeight fontFamily c (x,y) h s >> return ()
 
 
 ----------------------------------------------------------------------------------------------------
 data TextConstraint = Width | Height
 
-textConstrainedBy :: TextConstraint -> String -> GermGradient -> CairoPoint -> Double -> String
+textConstrainedBy :: TextConstraint -> String -> Gradient -> CairoPoint -> Double -> String
                   -> Render Double
 textConstrainedBy tc fontFamily (Color r g b a, Color r' g' b' a') (x,y) len s = do
   let us = uppercase s

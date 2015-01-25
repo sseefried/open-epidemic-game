@@ -98,10 +98,11 @@ import           Control.Applicative
 ----------------------------------------------------------------------------------------------------
 -- Constants (feel free to change)
 --
-levelCompleteColor, gameOverColor, scoreColor :: GermGradient
-levelCompleteColor = (Color 0.09 0.37 0.16 1, Color 0.09 0.80 0.16 1)
-gameOverColor = (Color 0.53 0.18 0.18 1, Color 0.73 0.18 0.18 1)
-scoreColor = (Color 0.0 0.0 0.5 1, Color 0.0 0.0 1.0 1)
+levelCompleteGrad, gameOverGrad, scoreGrad :: Gradient
+levelCompleteGrad = (Color 0.09 0.37 0.16 1, Color 0.09 0.80 0.16 1)
+gameOverGrad      = (Color 0.53 0.18 0.18 1, Color 0.73 0.18 0.18 1)
+scoreGrad         = (Color 0.0 0.0 0.5 1,    Color 0.0 0.0 1.0 1)
+continueGrad      = (Color 0 0 0 1,          Color 0.8  0.8  0.8   1)
 
 --
 -- Game constants
@@ -144,6 +145,14 @@ effectivenessDilutionFactor = 0.97
 -- mutate by (either up or down)
 gradientColorMutationMax :: Double
 gradientColorMutationMax = 0.15
+
+--
+-- When a level is finished or an antibiotics is unlocked we need to "mute" the events
+-- for a certain amount of time so that a stray click or finger tap doesn't immediately
+-- send the player to the next level before they've even notice they finished the level.
+--
+eventMuteTime :: Double
+eventMuteTime = 0.75 -- seconds
 
 --
 -- Whether to render debug info to the screen.
@@ -225,14 +234,14 @@ whiteT          = Color 1 1 1 0 -- T means transparent
 backgroundColor = whiteT
 
 
-type GermGradient = (Color, Color)
+type Gradient = (Color, Color)
 
 -- polar point (r,a) that lies inside a unit circle. Invariant: r < 1, 0 <= a < 1
 data PolarPoint = P2 Frac Frac -- radius and angle
 
 data GermGfx =
-  GermGfx { germGfxBodyGrad    :: !GermGradient
-          , germGfxNucleusGrad :: !GermGradient
+  GermGfx { germGfxBodyGrad    :: !Gradient
+          , germGfxNucleusGrad :: !Gradient
           , germGfxBody        :: [MovingPoint]
           , germGfxNucleus     :: [MovingPoint]
           , germGfxSpikes      :: !Int

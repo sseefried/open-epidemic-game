@@ -341,7 +341,7 @@ drawAntibiotic (R2 x y) resistance = do
       (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
 
 ----------------------------------------------------------------------------------------------------
-drawText :: TextConstraint -> GermGradient -> R2 -> Double -> String -> GLM Double
+drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do
   let textR :: Render Double
       textR = textConstrainedBy tc "Helvetica" grad (0,0) len s
@@ -353,12 +353,12 @@ drawText tc grad (R2 x y) len s = do
 
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth, drawTextOfHeight :: GermGradient -> R2 -> Double -> String -> GLM Double
+drawTextOfWidth, drawTextOfHeight :: Gradient -> R2 -> Double -> String -> GLM Double
 drawTextOfWidth  = drawText Width
 drawTextOfHeight = drawText Height
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth_, drawTextOfHeight_ :: GermGradient -> R2 -> Double -> String -> GLM ()
+drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM ()
 drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 ----------------------------------------------------------------------------------------------------

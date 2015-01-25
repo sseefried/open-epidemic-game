@@ -64,3 +64,10 @@ clamp minVal maxVal x = (minVal `max` x) `min` maxVal
 
 uppercase :: String -> String
 uppercase = map toUpper
+
+--
+-- Compose two monads together with [(>>)] but the return value is the return value of the first
+-- monad. The return value of the second monad is thrown away.
+--
+(*>>) :: Monad m => m a -> m b -> m a
+m *>> m' = do { r <- m; m'; return r}

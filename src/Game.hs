@@ -22,6 +22,7 @@ import GameEvent
 import GameM
 import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
+import Util
 ----------------------------------------------------------------------------------------------------
 --
 -- Given an initial size [initSize] and a time that the germ should multiply at [multiplyAt]
@@ -88,9 +89,9 @@ randomGermResistances m = catMaybes <$> (mapM immunity $ M.toList m)
 --
 data FSMState = FSMLevel Int -- level number
               | FSMPlayingLevel
-              | FSMAntibioticUnlocked
-              | FSMLevelComplete
-              | FSMGameOver
+              | FSMAntibioticUnlocked UTCTime
+              | FSMLevelComplete      UTCTime
+              | FSMGameOver           UTCTime
               deriving (Show, Eq, Ord)
 
 
@@ -171,11 +172,11 @@ handleEvent fsmState ev = do
   case ev of
     Reset  -> resetGameState >> (return $ FSMLevel 1)
     _  -> (case fsmState of -- events that depend on current FSM State
-             FSMLevel i            -> fsmLevel i
-             FSMPlayingLevel       -> fsmPlayingLevel
-             FSMAntibioticUnlocked -> fsmAntibioticUnlocked
-             FSMLevelComplete      -> fsmLevelComplete
-             FSMGameOver           -> fsmGameOver)
+             FSMLevel i              -> fsmLevel i
+             FSMPlayingLevel         -> fsmPlayingLevel
+             FSMAntibioticUnlocked t -> fsmAntibioticUnlocked t
+             FSMLevelComplete      t -> fsmLevelComplete t
+             FSMGameOver           t -> fsmGameOver t)
   where
     fsmLevel i = do
       resetHipState
@@ -195,10 +196,11 @@ handleEvent fsmState ev = do
       enableAntibiotic Penicillin
       return $ FSMPlayingLevel
     --------------------------------------
+    fsmPlayingLevel :: GameM FSMState
     fsmPlayingLevel = do
       gs <- get
       if M.size (gsGerms gs) > maxGerms
-       then return FSMGameOver
+       then do { t <- getTime; return $ FSMGameOver t }
        else do
         case ev of
           Tap p            -> playingLevelTap p
@@ -210,33 +212,46 @@ handleEvent fsmState ev = do
             return fsmState
           _ -> return fsmState -- error $ printf "Event '%s' not handled by fsmLevel" (show ev)
     --------------------------------------
-    fsmAntibioticUnlocked = error "fsmAntibioticUnlocked not implemented"
+    fsmAntibioticUnlocked :: UTCTime -> GameM FSMState
+    fsmAntibioticUnlocked _ = error "fsmAntibioticUnlocked not implemented"
     --------------------------------------
-    fsmLevelComplete      = do
+    fsmLevelComplete :: UTCTime -> GameM FSMState
+    fsmLevelComplete t    = do
       gs <- get
-      case ev of
-        _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
-        _ -> do
-          let textRender = drawTextOfWidth_ levelCompleteColor (R2 0 0) fieldWidth
-                            "Epidemic averted!"
-          clearRender
-          sideBarRender
-          addRender textRender
-          return $ FSMLevelComplete
+      let levelCompleteMsg = do
+            let textRender = drawTextOfWidth_ levelCompleteGrad (R2 0 0) fieldWidth
+                               "Epidemic averted!"
+            clearRender
+            sideBarRender
+            addRender textRender
+            return $ FSMLevelComplete t
+      whenEventsMutedOtherwise t levelCompleteMsg $ do
+        case ev of
+          _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
+          _                 -> levelCompleteMsg *>> tapToContinue
     --------------------------------------
-    fsmGameOver           = do
-      case ev of
-        _ | isContinue ev -> do
-          resetGameState
-          return $ FSMLevel 1
-        _ -> do
-          modify $ \gs ->
-           gs { gsRender = do
-                  gsRender gs -- draw what we had before
-                  drawTextOfWidth_ gameOverColor (R2 0 0) fieldWidth "Infected!"
-              , gsSoundQueue = [GameSoundLevelMusicStop]
-              }
-          return FSMGameOver
+    fsmGameOver :: UTCTime -> GameM FSMState
+    fsmGameOver t         = do
+      let infectedMsg = do
+            modify $ \gs ->
+              gs { gsRender = do
+                     gsRender gs -- draw what we had before
+                     drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
+                 , gsSoundQueue = [GameSoundLevelMusicStop]
+                 }
+            return $ FSMGameOver t
+
+      whenEventsMutedOtherwise t infectedMsg $ do
+        case ev of
+          _ | isContinue ev -> do
+            resetGameState
+            return $ FSMLevel 1
+          _ -> infectedMsg *>> tapToContinue
+
+tapToContinue :: GameM ()
+tapToContinue = addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
+                  "Tap to continue"
+
 
 ----------------------------------------------------------------------------------------------------
 isContinue :: Event -> Bool
@@ -251,9 +266,9 @@ playingLevelTap p = do
   killGerm p
   applyAntibiotics p
   gs <- get
-  return $ case M.size (gsGerms gs) of
-    0 -> FSMLevelComplete
-    _ -> FSMPlayingLevel
+  case M.size (gsGerms gs) of
+    0 -> do { t <- getTime; return $ FSMLevelComplete t }
+    _ -> return FSMPlayingLevel
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -444,8 +459,8 @@ sideBarRender = do
         let x = sideBarLeft + sideBarWidth/3
             y = sideBarTop  - worldHeight/10
             x' = sideBarLeft + sideBarWidth*5/6
-        h <- drawTextOfWidth scoreColor (R2 x y) (sideBarWidth*2/3*0.8) "Score:"
-        drawTextOfHeight_ scoreColor (R2 x' y) h $ printf "%4d" $ gsScore gs
+        h <- drawTextOfWidth scoreGrad (R2 x y) (sideBarWidth*2/3*0.8) "Score:"
+        drawTextOfHeight_ scoreGrad (R2 x' y) h $ printf "%4d" $ gsScore gs
   --
   addRender (renderAntibiotics >> renderScore)
 
@@ -501,3 +516,8 @@ modifyAntibiotic f ab = do
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()
+----------------------------------------------------------------------------------------------------
+whenEventsMutedOtherwise :: UTCTime -> GameM a -> GameM a -> GameM a
+whenEventsMutedOtherwise t dflt gm = do
+  d <- timeSince t
+  if (d >= eventMuteTime) then gm else dflt
