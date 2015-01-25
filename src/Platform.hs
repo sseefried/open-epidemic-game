@@ -45,7 +45,7 @@ isDesktop = not isMobile
 debugLog :: String -> IO ()
 debugLog = case platform of
   Android -> androidLog
-  _       -> putStrLn
+  _       -> putStr
 
 --
 -- [Nothing] means fullscreen. [Just (w,h)] means set screen size to width [w] and height [h]
