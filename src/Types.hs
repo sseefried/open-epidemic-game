@@ -158,15 +158,6 @@ gradientColorMutationMax = 0.15
 eventMuteTime :: Double
 eventMuteTime = 0.5 -- seconds
 
---
--- Whether to render debug info to the screen.
---
--- This is useful when you want to discover information about someone's device and they are
--- not too tech savvy. They can just read the information off the screen.
---
-debugInfo :: Bool
-debugInfo = False
-
 unlockAntibioticsMap :: Map Int Antibiotic
 unlockAntibioticsMap = M.fromList $ case debugGame of
   True  -> [(5, Penicillin), (10, Cyprofloxacin)]

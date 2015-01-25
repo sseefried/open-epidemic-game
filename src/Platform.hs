@@ -8,11 +8,17 @@ data Platform = MacOSX
               | Android
               | NoSound deriving (Eq, Show)
 
-debugGame :: Bool
-#ifdef DEBUG
+debugGame, debugSystem :: Bool
+#ifdef DEBUG_GAME
 debugGame = True
 #else
 debugGame = False
+#endif
+
+#ifdef DEBUG_SYSTEM
+debugSystem = True
+#else
+debugSystem = False
 #endif
 
 

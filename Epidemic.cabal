@@ -26,8 +26,12 @@ Flag ios
   Description: Build for iOS
   Default: False
 
-Flag debug
+Flag debug-game
   Description: debug the game
+  Default: False
+
+Flag debug-system
+  Description: Print debug info about the system on the screen
   Default: False
 
 
@@ -46,11 +50,6 @@ library
       cpp-options: -DIOS
 
     c-sources: src/util.c
-
-    if flag(debug)
-      cpp-options: -DDEBUG
-      cc-options: -DDEBUG
-
 
     if flag(android)
       ghc-options: -O2 -static
@@ -78,6 +77,13 @@ library
                  , array == 0.5.0.0
     else
       Buildable: False
+    if flag(debug-game)
+      cpp-options: -DDEBUG_GAME
+      cc-options:  -DDEBUG_GAME
+    if flag(debug-system)
+      cpp-options: -DDEBUG_SYSTEM
+      cc-options:  -DDEBUG_SYSTEM
+
 
 executable         EpidemicStaticLib
     hs-source-dirs : src
@@ -115,9 +121,12 @@ executable         EpidemicStaticLib
       Buildable: True
     else
       Buildable: False
-    if flag(debug)
-      cpp-options: -DDEBUG
-      cc-options: -DDEBUG
+    if flag(debug-game)
+      cpp-options: -DDEBUG_GAME
+      cc-options:  -DDEBUG_GAME
+    if flag(debug-system)
+      cpp-options: -DDEBUG_SYSTEM
+      cc-options:  -DDEBUG_SYSTEM
 
 
 
@@ -162,9 +171,12 @@ executable         Epidemic
       Buildable: False
     else
       Buildable: True
-    if flag(debug)
-      cpp-options: -DDEBUG
-      cc-options: -DDEBUG
+    if flag(debug-game)
+      cpp-options: -DDEBUG_GAME
+      cc-options:  -DDEBUG_GAME
+    if flag(debug-system)
+      cpp-options: -DDEBUG_SYSTEM
+      cc-options:  -DDEBUG_SYSTEM
 
 executable         GenerateIcons
     hs-source-dirs : src

@@ -248,7 +248,7 @@ runFrameUpdate besRef = do
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   runGLMIO glsls (gsRender gs)
   mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
-  when debugInfo $ renderDebugInfo besRef
+  when debugSystem $ renderDebugInfo besRef
   glFlush
   S.glSwapWindow (besWindow bes)
 
@@ -256,8 +256,8 @@ renderDebugInfo :: IORef BackendState -> IO ()
 renderDebugInfo besRef = do
   bes <- readIORef besRef
   let glsls = besGLSLState bes
-  runGLMIO glsls $ drawTextOfWidth_ (Color 0 0 0 1, Color 0 0 0 1) (R2 0 0) (fieldWidth/4)
-                     (show $ _besDims bes)
+  runGLMIO glsls $ drawTextLinesOfWidth_ (Color 0 0 0 1) (R2 0 0) fieldWidth
+                     [show $ _besDims bes]
 
 ----------------------------------------------------------------------------------------------------
 type LetterBox = ((Double, Double), (Double, Double))
