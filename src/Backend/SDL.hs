@@ -377,7 +377,7 @@ logFrameRate besRef = do
   let sz = fromIntegral frBufWindowSize
   when (besFrames bes `mod` sz == 0 && besFSMState bes == FSMPlayingLevel) $ do
     avTick <- averageTick (besFRBuf bes)
-    debugLog $ printf "Framerate = %.2f frames/s" (1/avTick)
+    debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 
 
 ----------------------------------------------------------------------------------------------------

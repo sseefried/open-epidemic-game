@@ -156,7 +156,7 @@ gradientColorMutationMax = 0.15
 -- send the player to the next level before they've even notice they finished the level.
 --
 eventMuteTime :: Double
-eventMuteTime = 0.5 -- seconds
+eventMuteTime = 1.5 -- seconds
 
 unlockAntibioticsMap :: Map Int Antibiotic
 unlockAntibioticsMap = M.fromList $ case debugGame of
