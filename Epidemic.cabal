@@ -102,6 +102,7 @@ executable         EpidemicStaticLib
                  , sdl2-mixer
                  , cairo
                  , control-monad-free
+                 , OpenGLRaw
                  -- everything below this line is a dependency of above
                  -- the line. We fix to specific versions
                  , base
