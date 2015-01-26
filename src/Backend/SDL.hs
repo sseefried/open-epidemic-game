@@ -85,10 +85,18 @@ compileGLSLProgram p = do
 
 initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
 initOpenGL window (w,h) = do
+  --
+  -- On iOS the you must set these attributes *before* the gl context is created.
+  --
+  let glAttrs = case True of
+                _ | platform `elem` [Android, IOSPlatform] ->
+                       [ (S.GLDepthSize,           24)
+                       , (S.GLContextProfileMask,  S.glContextProfileES)
+                       , (S.GLContextMajorVersion, 2) ]
+                _ -> [ (S.GLDepthSize,           24) ]
+  mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
-  mapM_ (uncurry S.glSetAttribute) [ {-(S.GLDoubleBuffer, 1),-} (S.GLDepthSize, 24) ]
---  S.glSetSwapInterval S.SynchronizedUpdates
-  S.glSetSwapInterval S.ImmediateUpdates
+  when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   --  glEnable gl_TEXTURE_2D is meaningless in GLSL
   glEnable gl_BLEND
   glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
@@ -182,7 +190,6 @@ initialize title = do
 
   when (w < h) $ exitWithError $
     printf "Width of screen (%d) must be greater than or equal to height (%d)" w h
-
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   (glslState, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
