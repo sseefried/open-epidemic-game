@@ -1,3 +1,36 @@
+# Wed 28 Jan 2015
+
+I'm tired of more Haskell dependencies! My problem today is that I want to use Cairo's freetype2
+support. This will require:
+  a) the freetype2 binding
+  b) more function bindings in the Haskell Cairo binding AND have it match up with the freetype2
+     binding.
+
+I think the solution is actually quite simple: don't write this code in Haskell. Write it in C.
+Load the TTF file, create the font, and then pass that to the Haskell code. Simple.
+
+# Tue 27 Jan 2015
+
+Today I tried to build Cairo with Quartz support. After finally finding this patch
+(https://www.libreoffice.org/bugzilla/attachment.cgi?id=110168) at chaging
+configure.ac I succeeded.
+
+This idea was that now I would be able to use Quartz fonts on iOS. It turns out
+that the Haskell Cairo binding does not provide bindings to either the Quartz or
+Freetype backend.
+
+I have two choices now. Provide the bindings to Quartz or provide bindings to Freetype.
+The latter is probably the better long term plan since I'll be able to use that on Android.
+
+* Quartz
+  - Pros: Nice fonts. Have already built Cairo with Quartz support
+  - Cons: Will still have ugly fonts on Android.
+
+* Freetype
+  - Pros: Consistent fonts on iOS and Android
+  - Cons: May not be able to build freetype for iOS easily. A cursory glance on the Internet
+     shows that this may not be a problem: https://librocket.com/wiki/documentation/BuildingFreeTypeForiOS
+
 # Thu 22 Jan 2015
 
 Why, oh why didn't I come to this co-working space immediately?
