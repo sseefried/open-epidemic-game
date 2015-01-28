@@ -2,7 +2,8 @@
 module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
-    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic
+    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic,
+    renderQuadWithColor
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -333,18 +334,20 @@ drawAntibiotic :: R2 -> Double -> GLM ()
 drawAntibiotic (R2 x y) resistance = do
   let s = antibioticWidth
       r = s/2
+  st <- getGLSLState
   renderCairoToQuad (x,y) (s,s) $ do
     C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
     circle (0,0) r
     C.fill
-    textOfWidth_ "Helvetica" (Color 0 0 0 1, Color 1 1 1 1) -- FIXME: Make a constant
+    textOfWidth_ (glslFontFace st) (Color 0 0 0 1, Color 1 1 1 1) -- FIXME: Make a constant
       (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
 
 ----------------------------------------------------------------------------------------------------
 drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do
+  st <- getGLSLState
   let textR :: Render Double
-      textR = textConstrainedBy tc "Helvetica" grad (0,0) len s
+      textR = textConstrainedBy tc (glslFontFace st) grad (0,0) len s
   lenD <- liftGLM $ runWithoutRender textR
   let (w',h') = case tc of
                   Width  -> (len,  lenD)
@@ -366,8 +369,9 @@ drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 ----------------------------------------------------------------------------------------------------
 drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
+  st <- getGLSLState
   let textR :: Render Double
-      textR = textLinesOfWidth "Helvetica" color (0,0) w ss
+      textR = textLinesOfWidth (glslFontFace st) color (0,0) w ss
   h <- liftGLM $ runWithoutRender textR
   -- FIXME: Hack. On android the height of text is not right.
   renderCairoToQuad (x, y) (w,h*1.2) $ textR

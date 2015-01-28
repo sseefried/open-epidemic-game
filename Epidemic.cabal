@@ -167,7 +167,9 @@ executable         Epidemic
                  , transformers
                  , utf8-string
                  , vector
-    c-sources: src/util.c
+    c-sources: src/util.c src/freetype_util.c
+    extra-libraries: freetype
+
     if flag(android) || flag(ios)
       Buildable: False
     else

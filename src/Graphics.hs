@@ -377,14 +377,14 @@ asGroup r = do
 ----------------------------------------------------------------------------------------------------
 
 --
--- [textOfWidth fontFamily c (x,y) w s] renders the text [s] at location [(x,y)] with width [w].
--- The text is centered at [(x,y)] and the height of the text depends on the [fontFamily].
+-- [textOfWidth fontFace c (x,y) w s] renders the text [s] at location [(x,y)] with width [w].
+-- The text is centered at [(x,y)] and the height of the text depends on the [fontFace].
 -- It returns the height of the rendered text
 --
 -- [textOfHeight] is the same except that it ensures the text is of a particular height and
 -- returns the width of the rendered text.
 --
-textOfWidth, textOfHeight :: String -> Gradient -> CairoPoint -> Double -> String -> Render Double
+textOfWidth, textOfHeight :: FontFace -> Gradient -> CairoPoint -> Double -> String -> Render Double
 
 textOfWidth  = textConstrainedBy Width
 textOfHeight = textConstrainedBy Height
@@ -393,25 +393,26 @@ textOfHeight = textConstrainedBy Height
 -- Versions of [textOfWidth] and [textOfHeight] where we don't care about the return value
 --
 
-textOfWidth_ :: String -> Gradient -> CairoPoint -> Double -> String -> Render ()
-textOfWidth_ fontFamily c (x,y) w s =  textOfWidth fontFamily c (x,y) w s >> return ()
+textOfWidth_ :: FontFace -> Gradient -> CairoPoint -> Double -> String -> Render ()
+textOfWidth_ fontFace c (x,y) w s =  textOfWidth fontFace c (x,y) w s >> return ()
 
 --
 -- A version of [textOfWidth] where we don't care about the height
 --
-textOfHeight_ :: String -> Gradient -> CairoPoint -> Double -> String -> Render ()
-textOfHeight_ fontFamily c (x,y) h s =  textOfHeight fontFamily c (x,y) h s >> return ()
+textOfHeight_ :: FontFace -> Gradient -> CairoPoint -> Double -> String -> Render ()
+textOfHeight_ fontFace c (x,y) h s =  textOfHeight fontFace c (x,y) h s >> return ()
 
 
 ----------------------------------------------------------------------------------------------------
 data TextConstraint = Width | Height
 
-textConstrainedBy :: TextConstraint -> String -> Gradient -> CairoPoint -> Double -> String
+textConstrainedBy :: TextConstraint -> FontFace -> Gradient -> CairoPoint -> Double -> String
                   -> Render Double
-textConstrainedBy tc fontFamily (Color r g b a, Color r' g' b' a') (x,y) len s = do
+textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = do
   let us = uppercase s
   setFontSize 1
-  selectFontFace fontFamily FontSlantNormal FontWeightBold
+--  selectFontFace fontFamily FontSlantNormal FontWeightBold
+  setFontFace fontFace
   (TextExtents bx by tw th _ _) <- textExtents us
   let rth = th
       bl = th + by
@@ -437,10 +438,11 @@ textConstrainedBy tc fontFamily (Color r g b a, Color r' g' b' a') (x,y) len s =
     return (lenD'*scale)
 ----------------------------------------------------------------------------------------------------
 
-textLinesOfWidth :: String -> Color -> CairoPoint -> Double -> [String] -> Render Double
-textLinesOfWidth fontFamily c (x,y) w ss = do
+textLinesOfWidth :: FontFace -> Color -> CairoPoint -> Double -> [String] -> Render Double
+textLinesOfWidth fontFace c (x,y) w ss = do
   setFontSize 1
-  selectFontFace fontFamily FontSlantNormal FontWeightNormal
+  setFontFace fontFace
+--  selectFontFace fontFace FontSlantNormal FontWeightNormal
   -- find the longest line
   let wid (TextExtents _ _ tw _ _ _) = tw
       ssLen = length ss

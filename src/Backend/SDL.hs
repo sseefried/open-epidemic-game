@@ -36,6 +36,7 @@ import Util
 import FrameRateBuffer
 import GraphicsGL
 import Coordinate
+import FreeType
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
@@ -116,12 +117,14 @@ initOpenGL window (w,h) = do
   texCoordLoc    <- getAttributeLocation programId "texCoord"
   drawTextureLoc <- getUniformLocation   programId "drawTexture"
   colorLoc       <- getUniformLocation   programId "color"
+  fontFace       <- loadFontFace
   let glsls = GLSLState { glslProgramId   = programId
                         , glslPosition    = positionLoc
                         , glslTexcoord    = texCoordLoc
                         , glslDrawTexture = drawTextureLoc
                         , glslColor       = colorLoc
                         , glslOrthoBounds = bds
+                        , glslFontFace    = fontFace
                         }
   return (glsls, context)
   where

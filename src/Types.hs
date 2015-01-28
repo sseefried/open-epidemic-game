@@ -1,7 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Types where
 
-import           Graphics.Rendering.Cairo (Render)
+import           Graphics.Rendering.Cairo (Render, FontFace)
 import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum, GLfloat)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
@@ -308,6 +308,8 @@ data GLSLState = GLSLState { glslPosition    :: AttributeLocation
                            , glslColor       :: UniformLocation
                            , glslProgramId   :: ProgramId
                            , glslOrthoBounds :: OrthoBounds
+                           -- FIXME: not really GLSL... Maybe rename this state?
+                           , glslFontFace    :: FontFace
                            }
 
 instance Functor GLM where
@@ -328,6 +330,9 @@ instance Applicative GLM where
 --
 liftGLM :: IO a -> GLM a
 liftGLM io = GLM . const $ io
+
+getGLSLState :: GLM GLSLState
+getGLSLState = GLM return
 
 --
 -- Magnitude of near and far planes in orthographic project
