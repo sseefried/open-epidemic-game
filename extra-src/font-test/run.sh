@@ -1,0 +1,1 @@
+ghci -W freetype_util.o `pkg-config cairo --libs` `pkg-config freetype2 --libs`
