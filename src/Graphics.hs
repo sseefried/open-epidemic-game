@@ -410,8 +410,8 @@ textConstrainedBy :: TextConstraint -> FontFace -> Gradient -> CairoPoint -> Dou
                   -> Render Double
 textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = do
   let us = uppercase s
-  setFontSize 1
---  selectFontFace fontFamily FontSlantNormal FontWeightBold
+  let fontSize = 1000 -- scaling it up initially gives more accurate TextExtents below.
+  setFontSize fontSize
   setFontFace fontFace
   (TextExtents bx by tw th _ _) <- textExtents us
   let rth = th
@@ -426,7 +426,10 @@ textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = d
     patternSetExtend p ExtendRepeat
     patternAddColorStopRGBA p 0   r  g  b  a
     patternAddColorStopRGBA p 0.5 r' g' b' a'
-    setFontSize scale
+--    setColor (Color 0.5 0.5 0.5 1)
+--    rectangle  (-1000) (-1000) 2000 2000
+--    fill
+    setFontSize (scale*fontSize)
     transform $ M.Matrix 1 0 0 (-1) 0 0
     moveTo x' y'
     textPath us
@@ -440,9 +443,9 @@ textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = d
 
 textLinesOfWidth :: FontFace -> Color -> CairoPoint -> Double -> [String] -> Render Double
 textLinesOfWidth fontFace c (x,y) w ss = do
-  setFontSize 1
+  let fontSize = 1000.0 -- scaling it up initially gives more accurate TextExtents
+  setFontSize fontSize
   setFontFace fontFace
---  selectFontFace fontFace FontSlantNormal FontWeightNormal
   -- find the longest line
   let wid (TextExtents _ _ tw _ _ _) = tw
       ssLen = length ss
@@ -462,7 +465,7 @@ textLinesOfWidth fontFace c (x,y) w ss = do
   --rectangle  (-1000) (-1000) 2000 2000
   --fill
   setColor c
-  setFontSize scale
+  setFontSize (scale*fontSize)
   transform $ M.Matrix 1 0 0 (-1) 0 0
   mapM_ showLine lines
   return (lineH*scale*(fromIntegral ssLen))

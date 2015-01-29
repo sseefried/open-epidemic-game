@@ -16,7 +16,7 @@ cairo_font_face_t *load_font_face() {
   FT_Face face;
   FT_Error error;
   cairo_font_face_t *cr_face;
-  char *path = "/Users/sseefried/code/games/epidemic-game/GoodDog.otf";
+  char *path = "/Users/sseefried/code/games/epidemic-game/font.ttf";
 
   error = FT_Init_FreeType(&lib);
   exitOnError(error);

@@ -105,8 +105,8 @@ import Platform
 levelCompleteGrad, gameOverGrad, scoreGrad :: Gradient
 levelCompleteGrad = (Color 0.09 0.37 0.16 1, Color 0.09 0.80 0.16 1)
 gameOverGrad      = (Color 0.53 0.18 0.18 1, Color 0.73 0.18 0.18 1)
-scoreGrad         = (Color 0.0 0.0 0.5 1,    Color 0.0 0.0 1.0 1)
-continueGrad      = (Color 0 0 0 1,          Color 0.8  0.8  0.8   1)
+scoreGrad         = (Color 0.0 0.0 0.5 1,    Color 0.0  0.0  1.0  1)
+continueGrad      = (Color 0 0 0 1,          Color 0.8  0.8  0.8  1)
 
 --
 -- Game constants
