@@ -28,8 +28,9 @@ import Platform
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLint
 rgbFormat = fromIntegral $ case platform of
-  Android -> gl_BGRA
-  _       -> gl_RGBA
+  Android     -> gl_BGRA
+  IOSPlatform -> gl_RGBA
+  _           -> gl_RGBA
 
 ----------------------------------------------------------------------------------------------------
 -- Resolution of largest texture for mipmap is 2^powOfTwo
@@ -157,12 +158,22 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
       cairoRender
 
     glBindTexture gl_TEXTURE_2D tid
+    glUniform1i drawTextureLoc 1 -- set to 'true'
+
+    --
+    -- On GL ES 2.0 with "non power of two" width textures (as these ones usually
+    -- are) you must set the texture wrap parameters below to "clamp to edge"
+    --
+    glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_S (fromIntegral gl_CLAMP_TO_EDGE)
+    glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_T (fromIntegral gl_CLAMP_TO_EDGE)
+
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
-    glUniform1i drawTextureLoc 1 -- set to 'true'
 
     glEnableVertexAttribArray (glslPosition glslAttrs)
     glEnableVertexAttribArray (glslTexcoord glslAttrs)
+
+
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
       pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
                    , x+w, y  , zMax, 1, 0  -- upper-left
@@ -178,7 +189,6 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
-  let zMax = 0
   let positionLoc = glslPosition glslAttrs
       drawTextureLoc = glslDrawTexture glslAttrs
       colorLoc       = glslColor glslAttrs
@@ -217,11 +227,7 @@ drawToMipmapTexture renderFun = do
   glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
   forM_ (zip textureWidths [0..]) $ \(x,i) -> do
     let xd = fromIntegral x
-    renderCairoToTexture textureId (Just i) (x,x) $ do
-      C.setSourceRGBA 1 1 1 0
-      C.rectangle 0 0 xd xd
-      C.fill
-      renderFun (fromIntegral x/2)
+    renderCairoToTexture textureId (Just i) (x,x) $ renderFun (fromIntegral x/2)
   return textureId
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
@@ -266,7 +272,7 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- while [movingPtToPt] is used for the polygon vertices.
 --
 germGfxToGermGL :: GermGfx -> GLM GermGL
-germGfxToGermGL gfx = GLM . const $ do
+germGfxToGermGL gfx = GLM $ const $ do
   textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
   --
   -- We pre-allocate a bunch of unboxed vectors (from Data.Vector). (Data.Vector uses
@@ -352,8 +358,7 @@ drawText tc grad (R2 x y) len s = do
   let (w',h') = case tc of
                   Width  -> (len,  lenD)
                   Height -> (lenD, len)
-  -- FIXME: Hack. On android the height of text is not right.
-  renderCairoToQuad (x, y) (w',h'*1.2) $ textR
+  renderCairoToQuad (x, y) (w',h') $ textR
 
 
 ----------------------------------------------------------------------------------------------------
@@ -373,8 +378,7 @@ drawTextLinesOfWidth color (R2 x y) w ss = do
   let textR :: Render Double
       textR = textLinesOfWidth (glslFontFace st) color (0,0) w ss
   h <- liftGLM $ runWithoutRender textR
-  -- FIXME: Hack. On android the height of text is not right.
-  renderCairoToQuad (x, y) (w,h*1.2) $ textR
+  renderCairoToQuad (x, y) (w,h) $ textR
 
 ----------------------------------------------------------------------------------------------------
 drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM ()

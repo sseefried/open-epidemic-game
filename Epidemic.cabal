@@ -49,7 +49,7 @@ library
     if flag(ios)
       cpp-options: -DIOS
 
-    c-sources: src/util.c
+    c-sources: src/util.c src/freetype_util.c
 
     if flag(android)
       ghc-options: -O2 -static
@@ -86,15 +86,14 @@ library
 
 
 executable         EpidemicStaticLib
-    hs-source-dirs : src
-    default-language:  Haskell2010
-    ghc-options: -W -threaded -O2 -staticlib
-    cpp-options: -DIOS
-    main-is:       MainLib.hs
+    hs-source-dirs:   src
+    default-language: Haskell2010
+    ghc-options:      -W -threaded -O2 -staticlib
+    cpp-options:      -DIOS
+    main-is:          MainLib.hs
 
-    c-sources: src/util.c
-
-
+    c-sources: src/util.c src/freetype_util.c
+    pkgconfig-depends: freetype2, cairo
 
     build-depends: Hipmunk
                  , MonadRandom
@@ -117,7 +116,6 @@ executable         EpidemicStaticLib
                  , transformers
                  , utf8-string
                  , vector
-    c-sources: src/util.c
     if flag(ios)
       Buildable: True
     else
@@ -168,7 +166,7 @@ executable         Epidemic
                  , utf8-string
                  , vector
     c-sources: src/util.c src/freetype_util.c
-    extra-libraries: freetype
+    pkgconfig-depends: freetype2, cairo
 
     if flag(android) || flag(ios)
       Buildable: False
