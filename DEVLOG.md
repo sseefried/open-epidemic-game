@@ -1,3 +1,15 @@
+# Fri 30 Jan 2015
+
+When you are installing arm-apple-darwin10-ghc make sure you edit the 'settings' file after the
+./configure!
+
+    $ ./configure
+    $ nano settings
+
+Now change all occurrences of `/usr/bin/gcc`.
+
+    $ make install
+
 # Wed 28 Jan 2015
 
 I'm tired of more Haskell dependencies! My problem today is that I want to use Cairo's freetype2
