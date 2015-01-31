@@ -2,9 +2,7 @@
 module CUtil where
 
 import Foreign.C.Types
-#ifdef ANDROID
 import Foreign.C.String
-#endif
 
 --
 -- When compiling the GHC ARM cross-compiler with LLVM 3.0 it produces incorrect
@@ -29,4 +27,15 @@ androidLog s = withCString s $ \cstr -> cAndroidLog cstr
 #else
 -- dummy function for when we're not building on Android
 androidLog _ = return ()
+#endif
+
+resourcePath :: IO String
+#ifdef ANDROID
+resourcePath = return "unknown"
+#else
+foreign import ccall "resource_path" cResourcePath :: IO CString
+resourcePath = do
+  cstr <- cResourcePath
+  peekCString cstr
+
 #endif

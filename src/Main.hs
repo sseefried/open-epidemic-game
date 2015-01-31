@@ -7,7 +7,6 @@ module Main where
 import Game
 import Backend.SDL as B
 
-
 main :: IO ()
 main = do
   besRef <- B.initialize "Epidemic"

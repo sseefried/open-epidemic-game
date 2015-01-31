@@ -165,7 +165,7 @@ executable         Epidemic
                  , transformers
                  , utf8-string
                  , vector
-    c-sources: src/util.c src/freetype_util.c
+    c-sources: src/util.c src/freetype_util.c src/resource_path.m
     pkgconfig-depends: freetype2, cairo
 
     if flag(android) || flag(ios)
