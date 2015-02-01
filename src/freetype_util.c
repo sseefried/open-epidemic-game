@@ -11,12 +11,11 @@ void exitOnError(FT_Error error) {
   }
 }
 
-cairo_font_face_t *load_font_face() {
+cairo_font_face_t *load_font_face(char *path) {
   FT_Library lib;
   FT_Face face;
   FT_Error error;
   cairo_font_face_t *cr_face;
-  char *path = "/Users/sseefried/code/games/epidemic-game/font.ttf";
 
   error = FT_Init_FreeType(&lib);
   exitOnError(error);

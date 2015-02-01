@@ -53,8 +53,8 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  -- must keep a handle on the window otherwise it gets
                                  -- garbage collected and hence disappears.
                                  , besWindow         :: S.Window
-                                 , besLevelMusic     :: M.Music
-                                 , besSquishSound    :: M.Chunk
+                                 , besLevelMusic     :: Maybe M.Music
+                                 , besSquishSound    :: Maybe M.Chunk
                                  }
 
 
@@ -117,7 +117,8 @@ initOpenGL window (w,h) = do
   texCoordLoc    <- getAttributeLocation programId "texCoord"
   drawTextureLoc <- getUniformLocation   programId "drawTexture"
   colorLoc       <- getUniformLocation   programId "color"
-  fontFace       <- loadFontFace
+  base           <- resourcePath
+  fontFace       <- loadFontFace $ base ++ "/font.ttf"
   let glsls = GLSLState { glslProgramId   = programId
                         , glslPosition    = positionLoc
                         , glslTexcoord    = texCoordLoc
@@ -196,22 +197,35 @@ initialize title = do
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
   (glslState, context) <- initOpenGL window (w,h)
   (levelMusic, squishSound) <- case platform of
-    Android -> return (error "levelMusic", error "squishSound")
-    NoSound -> return (error "levelMusic", error "squishSound")
+    Android -> return (Nothing, Nothing)
+    NoSound -> return (Nothing, Nothing)
     _       -> do
       M.openAudio 44100 S.AudioS16Sys 1 1024
       M.allocateChannels 10
-      levelMusic <- M.loadMUS "/Users/sseefried/code/games/epidemic-game/sounds/crystal-harmony.wav"
-      rwOps <- S.fromFile "/Users/sseefried/code/games/epidemic-game/sounds/slime-splash.wav" "r"
+      base        <- resourcePath
+--      levelMusic  <- M.loadMUS $ base ++ "/music.wav"
+      rwOps       <- S.fromFile (base ++ "/slime-splash.wav") "r"
       squishSound <- M.loadWAVRW rwOps False
-      return (levelMusic, squishSound)
+      return (Nothing, Just squishSound)
   t     <- getCurrentTime
   frBuf <- initFRBuf
   gs    <- newGameState (w,h)
   pressHistory <- newIORef $ PressHistory Nothing M.empty
-  newIORef $ BackendState t t dims glslState context gs pressHistory
-               (backendToWorld dims) 0 frBuf (FSMLevel 1)
-               window levelMusic squishSound
+  newIORef $ BackendState { _besStartTime     = t
+                          , besLastTime       = t
+                          , _besDims          = dims
+                          , besGLSLState      = glslState
+                          , _besGLContext     = context
+                          , besGameState      = gs
+                          , besPressHistory   = pressHistory
+                          , besBackendToWorld = backendToWorld dims
+                          , besFrames         = 0
+                          , besFRBuf          = frBuf
+                          , besFSMState       = FSMLevel 1
+                          , besWindow         = window
+                          , besLevelMusic     = levelMusic
+                          , besSquishSound    = squishSound
+                          }
   where
     wflags = [S.WindowShown]
 
@@ -351,16 +365,17 @@ runPhysicsEventHandler besRef handleEvent = do
 
 ----------------------------------------------------------------------------------------------------
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
-playSoundQueue bes = case platform of
-  Android -> const $ return ()  -- don't play any sounds on android. FIXME: Change this
-  NoSound -> const $ return ()  -- don't play any sounds with NoSound
-  _       -> mapM_ playSound
+playSoundQueue bes sounds = mapM_ playSound sounds
   where
     playSound :: GameSound -> IO ()
     playSound s = case s of
-      GameSoundLevelMusicStart -> M.playMusic (besLevelMusic  bes) 10000 -- loop a lot of times
+      GameSoundLevelMusicStart -> do
+        maybe (return ()) (\wav -> M.playMusic wav 10000) -- loop a lot of times
+              (besLevelMusic  bes)
       GameSoundLevelMusicStop  -> M.haltMusic
-      GameSoundSquish     -> M.playChannelTimed (-1) (besSquishSound bes) 0 (-1) >> return ()
+      GameSoundSquish          -> do
+         maybe (return ()) (\wav -> M.playChannelTimed (-1) wav 0 (-1) >> return ())
+               (besSquishSound bes)
 
 ----------------------------------------------------------------------------------------------------
 getEvents :: IORef BackendState -> IO (MaybeEvents)

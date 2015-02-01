@@ -37,5 +37,4 @@ foreign import ccall "resource_path" cResourcePath :: IO CString
 resourcePath = do
   cstr <- cResourcePath
   peekCString cstr
-
 #endif

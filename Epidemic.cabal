@@ -92,7 +92,7 @@ executable         EpidemicStaticLib
     cpp-options:      -DIOS
     main-is:          MainLib.hs
 
-    c-sources: src/util.c src/freetype_util.c
+    c-sources: src/util.c src/freetype_util.c src/resource_path.m
     pkgconfig-depends: freetype2, cairo
 
     build-depends: Hipmunk

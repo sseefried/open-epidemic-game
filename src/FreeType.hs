@@ -3,11 +3,12 @@ module FreeType where
 
 -- import Foreign.C.Types
 import Foreign.Ptr
+import Foreign.C.String
 import Graphics.Rendering.Cairo.Types (FontFace, mkFontFace)
 
 
-foreign import ccall "load_font_face" cLoadFontFace :: IO (Ptr FontFace)
+foreign import ccall "load_font_face" cLoadFontFace :: CString -> IO (Ptr FontFace)
 
-loadFontFace :: IO FontFace
-loadFontFace = cLoadFontFace >>= mkFontFace
+loadFontFace :: String -> IO FontFace
+loadFontFace s = withCString s $ \path -> cLoadFontFace path >>= mkFontFace
 
