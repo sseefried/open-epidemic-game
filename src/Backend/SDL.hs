@@ -203,6 +203,7 @@ initialize title = do
       M.openAudio 44100 S.AudioS16Sys 1 1024
       M.allocateChannels 10
       base        <- resourcePath
+      -- FIXME: Add new music in
 --      levelMusic  <- M.loadMUS $ base ++ "/music.wav"
       rwOps       <- S.fromFile (base ++ "/slime-splash.wav") "r"
       squishSound <- M.loadWAVRW rwOps False
@@ -403,7 +404,6 @@ logFrameRate besRef = do
   when (besFrames bes `mod` sz == 0 && besFSMState bes == FSMPlayingLevel) $ do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
-
 
 ----------------------------------------------------------------------------------------------------
 getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())

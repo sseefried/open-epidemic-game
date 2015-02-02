@@ -10,7 +10,5 @@ import CUtil
 
 main :: IO ()
 main = do
-  s <- resourcePath
-  putStrLn s
   besRef <- B.initialize "Epidemic"
   B.mainLoop besRef handleEvent

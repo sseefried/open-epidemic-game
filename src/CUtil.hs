@@ -16,17 +16,21 @@ foreign import ccall "float2double" cFloatToCDouble :: CFloat -> CDouble
 foreign import ccall "set_no_buffering" setNoBuffering ::  IO ()
 #ifdef ANDROID
 foreign import ccall "androidLog" cAndroidLog :: CString -> IO ()
+#else
+foreign import ccall "ns_log" cNSLog :: CString -> IO ()
 #endif
 
 cFloatToDouble :: CFloat -> Double
 cFloatToDouble = uncurry encodeFloat . decodeFloat . cFloatToCDouble
 
-androidLog :: String -> IO ()
+androidLog, nsLog :: String -> IO ()
 #ifdef ANDROID
 androidLog s = withCString s $ \cstr -> cAndroidLog cstr
+nsLog _ = return ()
 #else
 -- dummy function for when we're not building on Android
 androidLog _ = return ()
+nsLog s = withCString s cNSLog
 #endif
 
 resourcePath :: IO String
