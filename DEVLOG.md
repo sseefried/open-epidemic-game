@@ -1,3 +1,22 @@
+# Mon 02 Feb 2015
+
+Was having an intermittent problem with `_ZCMain_main_closure` not being exported in
+`libEpidemic.a` for iOS Simulator version of game. Adding `-no-hs-main` to the `ghc-options` in
+`Epidemic.cabal` seemed to fix the problem.
+
+---
+
+The next problem I want to tackle is how to load assets for the Android version of the game.
+After a little reading it seems the best thing to do is extra the assets files from the APK
+and place them on the device somewhere, and then load them.
+
+The Java method that should be used to get a directory for these files is this one:
+http://developer.android.com/reference/android/content/Context.html#getExternalFilesDir(java.lang.String)
+
+I'll then have to work out a way of sending that directory path to the Haskell application.
+
+*Sigh* I'm going to have to write some Java code.
+
 # Fri 30 Jan 2015
 
 When you are installing arm-apple-darwin10-ghc make sure you edit the 'settings' file after the
