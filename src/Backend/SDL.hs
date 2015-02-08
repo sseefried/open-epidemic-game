@@ -397,6 +397,7 @@ mainLoop besRef handleEvent = loop $ do
     loop :: IO () -> IO ()
     loop io = io >> loop io
 
+----------------------------------------------------------------------------------------------------
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
   bes <- readIORef besRef

@@ -1,3 +1,49 @@
+# Sun 08 Feb 2015
+
+Today I finally got the game building on an iPhone. However I almost immediately got this error:
+
+    internal error: stg_ap_v_ret
+
+A little snooping in the GHC RTS source code shows that this symbol will NOT be defined when
+you've got CPP symbol `TABLES_NEXT_TO_CODE` defined. I'm sure I've seen this string somewhere
+before while a big build has been going on.
+
+More investigation revealed that `-DTABLES_NEXT_TO_CODE` is pass as an option to
+`arm-apple-darwin10-clang` during the building of Epidemic.
+
+So, why is this symbol ever called by a running program?
+
+Even on x86_64 architecture `-DTABLES_NEXT_TO_CODE` is defined when building object files with
+`gcc`.
+
+---
+
+Update. It turns out that my reasoning is probably flawed.
+
+The GHC Trac "report a bug" [page](https://ghc.haskell.org/trac/ghc/wiki/ReportABug) says that
+if you get `stg_ap_v_ret` it's just a run-time error and can occur for all sorts of reasons.
+A new ticket should be lodged for any of these.
+
+---
+
+Then I found this on the iOS cross-compling wiki:
+
+"Set Dead Code Stripping to No. This is needed because GHC generates "tables next to code", and without this setting, Xcode thinks the tables are dead code and strips them, causing a crash."
+
+
+
+# Wed 04 Feb 2015
+
+More design ideas.
+
+- Germs move. Some germs eat other germs. (This can be a good thing!) But they also grow
+  faster.
+
+- As germs divide their division times goes down so that you can't just sit in one level getting
+  an awesome score.
+
+
+
 # Mon 02 Feb 2015
 
 Was having an intermittent problem with `_ZCMain_main_closure` not being exported in
