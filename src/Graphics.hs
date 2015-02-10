@@ -113,7 +113,7 @@ germGfxRenderNucleus :: GermGfx -> Double -> Render ()
 germGfxRenderNucleus gg r = do
    asGroup $ do
      scale r r
-     translate 0.5 0.5
+     translate 1 1
      withGradient (pmap (changeAlpha nucleusAlpha) $ germGfxNucleusGrad gg) 1 $ do
        blob . map (ptToCairoPt . movingPtToStaticPt) . germGfxNucleus $ gg
      -- scale to radius [r]
