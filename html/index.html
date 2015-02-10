@@ -1,0 +1,92 @@
+<DOCTYPE !html>
+<html>
+<head>
+<script type="text/javascript" src="jquery-2.1.1.min.js"></script>
+
+<script type="text/javascript">
+  $(function() {
+    var resize = function() {
+      var w = $(window).width(),
+          title = Math.round(w*0.1) + "px",
+          large = Math.round(w*0.025) + "px";
+      $('.title').css("font-size", title);
+      $('.large').css("font-size", large);
+    }
+    resize();
+    $(window).resize(resize);
+  })
+</script>
+
+<style>
+  @font-face {
+    font-family: 'ElliotSix';
+    src: url('font.ttf');
+  }
+
+  .elliot-six {
+    font-family: 'ElliotSix';
+  }
+
+  .title {
+    font-family: 'ElliotSix';
+    text-align: center;
+    padding-top: 20px;
+    color: #095720;
+    background: -webkit-linear-gradient(#095720, #16AA30);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  body {
+    background: #333333;
+    font-family: Helvetica;
+    margin: 0;
+    z-index: 0;
+  }
+
+  .background {
+    width: 60%;
+    height: 100%;
+    margin: auto;
+    background: white;
+    background-image: url("background.png");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 90%;
+    z-index: 1;
+    padding: 2%;
+  }
+
+  .content {
+    z-index: 10;
+
+  }
+
+  .large {
+    font-family: 'ElliotSix';
+    margin-top: 20%;
+    text-align: center;
+  }
+
+
+
+</style>
+</head>
+<body>
+  <div class="background">
+
+    <div class="content">
+      <div class="title">Epidemic</div>
+      <div class="large">
+        <p>A game about exponential growth</p>
+        <p>The microbes shall rule again!</p>
+        <br/>
+        <br/>
+        <p>Coming soon</p>
+      </div>
+    </div>
+  </div>
+
+
+</body>
+</html>
