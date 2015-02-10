@@ -1,3 +1,43 @@
+# Mon 09 Feb 2015
+
+Trying to build GHC aarch64:
+
+Things I've learned so far
+
+* Don't use LLVM 3.0 as Luke Iannini suggested for GHC ARM and GHC i386.
+* Doesn't look like 3.5 is support by GHC
+* Homebrew LLVM 3.4 doesn't have -arch arm64. Tried:
+    `brew install llvm34 --with-clang --all-targets`
+  That didn't work
+* Got on #haskell on irc.freenode.net. Was told that LLVM 3.6 is the one you need to use and
+  must use branch `wip/llvm-3.6`.
+
+* "perf-cross" does not work as a target in `mk/builk.mk`. Will file ticket on GHC Trac.
+* Had a problem with module System.Posix.Directory.Common not building because of `fdatasync`
+
+    error: implicit declaration of function 'fdatasync' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
+
+  I have not fixed the problem yet but was able to change HAVE_FDATASYNC
+  (in `libraries/unix/include/HsUnixConfig.h`) to:
+
+    #define HAVE_FDATASYNC 0
+
+Compiler built fine after that!
+
+---
+
+Still, not everything is rosy. When I try to build something with cabal I get
+
+    ghc: ghc no longer supports single-file style package databases
+    (dist/package.conf.inplace) use 'ghc-pkg init' to create
+    the database with the correct format.
+
+Austin Seipp says [here](http://comments.gmane.org/gmane.comp.lang.haskell.ghc.devel/6222) that
+I need to update to Cabal HEAD to get this to work.
+
+
+
+
 # Sun 08 Feb 2015
 
 Today I finally got the game building on an iPhone. However I almost immediately got this error:
