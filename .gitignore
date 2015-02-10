@@ -16,3 +16,5 @@ run.sh
 sounds/
 extra-src/Events
 Epidemic.app/
+.DS_Store
+liba.a
