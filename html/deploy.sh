@@ -1,3 +1,3 @@
 #!/bin/bash
 
-scp * 'playspace:~/sites/seanseefried.com/public/epidemic-game'
+scp * 'playspace:~/sites/declarative-games.com/public/epidemic'
