@@ -1,13 +1,13 @@
 TODO
 ----
 
+[ ] Game does not save state when you hit home button to pause.
+
+[ ] Figure out loading of assets on Android. Unzip and load.
+
 [ ] Add liquid from bottle sound effect for antibiotics
 
-[ ] Get iOS build going. Update for TestFlight
-
 [ ] Update Android build for TestFlight
-
-[ ] Keep antibiotics showing when you've finished the level
 
 [ ] Art. Make it looks like we're looking through a microscope.
 
@@ -55,6 +55,9 @@ TODO
 ----
 DONE
 ----
+[X] Keep antibiotics showing when you've finished the level
+
+[X] Get iOS build going. Update for TestFlight
 
 [X] Fix GLFun type to use pre-defined attribute locations instead of
     re-calculating each time. (See GraphicsGL.hs)
