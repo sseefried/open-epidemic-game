@@ -1,6 +1,9 @@
 TODO
 ----
 
+[ ] Create a script to do what GHC flag -staticlib does on Mac OS X.
+    See Ivan Perez's email.
+
 [ ] Game does not save state when you hit home button to pause.
 
 [ ] Figure out loading of assets on Android. Unzip and load.
