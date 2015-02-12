@@ -200,7 +200,8 @@ initialize title mbResourcePath = do
       maybe (exitWithError "Resource path must be provided to haskell_main for Android")
             return mbResourcePath
     _ -> iOSResourcePath
-  dirExists <- doesDirectoryExist resourcePath 
+  debugLog $ printf "Resource path is `%s'" resourcePath
+  dirExists <- doesDirectoryExist resourcePath
   when (not dirExists ) $ exitWithError $
     printf "Resource path `%s' does not exist" resourcePath
   (glslState, context) <- initOpenGL window (w,h) resourcePath

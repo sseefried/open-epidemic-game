@@ -85,9 +85,9 @@ library
 executable         EpidemicStaticLib
     hs-source-dirs:   src
     default-language: Haskell2010
-    ghc-options:      -W -O2 -staticlib -no-hs-main
+    ghc-options:      -W -O -staticlib -threaded -no-hs-main
     cpp-options:      -DIOS
-    main-is:          MainLib.hs
+    main-is:          IOSMain.hs
 
     c-sources: src/util.c src/freetype_util.c src/objc_util.m
     pkgconfig-depends: freetype2, cairo
