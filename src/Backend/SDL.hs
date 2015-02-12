@@ -22,6 +22,7 @@ import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Marshal.Alloc (alloca, allocaBytes)
 import           Foreign.Storable (peek)
 import           Control.Applicative ((<$>))
+import           System.Directory (doesDirectoryExist)
 import qualified Data.Map as M
 
 -- friends
@@ -199,10 +200,11 @@ initialize title mbResourcePath = do
       maybe (exitWithError "Resource path must be provided to haskell_main for Android")
             return mbResourcePath
     _ -> iOSResourcePath
-
+  dirExists <- doesDirectoryExist resourcePath 
+  when (not dirExists ) $ exitWithError $
+    printf "Resource path `%s' does not exist" resourcePath
   (glslState, context) <- initOpenGL window (w,h) resourcePath
   (levelMusic, squishSound) <- case platform of
-    Android -> return (Nothing, Nothing)
     NoSound -> return (Nothing, Nothing)
     _       -> do
       M.openAudio 44100 S.AudioS16Sys 1 1024
