@@ -84,8 +84,8 @@ compileGLSLProgram p = do
 
 ----------------------------------------------------------------------------------------------------
 
-initOpenGL :: S.Window -> (Int, Int) -> IO (GLSLState, S.GLContext)
-initOpenGL window (w,h) = do
+initOpenGL :: S.Window -> (Int, Int) -> String -> IO (GLSLState, S.GLContext)
+initOpenGL window (w,h) resourcePath = do
   --
   -- On iOS the you must set these attributes *before* the gl context is created.
   --
@@ -117,8 +117,7 @@ initOpenGL window (w,h) = do
   texCoordLoc    <- getAttributeLocation programId "texCoord"
   drawTextureLoc <- getUniformLocation   programId "drawTexture"
   colorLoc       <- getUniformLocation   programId "color"
-  base           <- resourcePath
-  fontFace       <- loadFontFace $ base ++ "/font.ttf"
+  fontFace       <- loadFontFace $ resourcePath ++ "/font.ttf"
   let glsls = GLSLState { glslProgramId   = programId
                         , glslPosition    = positionLoc
                         , glslTexcoord    = texCoordLoc
@@ -182,8 +181,8 @@ ortho2D programId bds = do
     tz   =   (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
-initialize :: String -> IO (IORef BackendState)
-initialize title = do
+initialize :: String -> Maybe String -> IO (IORef BackendState)
+initialize title mbResourcePath = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
   dims@(w,h) <- case screenDimensions of
@@ -195,17 +194,22 @@ initialize title = do
   when (w < h) $ exitWithError $
     printf "Width of screen (%d) must be greater than or equal to height (%d)" w h
   window  <- S.createWindow title (S.Position 0 0) (S.Size w h) wflags
-  (glslState, context) <- initOpenGL window (w,h)
+  resourcePath <- case platform of
+    Android ->
+      maybe (exitWithError "Resource path must be provided to haskell_main for Android")
+            return mbResourcePath
+    _ -> iOSResourcePath
+
+  (glslState, context) <- initOpenGL window (w,h) resourcePath
   (levelMusic, squishSound) <- case platform of
     Android -> return (Nothing, Nothing)
     NoSound -> return (Nothing, Nothing)
     _       -> do
       M.openAudio 44100 S.AudioS16Sys 1 1024
       M.allocateChannels 10
-      base        <- resourcePath
       -- FIXME: Add new music in
---      levelMusic  <- M.loadMUS $ base ++ "/music.wav"
-      rwOps       <- S.fromFile (base ++ "/slime-splash.wav") "r"
+      -- levelMusic  <- M.loadMUS $ base ++ "/music.wav"
+      rwOps       <- S.fromFile (resourcePath ++ "/slime-splash.wav") "r"
       squishSound <- M.loadWAVRW rwOps False
       return (Nothing, Just squishSound)
   t     <- getCurrentTime

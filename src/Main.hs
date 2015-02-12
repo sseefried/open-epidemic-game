@@ -10,5 +10,5 @@ import CUtil
 
 main :: IO ()
 main = do
-  besRef <- B.initialize "Epidemic"
+  besRef <- B.initialize "Epidemic" Nothing
   B.mainLoop besRef handleEvent

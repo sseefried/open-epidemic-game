@@ -33,12 +33,10 @@ androidLog _ = return ()
 nsLog s = withCString s cNSLog
 #endif
 
-resourcePath :: IO String
+iOSResourcePath :: IO String
 #ifdef ANDROID
-resourcePath = return "unknown"
+iOSResourcePath = return "This is an Android build. There is not iOS resource path"
 #else
-foreign import ccall "resource_path" cResourcePath :: IO CString
-resourcePath = do
-  cstr <- cResourcePath
-  peekCString cstr
+foreign import ccall "ios_resource_path" ciOSResourcePath :: IO CString
+iOSResourcePath = ciOSResourcePath >>= peekCString
 #endif
