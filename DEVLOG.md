@@ -1,3 +1,9 @@
+# Thu 12 Feb 2015
+
+To learn more about the directory structure of an Android project.
+
+http://www.compiletimeerror.com/2013/01/directorystructure-of-android-project.html#.VNvc4mSUc6E
+
 # Mon 09 Feb 2015
 
 Trying to build GHC aarch64:
