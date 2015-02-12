@@ -11,11 +11,10 @@ import System.Environment
 import Game
 import Backend.SDL as B
 
-foreign export ccall "haskell_main" main :: IO ()
+foreign export ccall "haskell_main" main :: CString -> IO ()
 
-main :: IO ()
-main = do
-  args <- getArgs
+main :: Maybe String -> IO ()
+main mbResourcePath = do
   let mbResourcePath = case args of
                        p:_ -> Just p
                        []  -> Nothing
