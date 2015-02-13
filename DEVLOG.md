@@ -1,3 +1,31 @@
+# Fri 13 Feb 2015
+
+Learned all about signing apps today. On Android you manage your own keystore and private keys
+for signing your apps.
+
+http://developer.android.com/tools/publishing/app-signing.html
+
+---
+
+I've now managed to sign an app and upload it to the Google Play store. I've also created
+a Google Group called "Declarative Games Epidemic Testers". I can't yet publish the game because
+there are a whole bunch of things I need to fill in:
+
+* You need to add a high-res icon. [English (United Kingdom) – en-GB]
+* You need to add a feature graphic. [English (United Kingdom) – en-GB]
+* You need to add at least 2 non-Android TV screenshots. [English (United Kingdom) – en-GB]
+* You need to select a category.
+* You need to select a content rating.
+* You need to add a short description. [English (United Kingdom) – en-GB]
+* You need to add a full description. [English (United Kingdom) – en-GB]
+* You need to acknowledge that this application meets the Content Guidelines.
+* You need to acknowledge that this application complies with US export laws.
+* You need to target at least one country.
+* You need to enter a privacy policy URL.
+* You need to make your application free or set a price for it.
+
+Okay, ouch. Will do this soon.
+
 # Thu 12 Feb 2015
 
 To learn more about the directory structure of an Android project.

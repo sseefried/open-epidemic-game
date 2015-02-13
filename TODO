@@ -1,6 +1,11 @@
 TODO
 ----
 
+[ ] Put a delay in when it's running at 60fps. Don't want to consume too
+    much power.
+
+[ ] Remove the status bar on iOS version
+
 [ ] Rebuild 7.11 ARMv7 cross compiler. Avoid the bugs that seem to be in it.
 
 [ ] Create a script to do what GHC flag -staticlib does on Mac OS X.
