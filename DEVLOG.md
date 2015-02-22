@@ -1,3 +1,45 @@
+# Sun 22 Feb 2015
+
+I've decided to not work on anything but my game for another month. Hopefully I can get at least
+100 hours more done on the game by the end of March.
+
+---
+
+Some more design ideas
+
+* smaller germs that move around in the background and don't really do anything.
+* small, cigar shaped germs (perhaps with cillia!) that move around in the foreground and are
+  hard to catch.
+* hold down on a germ instead of tapping it and watch its health drop. Can hold down a maximum
+  of n germs at a time. Perhaps you unlock "holding down multiple germs at a time" as a power.
+* germs should shrink from a death. Could yield some really nice flocking behaviour or allow you to
+  herd them.
+* Perhaps germs consume food in order to grow? Then herding them would be a good way to keep them
+  from growing further.
+
+---
+
+If I'm really going to get some good data of a game, I think I'm going to need to be able to
+record games. Thinking about this reminds me of a Gamasutra article I saw years ago in which
+someone spoke about floating point error leading to chaotic behavior. I'm going to have to record
+something like
+
+* cumulative time
+* stats of every germ. Position, size, etc
+* event times.
+
+I then need to get people to send me the recordings and play the recordings to see how people
+are playing the game.
+
+# Wed 18 Feb 2015
+
+I wanted to record what I wrote to Rauri about the performance of Cairo in drawing germs.
+
+"For resolution 568x320 (the non-retina display resolution of an iPhone 5) we get that
+drawing 400 germs has a theoretical maximum frame rate of ... 43 frames/s. This is with no game
+logic and certainly no physics."
+
+
 # Fri 13 Feb 2015
 
 Learned all about signing apps today. On Android you manage your own keystore and private keys
@@ -25,6 +67,11 @@ there are a whole bunch of things I need to fill in:
 * You need to make your application free or set a price for it.
 
 Okay, ouch. Will do this soon.
+
+---
+
+Hah, all of this wasn't that hard to do. Just filled it in with a bunch of dummy data.
+No problem at all.
 
 # Thu 12 Feb 2015
 
