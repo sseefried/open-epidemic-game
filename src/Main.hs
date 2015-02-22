@@ -6,7 +6,6 @@ module Main where
 -- friends
 import Game
 import Backend.SDL as B
-import CUtil
 
 main :: IO ()
 main = do
