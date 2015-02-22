@@ -341,7 +341,8 @@ applyAntibiotics (R2 x y)= do
   let abClicked abd =
         let R2 x' y' = abPos abd
             w        = antibioticWidth
-        in x >= x' - w/2 && x <= x' + w/2 && y >= y' - w/2 && y <= y' + w/2
+        in x >= x' - w/2 && x <= x' + w/2 && y >= y' - w/2 && y <= y' + w/2 &&
+           abEnabled abd
       killWithAB ab gs = M.filter (\g -> ab `elem` germResistances g) (gsGerms gs)
   case (M.toList . M.filter abClicked $ gsAntibiotics gs) of
     []         -> return ()
@@ -349,7 +350,7 @@ applyAntibiotics (R2 x y)= do
       let germs' = killWithAB ab gs
       modify $ \gs -> gs { gsGerms      = germs'
                          , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
-      modifyAntibioticEffectiveness (effectivenessDilutionFactor*) ab -- FIXME: magic number
+      modifyAntibioticEffectiveness (effectivenessDilutionFactor*) ab
 
 ----------------------------------------------------------------------------------------------------
 pointCollides :: R2 -> Germ -> GameM Bool
