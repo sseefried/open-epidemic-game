@@ -9,7 +9,7 @@ if [ $# -gt 0 ]; then
 
 fi
 
-cabal configure $DEBUG_FLAG
-cabal build exe:Epidemic
-macosx-app dist/build/Epidemic/Epidemic
-open Epidemic.app
+cabal configure $DEBUG_FLAG && \
+  cabal build exe:Epidemic && \
+  macosx-app dist/build/Epidemic/Epidemic && \
+  open Epidemic.app
