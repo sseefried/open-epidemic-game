@@ -35,6 +35,6 @@ generateIcons args = do
 
 main :: IO ()
 main = do
-  generateIcons ((1200, Just 0.10):zip [144, 120, 114, 96, 80, 72, 57, 58, 29, 48] (repeat Nothing))
+  generateIcons ((1200, Just 0.10):zip [512, 144, 120, 114, 96, 80, 72, 57, 58, 29, 48] (repeat Nothing))
 
 
