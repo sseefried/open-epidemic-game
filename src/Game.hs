@@ -533,15 +533,26 @@ playingLevelUnselect p = do
   return FSMPlayingLevel
 
 ----------------------------------------------------------------------------------------------------
+-- FIXME: Move somewhere else
+unselect :: Germ -> Germ
+unselect g = g { germSelected = False }
+----------------------------------------------------------------------------------------------------
 playingLevelDrag :: R2 -> R2 -> GameM FSMState
 playingLevelDrag p p' = do
   germsToDrag <- germsSatisfyingM (pointCollides p)
   case germsToDrag of
     []         -> return ()
-    (_,g):_ -> do
-      runOnHipState $ setHipCircPosVel (germHipCirc g) p' (R2 0 0)
+    gp@(_,g):_ -> do
+      inField <- isInGameField g
+      if inField then runOnHipState $ setHipCircPosVel (germHipCirc g) p' (R2 0 0)
+                 else updateGerm unselect gp
   return FSMPlayingLevel
-
+  where
+    isInGameField :: Germ -> GameM Bool
+    isInGameField g = do
+      gs <- get
+      R2 x y <- runHipM (gsHipState gs) $ getHipCircPos $ germHipCirc g
+      return $ x >= fieldLeft && x <= fieldRight && y >= fieldBottom && y <= fieldTop
 ----------------------------------------------------------------------------------------------------
 -- FIXME: Use a bloody lens!
 enableAntibiotic :: Antibiotic -> GameM ()
