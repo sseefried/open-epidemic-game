@@ -226,7 +226,6 @@ drawToMipmapTexture renderFun = do
   -- gl_TEXTURE_MAG_FILTER accepts gl_NEAREST or gl_LINEAR
   glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
   forM_ (zip textureWidths [0..]) $ \(x,i) -> do
-    let xd = fromIntegral x
     renderCairoToTexture textureId (Just i) (x,x) $ renderFun (fromIntegral x/2)
   return textureId
   where

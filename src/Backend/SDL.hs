@@ -354,22 +354,20 @@ runPhysicsEventHandler besRef handleEvent = do
   duration <- (realToFrac . diffUTCTime t) <$> projIORef besLastTime besRef
   -- Actions that must always be run
   withIORef besRef $ \bes -> do
+    addTick (besFRBuf bes) duration
     let gs       = besGameState bes
         fsmState = besFSMState  bes
     (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
     playSoundQueue bes (gsSoundQueue gs')
     -- update the fsmState and gameState.
-    return $ bes { besFSMState = fsmState'
-                 , besLastTime = t
-                 , besGameState = gs' { gsSoundQueue = [] } }
+    return $ bes { besFSMState  = fsmState'
+                 , besLastTime  = t
+                 , besGameState = gs' { gsSoundQueue = [] }
+                 , besFrames    = besFrames bes + 1 }
 
   -- Actions that should be run in various game states.
   withIORef besRef $ \bes -> do
     case besFSMState bes of
-      FSMPlayingLevel -> do
-        -- If there are any queued sounds play them now
-        addTick (besFRBuf bes) duration
-        return $ bes { besFrames = besFrames bes + 1 }
       _ -> return bes
 
 ----------------------------------------------------------------------------------------------------
@@ -400,10 +398,19 @@ mainLoop besRef handleEvent = loop $ do
   runFrameUpdate       besRef
   runInputEventHandler besRef handleEvent
   runPhysicsEventHandler besRef handleEvent
+  delayBasedOnAverageFramerate besRef
   logFrameRate besRef
   where
     loop :: IO () -> IO ()
     loop io = io >> loop io
+
+----------------------------------------------------------------------------------------------------
+delayBasedOnAverageFramerate :: IORef BackendState -> IO ()
+delayBasedOnAverageFramerate besRef = do
+  bes <- readIORef besRef
+  avTick <- averageTick (besFRBuf bes)
+  let t = ceiling $ (max (1/desiredFramerate - avTick) 0) * 1000.0
+  S.delay t
 
 ----------------------------------------------------------------------------------------------------
 logFrameRate :: IORef BackendState -> IO ()

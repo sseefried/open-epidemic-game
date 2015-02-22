@@ -163,6 +163,9 @@ unlockAntibioticsMap = M.fromList $ case debugGame of
   True  -> [(5, Penicillin), (10, Cyprofloxacin)]
   False -> [(25, Penicillin), (100, Cyprofloxacin)]
 
+desiredFramerate :: Double
+desiredFramerate = 60
+
 ----------------------------------------------------------------------------------------------------
 -- Derived constants. (Do not change)
 
