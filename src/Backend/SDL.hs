@@ -352,23 +352,24 @@ runPhysicsEventHandler :: IORef BackendState -> (FSMState -> Event -> GameM FSMS
 runPhysicsEventHandler besRef handleEvent = do
   t <- getCurrentTime
   duration <- (realToFrac . diffUTCTime t) <$> projIORef besLastTime besRef
+  -- Actions that must always be run
   withIORef besRef $ \bes -> do
-    let gs = besGameState bes
-        fsmState = besFSMState bes
+    let gs       = besGameState bes
+        fsmState = besFSMState  bes
     (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
     playSoundQueue bes (gsSoundQueue gs')
     -- update the fsmState and gameState.
     return $ bes { besFSMState = fsmState'
+                 , besLastTime = t
                  , besGameState = gs' { gsSoundQueue = [] } }
 
-  -- extra actions
+  -- Actions that should be run in various game states.
   withIORef besRef $ \bes -> do
     case besFSMState bes of
       FSMPlayingLevel -> do
         -- If there are any queued sounds play them now
         addTick (besFRBuf bes) duration
-        return $ bes { besLastTime = t
-                     , besFrames = besFrames bes + 1 }
+        return $ bes { besFrames = besFrames bes + 1 }
       _ -> return bes
 
 ----------------------------------------------------------------------------------------------------

@@ -70,9 +70,10 @@ generateGerm mbGerm initSize hipCirc = do
                 , germSelected       = False
                 , germResistances    = germResistances
                 }
-
+----------------------------------------------------------------------------------------------------
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
 randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
+
 ----------------------------------------------------------------------------------------------------
 
 randomGermResistances :: RandomGen g => Map Antibiotic AntibioticData -> Rand g [Antibiotic]
@@ -362,8 +363,8 @@ pointCollides (R2 x y) g = do
 -- the size of the germ. I found that visually it works better if it grows as (1 / sqrt size)
 -- but I have yet to determine why this looks so natural.
 --
--- I have a suspicion that is has something to do with the area of the germ.
-
+-- I have a suspicion that it has something to do with the area of the germ. To put it another way
+-- small things move faster when their area is small.
 --
 growGerm :: Time -> GermId -> GameM ()
 growGerm duration germId = do
