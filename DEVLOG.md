@@ -1,3 +1,32 @@
+# Mon 23 Feb 2015
+
+Turns out that I need to put up a different version of the game on Google Play that is free.
+I only needed to do a few things:
+
+a) Change the `name` field of the `<project>` tag in `build.xml`. (I added a ".beta")
+b) Create a new private key alias "epidemic-beta" and sign with that. Do this by
+   editing `ant.properties`.
+c) Change title of app to "Epidemic Beta" in `res/values/strings.xml`
+d) Change the package name in `AndroidManifest.xml`. This is the path to the java source.
+e) Create a new class `src/com/declarative/games/epidemic/beta/Activity.java`
+
+This is the key signing command.
+
+     keytool -genkey -v -keystore declarative-games.keystore \
+       -alias epidemic-beta -keyalg RSA -keysize 2048 -validity 10000
+
+---
+
+I want to create an interactive environment where I can reload and display Cairo graphics from
+GHCi. Nothing too fancy. No need to watch a file an recompile it each time it changes.
+I'm quite happy just to type
+
+    :r
+    display <some cairo effect>
+
+What I want it to is render the Cairo graphic to a PNG and then open that with Preview.
+I can't imagine this is going to be too hard.
+
 # Sun 22 Feb 2015
 
 I've decided to not work on anything but my game for another month. Hopefully I can get at least
