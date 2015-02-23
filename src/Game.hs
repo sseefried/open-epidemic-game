@@ -574,7 +574,7 @@ modifyAntibiotic f ab = do
   let m = gsAntibiotics gs
   case M.lookup ab m of
     Just abd -> do
-      printStrLn "Antibiotic modifed\n"
+      printStrLn "Antibiotic modified\n"
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()
