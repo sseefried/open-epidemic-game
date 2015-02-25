@@ -1,3 +1,9 @@
+# Wed 25 Feb 2015
+
+More feedback:
+
+* It's not clear when you're "about to die" in the game. Perhaps make that clearer.
+
 # Mon 23 Feb 2015
 
 Turns out that I need to put up a different version of the game on Google Play that is free.
