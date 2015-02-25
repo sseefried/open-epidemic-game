@@ -13,3 +13,5 @@ cabal configure $DEBUG_FLAG && \
   cabal build exe:Epidemic && \
   macosx-app dist/build/Epidemic/Epidemic && \
   open Epidemic.app
+
+cp resources/* Epidemic.app/Contents/Resources
