@@ -251,7 +251,7 @@ handleEvent fsmState ev = do
       gs <- get
       let levelCompleteMsg = do
             let textRender = drawTextOfWidth_ levelCompleteGrad (R2 0 0) fieldWidth
-                               "Epidemic averted!"
+                               "Cured!"
             clearRender
             sideBarRender
             addRender textRender
