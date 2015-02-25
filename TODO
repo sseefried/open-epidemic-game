@@ -1,6 +1,8 @@
 TODO
 ----
 
+[ ] Look at the battery usage of the game on Android.
+
 [ ] Android: Rethink using external storage to decompress assets. It requires
     a permission.
 
