@@ -2,7 +2,7 @@
 
 This directory contains screen shots. I explain each shot and the design decisions behind it here.
 
-## 2015-01-11-letter-boxing.png
+## *2015-01-11* Letter boxing
 
 **Git commit**: 44d5b8315bd330f4a22afe0e7b8dc3a2cc8a1647
 
@@ -20,7 +20,9 @@ to contain the antibiotics that players will unlock while provide a square game 
 You'll notice in the pic that the "Infected!" message only covers the game field. I might
 change this in the future.
 
-## 2015-01-21-antibiotics.png
+![Letter boxing](2015-01-11-letter-boxing.png)
+
+## *2015-01-21* Antibiotics
 
 **Git commit**: f7c29d8e5c1d55e9ec51ed626dfbc12bad2d6d6e
 
@@ -34,27 +36,40 @@ or an area of effect based on where it was dropped. Probably the former as the l
 implications for strategy and design. The implication on design is that I'll have to signify
 somehow the area of effect.
 
-## 2015-01-22-mutation.png
+![Antibiotics](2015-01-21-antibiotics.png)
+
+## *2015-01-22* Mutation
 
 **Git commit**: 68565a0be335d4e65fd55485acb9c994846f246e
 
 The germs now mutate and inherit from each other.
 
-## 2015-01-24-score.png
+![Mutation](2015-01-22-mutation.png)
+
+## *2015-01-24* Score
 
 **Git commit**: 42cc56818e663d36ddc45e273807850571e6e794
 
 Score has been added.
 
-## 2015-01-25-gradient.png
+![Score](2015-01-24-score.png)
+
+
+## *2015-01-25* Gradient
 
 **Git commit**: eaa5f33065a1e4eb0da51215ef4e201fe02b5841
+
+![Gradient](2015-01-25-gradient.png)
 
 Gradients to text added. "Tap to continue" message added. This appears a small time after
 the "Epidemic averted!" or "Infected!" message so that people don't inadvertently tap into the
 next level without seeing that they completed a level or died.
 
-## 2015-02-26-antibiotic-flasks.png
+## 2015-02-26 Antibiotic flasks
+
+**Git commit: 723fd72027f255b7e2bc1bae21eee0f72a659568**
+
+Wrote some code to draw the antibiotic flask. Here's an evolution of my work over the last 30 minutes.
 
 ![Flask 1](flask-0.png)
 ![Flask 2](flask-1.png)
