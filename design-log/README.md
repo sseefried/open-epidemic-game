@@ -59,7 +59,7 @@ Score has been added.
 
 **Git commit**: eaa5f33065a1e4eb0da51215ef4e201fe02b5841
 
-![Gradient](2015-01-25-gradient.png)
+![Gradient](2015-01-25-gradients.png)
 
 Gradients to text added. "Tap to continue" message added. This appears a small time after
 the "Epidemic averted!" or "Infected!" message so that people don't inadvertently tap into the
