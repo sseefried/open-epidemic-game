@@ -65,9 +65,15 @@ Gradients to text added. "Tap to continue" message added. This appears a small t
 the "Epidemic averted!" or "Infected!" message so that people don't inadvertently tap into the
 next level without seeing that they completed a level or died.
 
-## 2015-02-26 Antibiotic flasks
+## **2015-01-28** True Type fonts with Freetype 2
 
-**Git commit: 723fd72027f255b7e2bc1bae21eee0f72a659568**
+**Git commit**: 29bcb7b7a58417ea2ff33a4aa9e692b606c6de7a
+
+![True type fonts](2015-01-28-freetype.png)
+
+## *2015-02-26* Antibiotic flasks
+
+**Git commit:** 723fd72027f255b7e2bc1bae21eee0f72a659568
 
 Wrote some code to draw the antibiotic flask. Here's an evolution of my work over the last 30 minutes.
 
