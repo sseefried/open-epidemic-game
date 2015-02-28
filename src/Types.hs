@@ -139,11 +139,11 @@ maxGerms :: Int
 maxGerms = 50
 
 startingAntibioticEffectiveness :: Double
-startingAntibioticEffectiveness = 0.9 -- percentage
+startingAntibioticEffectiveness = 0.92 -- percentage
 
 -- Amount we multiply effectiveness by each time antibiotic is used
 effectivenessDilutionFactor :: Double
-effectivenessDilutionFactor = 0.97
+effectivenessDilutionFactor = 0.90
 
 -- the maximum amount that a component of a Color (R,G,B) can
 -- mutate by (either up or down)
