@@ -1,6 +1,8 @@
 High priority
 -------------
 
+[ ] Increase the doubling speed so you can't just stay in level 1
+
 [ ] Fix the memory leak
 
 [ ] Start respecting AppDidEnterBackground events and put the game in a
