@@ -1,5 +1,5 @@
-TODO
-----
+High priority
+-------------
 
 [ ] Fix the memory leak
 
@@ -9,26 +9,32 @@ TODO
 [ ] Only draw what is absolutely necessary on the non-playing state screens.
     Try to keep gsRenderDirty False as much as possible.
 
-[ ] Refactor the GameState to be opaque so that you can hide annoying
-    stuff like the gsRenderDirty/gsRender pair behind one concept.
-
 [ ] Cache the antibiotic graphic so it's not redrawn every time.
 
 [ ] Look at the battery usage of the game on Android.
+
+[ ] Remove the status bar on iOS version
+
+[ ] Game does not save state when you hit home button to pause. Reported
+    by Andy. Check.
+
+[ ] Add liquid from bottle sound effect for antibiotics
+
+[ ] Change the z-index on the germ being dragged!
+
+------------
+Low priority
+------------
+[ ] Refactor the GameState to be opaque so that you can hide annoying
+    stuff like the gsRenderDirty/gsRender pair behind one concept.
 
 [ ] Android: Rethink using external storage to decompress assets. It requires
     a permission.
 
 [ ] add an effect where the screen cracks when you get infected.
 
-[ ] Remove the status bar on iOS version
-
 [ ] Create a script to do what GHC flag -staticlib does on Mac OS X.
     See Ivan Perez's email.
-
-[ ] Game does not save state when you hit home button to pause
-
-[ ] Add liquid from bottle sound effect for antibiotics
 
 [ ] Art: Make it looks like we're looking through a microscope.
 
@@ -36,20 +42,19 @@ TODO
 
 [ ] Art: Add a "dirty screen" effect via a shader
 
-
-[ ] Change the z-index on the germ being dragged!
-
 [ ] Rename Physics event to Idle event.
 
 [ ] Turn GLScript into a free monad too.
 
 [ ] Speed up the algorithm to search and kill germs
 
+
 [ ] Blur effect: I'd like to add a blur effect to the game to make it truly look like
    a petrie dish. It's going to be hard to get the performance acceptable.
    After just a little preliminary reading I don't think I just want to do
    a Guassian blur but rather to use a more sophisticated depth of field
    effect or "bokeh" effect.
+
 
 
 ----
