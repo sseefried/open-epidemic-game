@@ -273,22 +273,19 @@ randomColor = do
 --
 -- Instead of sharp corners, we draw a quadratic bezier curve with control points (2', 2, 2'')
 --
-
-flask :: Render ()
-flask = do
+--
+flask :: Color -> Render ()
+flask liquidColor = do
   let neckWidth = 0.2
       bodyWidth = 1.0
       neckHeight = totalHeight - bodyHeight
       bodyHeight = 0.7*totalHeight
       totalHeight = 0.97
-      originX = 0
-      originY = 0
       roundFactor = 0.25 -- percent
       neckRoundFactor = 0.03
       spoutRoundFactorX = 0.04
       spoutRoundFactorY = 0.05
       liquidFactor = 0.75 -- percentage full (not by volume, by height)
-  setColor green
   setLineWidth 0.02
   setLineCap LineCapRound
   ----
@@ -313,34 +310,29 @@ flask = do
       (x2,y2)   = (bodyWidth/2, -totalHeight/2)
       (x2b,y2b) = (x2 - dy, y2)
   ----
-  moveTo lx ly
-  lineTo x2a y2a
-  quadraticCurveTo (x2, y2) (x2b, y2b)
-  lineTo (-x2b) (y2b)
-  quadraticCurveTo (-x2, y2) (-x2a, y2a)
-  lineTo (-lx) ly
-  lineTo lx ly
+  let drawBody x' y' = do
+        moveTo x' y'
+        lineTo x2a y2a
+        quadraticCurveTo (x2, y2) (x2b, y2b)
+        lineTo (-x2b) (y2b)
+        quadraticCurveTo (-x2, y2) (-x2a, y2a)
+        lineTo (-x') y'
+
+  setColor liquidColor
+  drawBody lx ly
   fill
 
-
-  setColor black
+  setColor $ Color 0.5 0.5 0.5 1
   moveTo x0a y0a
   quadraticCurveTo (x0, y0) (x0b, y0b)
   lineTo x1a y1a
-
   quadraticCurveTo (x1, y1) (x1b, y1b)
-  lineTo x2a y2a
-  quadraticCurveTo (x2, y2) (x2b, y2b)
-  lineTo (-x2b) (y2b)
-  quadraticCurveTo (-x2, y2) (-x2a, y2a)
-  lineTo (-x1b) y1b
+
+  drawBody x1b y1b
+
   quadraticCurveTo (-x1, y1) (-x1a, y1a)
-
-
-
   lineTo (-x0b) y0b
   quadraticCurveTo (-x0, y0) (-x0a, y0a)
-
   stroke
 
 ----------------------------------------------------------------------------------------------------
