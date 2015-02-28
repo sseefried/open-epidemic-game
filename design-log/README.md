@@ -7,6 +7,12 @@ This directory contains screen shots. I explain each shot and the design decisio
 It's in reverse order so you might want to scroll down to the bottom to see how the game looked
 at the beginning.
 
+## *2015-02-28* Antibiotic flasks add to game
+
+**Git commit:** f7e2bff0f7ec0711fcac979bb0d3592993a3bb08
+
+![Flasks](2015-02-28-flasks-added.png)
+
 ## *2015-02-26* Antibiotic flasks
 
 **Git commit:** 723fd72027f255b7e2bc1bae21eee0f72a659568
