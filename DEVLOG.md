@@ -4,6 +4,12 @@ Game play idea. Perhaps the area of effect of an antibiotic should not the compl
 As the antibiotics get less potent they fade in colour until they become
 clear eventually.
 
+---
+
+I discovered that once I've installed from Google Play I can't do my ordinary Android
+'full-build.sh' to get it on my phone. I must first uninstall it and then run 'full-build.sh'
+again.
+
 # Fri 27 Feb 2015
 
 I've got a nice flask graphic but now I want to make the contents of the flask fade out
