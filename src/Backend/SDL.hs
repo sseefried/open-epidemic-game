@@ -274,11 +274,11 @@ runFrameUpdate besRef = do
       f2f = realToFrac
   bes <- readIORef besRef
   let gs  = besGameState bes
-      (Color r g b a) = backgroundColor -- FIXME: Shouldn't be transparent
+      (Color r g b _) = backgroundColor -- FIXME: Shouldn't be transparent
       glsls = besGLSLState bes
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
-    glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
+    glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
     runGLMIO glsls (gsRender gs)
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
