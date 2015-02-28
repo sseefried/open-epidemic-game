@@ -1,6 +1,8 @@
 TODO
 ----
 
+[ ] Fix the memory leak
+
 [ ] Start respecting AppDidEnterBackground events and put the game in a
     quiescent state.
 
