@@ -163,6 +163,13 @@ unlockAntibioticsMap = M.fromList $ case debugGame of
   True  -> [(5, Penicillin), (10, Cyprofloxacin)]
   False -> [(25, Penicillin), (100, Cyprofloxacin)]
 
+-- [antibioticColor] generates a color for the liquid in the antibiotic based on
+-- the antibiotic and its effectiveness
+antibioticRGB :: Antibiotic -> (Double,Double,Double)
+antibioticRGB ab = case ab of
+  Penicillin    -> (0,1,0)
+  Cyprofloxacin -> (1,0,1)
+
 desiredFramerate :: Double
 desiredFramerate = 60
 
@@ -402,3 +409,10 @@ allAntibiotics = let p = Penicillin in [p..]
 numAntibiotics :: Int
 numAntibiotics = length allAntibiotics
 
+-- FIXME: This probably needs to be moved somewhere.
+-- [antibioticColor] generates a color for the liquid in the antibiotic based on
+-- the antibiotic and its effectiveness
+antibioticColor :: Antibiotic -> Double -> Color
+antibioticColor ab effectiveness =
+  let (r,g,b) = antibioticRGB ab
+  in Color r g b (effectiveness/startingAntibioticEffectiveness)

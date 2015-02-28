@@ -14,8 +14,6 @@ import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Word (Word8)
 import           Control.Monad
-import           Text.Printf
-
 
 import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
@@ -335,18 +333,12 @@ germGfxToGermGL gfx = GLM $ const $ do
 --
 -- Draw antibiotic *centred* at (x, y)
 --
-drawAntibiotic :: R2 -> Double -> GLM ()
-drawAntibiotic (R2 x y) resistance = do
+drawAntibiotic :: R2 -> Antibiotic -> Double -> GLM ()
+drawAntibiotic (R2 x y) ab effectiveness = do
   let s = antibioticWidth
-      r = s/2
-  st <- getGLSLState
   renderCairoToQuad (x,y) (s,s) $ do
-    C.setSourceRGBA 0.5 0.5 0.5 1 -- grey -- FIXME: Colour dependent on antibiotic
-    circle (0,0) r
-    C.fill
-    textOfWidth_ (glslFontFace st) (Color 0 0 0 1, Color 1 1 1 1) -- FIXME: Make a constant
-      (0,0) (s*0.8) (printf "%3.1f%%" $ resistance * 100.0)
-
+    C.scale s s
+    flask (antibioticColor ab effectiveness)
 ----------------------------------------------------------------------------------------------------
 drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do

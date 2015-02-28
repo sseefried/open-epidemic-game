@@ -500,8 +500,8 @@ sideBarRender :: GameM ()
 sideBarRender = do
   gs <- get
   let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
-      drawOneAntibiotic (_, abd) =
-        when (abEnabled abd) $ drawAntibiotic (abPos abd) (abEffectiveness abd)
+      drawOneAntibiotic (ab, abd) =
+        when (abEnabled abd) $ drawAntibiotic (abPos abd) ab (abEffectiveness abd)
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
   --
   let renderScore = do
@@ -581,3 +581,5 @@ whenEventsMutedOtherwise :: UTCTime -> GameM a -> GameM a -> GameM a
 whenEventsMutedOtherwise t dflt gm = do
   d <- timeSince t
   if (d >= eventMuteTime) then gm else dflt
+
+----------------------------------------------------------------------------------------------------
