@@ -1,3 +1,20 @@
+# Sat 28 Feb 2015
+
+Game play idea. Perhaps the area of effect of an antibiotic should not the complete screen.
+As the antibiotics get less potent they fade in colour until they become
+clear eventually.
+
+# Fri 27 Feb 2015
+
+I've got a nice flask graphic but now I want to make the contents of the flask fade out
+slowly as the antibiotic becomes less effective. If I was drawing each frame this would be easy.
+Just use a different colour each time, but I've switched to using a one-time mipmapping
+strategy.
+
+But wait, this was only for performance reasons! There's no problem with redrawing the graphic
+each time with a slightly faded colour. I don't even need to mipmap since the graphic is never
+scaled, unlike the germs.
+
 # Wed 25 Feb 2015
 
 More feedback:

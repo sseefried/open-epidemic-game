@@ -1,7 +1,16 @@
 TODO
 ----
 
-[ ] Add Score field
+[ ] Start respecting AppDidEnterBackground events and put the game in a
+    quiescent state.
+
+[ ] Only draw what is absolutely necessary on the non-playing state screens.
+    Try to keep gsRenderDirty False as much as possible.
+
+[ ] Refactor the GameState to be opaque so that you can hide annoying
+    stuff like the gsRenderDirty/gsRender pair behind one concept.
+
+[ ] Cache the antibiotic graphic so it's not redrawn every time.
 
 [ ] Look at the battery usage of the game on Android.
 
@@ -10,38 +19,23 @@ TODO
 
 [ ] add an effect where the screen cracks when you get infected.
 
-[ ] Put a delay in when it's running at 60fps. Don't want to consume too
-    much power.
-
 [ ] Remove the status bar on iOS version
-
-[ ] Rebuild 7.11 ARMv7 cross compiler. Avoid the bugs that seem to be in it.
 
 [ ] Create a script to do what GHC flag -staticlib does on Mac OS X.
     See Ivan Perez's email.
 
-[ ] Game does not save state when you hit home button to pause.
-
-[ ] Figure out loading of assets on Android. Unzip and load.
+[ ] Game does not save state when you hit home button to pause
 
 [ ] Add liquid from bottle sound effect for antibiotics
 
-[ ] Update Android build for TestFlight
-
-[ ] Art. Make it looks like we're looking through a microscope.
-
-[ ] Only kill germs affected by antibiotic
+[ ] Art: Make it looks like we're looking through a microscope.
 
 [ ] Start using lenses. e.g. for enabling antibiotics
 
-[ ] BUG: Solve the problem of the "action bar" showing on the game.
+[ ] Art: Add a "dirty screen" effect via a shader
 
-[ ] Add a "dirty screen" effect via a shader
-
-[ ] Make sure germ being dragged stays in bounds!
 
 [ ] Change the z-index on the germ being dragged!
-
 
 [ ] Rename Physics event to Idle event.
 
@@ -49,31 +43,30 @@ TODO
 
 [ ] Speed up the algorithm to search and kill germs
 
-[ ] I need to get the radii of the germs right, which I think is going
-   to be a bit of a chore. The problem is that the edges of the germs are
-   Bezier curves where the control points lie outside the actual
-   physical edge of the curve. (The control points lie on what I'll dub the
-   "notional radius" of the germs.) Unless I calculate what the outermost point
-   of the germs are using Bezier maths I can't really know what the *true*
-   radius of the germs is. Since the notional radius is used for collision
-   detection it looks like the germs are colliding when their edges aren't
-   touching. Perhaps this isn't a problem, and I can live with it. It's
-   not like the collisions where ever going to be "pixel perfect".
-
-[ ] I'd like to add a blur effect to the game to make it truly look like
+[ ] Blur effect: I'd like to add a blur effect to the game to make it truly look like
    a petrie dish. It's going to be hard to get the performance acceptable.
    After just a little preliminary reading I don't think I just want to do
    a Guassian blur but rather to use a more sophisticated depth of field
    effect or "bokeh" effect.
 
-[ ] I want the antibiotics to be dragged and dropped on top of the germs
-   and to have an area of effect that is not the complete screen. As the
-   antibiotics get less potent they fade in colour until they become
-   clear eventually.
 
 ----
 DONE
 ----
+[X] Make sure germ being dragged stays in bounds!
+
+[X] BUG: Solve the problem of the "action bar" showing on the game.
+
+[X] Only kill germs affected by antibiotic
+
+
+[X] Figure out loading of assets on Android. Unzip and load.
+
+[X] Put a delay in when it's running at 60fps. Don't want to consume too
+    much power.
+
+[X] Add Score field
+
 [X] Keep antibiotics showing when you've finished the level
 
 [X] Get iOS build going. Update for TestFlight
