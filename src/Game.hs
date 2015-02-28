@@ -195,14 +195,17 @@ handleEvent fsmState ev = do
                          , gsSoundQueue   = [GameSoundLevelMusicStart]
                          , gsCurrentLevel = i
                          }
-      -- FIXME: Remove. Penicillin should not be enabled initially.
       return $ FSMPlayingLevel
     --------------------------------------
     fsmPlayingLevel :: GameM FSMState
     fsmPlayingLevel = do
       gs <- get
       if M.size (gsGerms gs) > maxGerms
-       then do { t <- getTime; return $ FSMGameOver t }
+       then do
+         t <- getTime
+         addRender $ drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
+         modify $ \gs -> gs {  gsSoundQueue = [GameSoundLevelMusicStop] }
+         return $ FSMGameOver t
        else do
         case ev of
           Tap p            -> playingLevelTap p
@@ -259,24 +262,18 @@ handleEvent fsmState ev = do
         case ev of
           _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
           _                 -> levelCompleteMsg *>> tapToContinue
+    ----------------
+
     --------------------------------------
     fsmGameOver :: UTCTime -> GameM FSMState
     fsmGameOver t         = do
-      let infectedMsg = do
-            modify $ \gs ->
-              gs { gsRender = do
-                     gsRender gs -- draw what we had before
-                     drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
-                 , gsSoundQueue = [GameSoundLevelMusicStop]
-                 }
-            return $ FSMGameOver t
-
-      whenEventsMutedOtherwise t infectedMsg $ do
+      let idle = return $ FSMGameOver t
+      whenEventsMutedOtherwise t idle $ do
         case ev of
           _ | isContinue ev -> do
             resetGameState
             return $ FSMLevel startLevelGerms
-          _ -> infectedMsg *>> tapToContinue
+          _ -> idle *>> tapToContinue
 
 tapToContinue :: GameM ()
 tapToContinue = addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
