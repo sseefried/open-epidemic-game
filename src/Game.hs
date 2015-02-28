@@ -172,7 +172,7 @@ handleEvent :: FSMState -> Event -> GameM FSMState
 handleEvent fsmState ev = do
   -- events that can occur in any FSM State
   case ev of
-    Reset  -> resetGameState >> (return $ FSMLevel 1)
+    Reset  -> resetGameState >> (return $ FSMLevel startLevelGerms)
     _  -> (case fsmState of -- events that depend on current FSM State
              FSMLevel i                 -> fsmLevel i
              FSMPlayingLevel            -> fsmPlayingLevel
@@ -274,7 +274,7 @@ handleEvent fsmState ev = do
         case ev of
           _ | isContinue ev -> do
             resetGameState
-            return $ FSMLevel 1
+            return $ FSMLevel startLevelGerms
           _ -> infectedMsg *>> tapToContinue
 
 tapToContinue :: GameM ()

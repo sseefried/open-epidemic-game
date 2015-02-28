@@ -199,6 +199,9 @@ worldTop    = fieldTop
 
 antibioticWidth = sideBarWidth * 0.8
 
+startLevelGerms :: Int
+startLevelGerms = 4
+
 ----------------------------------------------------------------------------------------------------
 --
 -- World co-ordinates vs. canvas co-ordinates
