@@ -10,6 +10,19 @@ I discovered that once I've installed from Google Play I can't do my ordinary An
 'full-build.sh' to get it on my phone. I must first uninstall it and then run 'full-build.sh'
 again.
 
+---
+
+Naming convention for beta builds
+
+First 6 digits of following two SHA1 hashes:
+
+1. epidemic-game commit.
+2. iOS/Android repo commit just before bumping version.
+
+e.g. I am in the Android repo and I have first six digits of 'epidemic-game' repo of 09f633
+and first six digits of last commit in Android repo was 0258cb. Then my bumped version string
+is: "09f633-0258cb"
+
 # Fri 27 Feb 2015
 
 I've got a nice flask graphic but now I want to make the contents of the flask fade out
