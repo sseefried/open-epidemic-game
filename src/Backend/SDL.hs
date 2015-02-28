@@ -276,16 +276,16 @@ runFrameUpdate besRef = do
   let gs  = besGameState bes
       (Color r g b a) = backgroundColor -- FIXME: Shouldn't be transparent
       glsls = besGLSLState bes
-  glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
-  glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
+    glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
+    glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
     runGLMIO glsls (gsRender gs)
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
-  mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
-  when debugSystem $ renderDebugInfo besRef
-  glFlush
-  S.glSwapWindow (besWindow bes)
+    mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
+    when debugSystem $ renderDebugInfo besRef
+    glFlush
+    S.glSwapWindow (besWindow bes)
 
 renderDebugInfo :: IORef BackendState -> IO ()
 renderDebugInfo besRef = do
