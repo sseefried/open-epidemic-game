@@ -377,6 +377,7 @@ type HipSpace = H.Space
 type GermId = Int
 
 data GameState = GameState { gsRender        :: GLM () -- GL commands
+                           , gsRenderDirty   :: Bool
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
                            , gsNextGermId    :: !GermId

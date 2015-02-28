@@ -141,6 +141,7 @@ initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
   GameState {
       gsRender        = (return ())
+    , gsRenderDirty   = False
     , gsBounds        = bounds
     , gsGerms         = germMapList
     , gsNextGermId    = (length germs)
@@ -468,12 +469,14 @@ physics duration = do
 
 ----------------------------------------------------------------------------------------------------
 addRender :: GLM () -> GameM ()
-addRender glm = modify $ \gs -> gs { gsRender = gsRender gs >> glm }
+addRender glm = modify $ \gs -> gs { gsRender = gsRender gs >> glm
+                                   , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
 
 clearRender :: GameM ()
-clearRender = modify $ \gs -> gs { gsRender = return () }
+clearRender = modify $ \gs -> gs { gsRender = return ()
+                                 , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
 --

@@ -278,7 +278,10 @@ runFrameUpdate besRef = do
       glsls = besGLSLState bes
   glClearColor (f2f r) (f2f g) (f2f b) (f2f a)
   glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-  runGLMIO glsls (gsRender gs)
+  -- Only update if the render is dirty
+  when (gsRenderDirty gs) $ do
+    runGLMIO glsls (gsRender gs)
+    modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
   mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
   when debugSystem $ renderDebugInfo besRef
   glFlush
