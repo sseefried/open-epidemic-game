@@ -221,16 +221,14 @@ handleEvent fsmState ev = do
             addRender $ drawTextLinesOfWidth_ black (R2 0 0) fieldWidth
                             [ printf "You unlocked %s!" (show ab)
                             , ""
-                            , printf "It starts out at %.0f%% effectiveness"
-                                (startingAntibioticEffectiveness * 100.0)
-                            , printf "This means each germ has a %.0f%% chance"
-                                ((1 - startingAntibioticEffectiveness) * 100.0)
-                            , "of being immune"
-                            , "Germs inherit their immunity from"
+                            , "Some germs are immune."
+                            , "Germs inherit immunity from"
                             , "their parents"
                             , ""
-                            , "Careful! Each time you use an antibiotic"
-                            , "its effectiveness goes down"]
+                            , "Careful! Each time you"
+                            , "use an antibiotic"
+                            , "the chance of germ"
+                            , "immunity increases!" ]
             sideBarRender
             return $ FSMAntibioticUnlocked t ab
       whenEventsMutedOtherwise t unlockedMsg $ do
