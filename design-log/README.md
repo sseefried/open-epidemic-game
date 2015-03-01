@@ -7,6 +7,16 @@ This directory contains screen shots. I explain each shot and the design decisio
 It's in reverse order so you might want to scroll down to the bottom to see how the game looked
 at the beginning.
 
+## *2015-03-01* Increased birth rate of germs
+
+It was possible to "game" the game by killing off all germs but one and then just killing its
+child as soon as it was born. You could get an unlimited score this way. I have now changed
+the mechanics of the game to prevent this from being a viable strategy. The germs now increase
+their birth rate as their generation increases.
+
+You can watch a video of this [here](https://www.youtube.com/watch?v=x8anPTr0C88).
+
+
 ## *2015-02-28* Antibiotic flasks add to game
 
 **Git commit:** f7e2bff0f7ec0711fcac979bb0d3592993a3bb08

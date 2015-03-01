@@ -417,7 +417,6 @@ updateParentGerm g = do
              , germSizeFun    = germSizeFunForParams initSize multiplyAt'
              }
 
-
 ----------------------------------------------------------------------------------------------------
 --
 -- [whenGerm] applies [f] if germ with [germId] exists in the [GameState]
