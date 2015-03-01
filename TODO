@@ -1,13 +1,14 @@
 High priority
 -------------
 
+[ ] Bug: Show all the new germs before you show game over screen.
+    I'm pretty sure this is not working.
+
 [ ] Create a small chance that mutated germs lose their immunity.
 
 [ ] Add back blobs to centres of germs.
 
 [ ] Centre the level finished text.
-
-[ ] Increase the doubling speed so you can't just stay in level 1
 
 [ ] Fix the memory leak
 
@@ -68,6 +69,8 @@ Low priority
 ----
 DONE
 ----
+[X] Increase the doubling speed so you can't just stay in level 1
+
 [X] Make sure germ being dragged stays in bounds!
 
 [X] BUG: Solve the problem of the "action bar" showing on the game.

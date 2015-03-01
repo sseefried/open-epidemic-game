@@ -125,11 +125,18 @@ initialGermSize = worldHeight / 30
 initialGermSizeVariance :: Double
 initialGermSizeVariance = worldHeight / 150
 
-doublingPeriod :: Double
-doublingPeriod = 3
+--
+-- The doubling period starts at this value.
+--
+initialDoublingPeriod :: Double
+initialDoublingPeriod = 3
 
-doublingPeriodVariance :: Double
-doublingPeriodVariance = 0.5
+-- A factor by which the doublingPeriod is decreased each time a germ is birthed.
+doublingPeriodDecreaseFactor :: Double
+doublingPeriodDecreaseFactor = 0.95
+
+doublingPeriodVarianceFraction :: Double
+doublingPeriodVarianceFraction = 0.2 -- as a fraction of the doubling period.
 
 resistanceIncrease :: Double
 resistanceIncrease = 1.1
@@ -294,6 +301,7 @@ data Germ = Germ { germMultiplyAt     :: Time
                  , germHipCirc        :: HipCirc
                  , germGfx            :: GermGfx
                  , germGL             :: GermGL
+                 , germGeneration     :: Int -- how many parents did this germ have?
                  , germCumulativeTime :: Time
                  , germAnimTime       :: Time
                  , germSelected       :: Bool

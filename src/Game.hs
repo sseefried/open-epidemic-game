@@ -50,12 +50,13 @@ createGerm = generateGerm Nothing
 --
 generateGerm :: Maybe Germ -> Double -> HipCirc -> GameM Germ
 generateGerm mbGerm initSize hipCirc = do
+  let generation  = maybe 0 germGeneration mbGerm
   gs              <- get
   gfx <- evalRand $ case mbGerm of
            Just germ -> mutateGermGfx (germGfx germ)
            Nothing   -> randomGermGfx
-  multiplyAt      <- evalRand $ randomValWithVariance doublingPeriod  doublingPeriodVariance
   germGL          <- runGLM $ germGfxToGermGL gfx
+  multiplyAt <- calculateMultiplyAt generation
   germResistances <-
     case mbGerm of
       Just g  -> return $ germResistances g
@@ -69,7 +70,16 @@ generateGerm mbGerm initSize hipCirc = do
                 , germAnimTime       = 0
                 , germSelected       = False
                 , germResistances    = germResistances
+                , germGeneration     = generation + 1
                 }
+----------------------------------------------------------------------------------------------------
+calculateMultiplyAt :: Int -> GameM Double
+calculateMultiplyAt generation = do
+  let doublingPeriod = initialDoublingPeriod*(doublingPeriodDecreaseFactor^generation)
+      variance       = doublingPeriod * doublingPeriodVarianceFraction
+  evalRand $ randomValWithVariance doublingPeriod variance
+
+
 ----------------------------------------------------------------------------------------------------
 randomValWithVariance :: RandomGen g => Double -> Double -> Rand g Double
 randomValWithVariance val variance = (val+) <$> getRandomR (-variance, variance)
@@ -385,14 +395,28 @@ growGerm duration germId = do
         addHipCirc (sz/2) (R2 x' y')
       ng <- birthGerm g (sz/2) hc'
       insertGerm i ng -- insert new germ
-      -- update first germ
-      insertGerm germId $ g { germCumulativeTime = 0 }
+      parentGerm' <- updateParentGerm g
+      insertGerm germId $ parentGerm'
       modify $ \gs -> gs { gsNextGermId = i + 1 }
     else do
       runOnHipState $ setHipCircRadius hc sz -- update the size in the physics
       let g' = g { germCumulativeTime = duration + t
                  , germAnimTime       = (sqrt (fieldHeight / sz) * duration) + animT }
       insertGerm germId g'
+
+-- Update the parent germ. Its generation needs to go up and its
+-- multiplyAt needs to be recalculated
+updateParentGerm :: Germ -> GameM Germ
+updateParentGerm g = do
+  let generation' = germGeneration g + 1
+  multiplyAt' <- calculateMultiplyAt generation'
+  let initSize = germSizeFun g 0
+  return $ g { germCumulativeTime = 0
+             , germMultiplyAt = multiplyAt'
+             , germGeneration = generation'
+             , germSizeFun    = germSizeFunForParams initSize multiplyAt'
+             }
+
 
 ----------------------------------------------------------------------------------------------------
 --
