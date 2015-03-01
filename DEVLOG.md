@@ -1,3 +1,89 @@
+# Sun 29 Feb 2015
+
+## Building GHC from source
+
+In order to build an aarch64 cross compiler I had to build from the wip/llvm-3.6 branch of
+GHC. Erik de Castro Lopo told me about a command I needed to run after having download the
+source.
+
+    git submodule update --init --recursive --rebase
+
+I now wanted to break down exactly what that does. Here are the relevant parts of the man page.
+
+    update
+        Update the registered submodules, i.e. clone missing submodules and
+        checkout the commit specified in the index of the containing repository.
+        This will make the submodules HEAD be detached unless --rebase or --merge
+        is specified or the key submodule.$name.update is set to rebase, merge or
+        none.  none can be overridden by specifying --checkout. Setting the key
+        submodule.$name.update to !command will cause command to be run.  command
+        can be any arbitrary shell command that takes a single argument, namely
+        the sha1 to update to.
+
+        If the submodule is not yet initialized, and you just want to use the
+        setting as stored in .gitmodules, you can automatically initialize the
+        submodule with the --init option.
+
+        If --recursive is specified, this command will recurse into the
+        registered submodules, and update any nested submodules within.
+
+        If --force is specified, the submodule will be checked out (using git
+        checkout --force if appropriate), even if the commit specified in the
+        index of the containing repository already matches the commit checked out
+        in the submodule.
+
+    --recursive
+        This option is only valid for foreach, update and status commands.
+        Traverse submodules recursively. The operation is performed not only in
+        the submodules of the current repo, but also in any nested submodules
+        inside those submodules (and so on).
+
+    --rebase
+        This option is only valid for the update command. Rebase the current
+        branch onto the commit recorded in the superproject. If this option is
+        given, the submodule's HEAD will not be detached. If a merge failure
+        prevents this process, you will have to resolve these failures with git-
+        rebase(1). If the key submodule.$name.update is set to rebase, this
+        option is implicit.
+
+    --init
+        This option is only valid for the update command. Initialize all
+        submodules for which "git submodule init" has not been called so far
+        before updating.
+
+The bit I'm confused about it `--rebase`. Is it a good idea?
+
+After a discussion with Erik, I've decided it's probably *not* what I want.
+
+## Configure command for GHC 7.11 on wip/llvm-3.6 branch
+
+    ./configure --target=aarch64-apple-darwin14 \
+      --with-ghc=$HOME/ghc-ios/host-sysroot/bin/ghc \
+      --enable-bootstrap-with-devel-snapshot \
+      --with-gcc=aarch64-apple-darwin14-clang \
+      --enable-unregisterised \
+      --with-ld=aarch64-apple-darwin14-ld \
+      --with-llc=/usr/local/clang+llvm-3.6.0-rc2-x86_64-apple-darwin/bin/llc \
+      --with-opt=/usr/local/clang+llvm-3.6.0-rc2-x86_64-apple-darwin/bin/opt \
+      --prefix=$HOME/ghc-ios/aarch64-sysroot
+
+Notice the use of a host compiler `$HOME/ghc-ios/host-sysroot/bin/ghc`. You need to build
+this first and then use it. I had problems building, that I cannot recall,  otherwise.
+This is known as a "stage 0" compiler.
+
+The `aarch64-apple-darwin14-clang` script is:
+
+    #!/bin/sh
+    TARGET_PLATFORM=`xcrun --show-sdk-path --sdk iphoneos`
+    TARGET_GCC=/usr/local/clang+llvm-3.6.0-rc2-x86_64-apple-darwin/bin/clang
+    TARGET_CFLAGS="-isysroot $TARGET_PLATFORM -arch arm64 -miphoneos-version-min=7.0"
+
+    exec $TARGET_GCC $TARGET_CFLAGS "$@"
+
+and the `mk/build.mk` has to be:
+
+    BuildFlavour  = quick-cross
+
 # Sat 28 Feb 2015
 
 Game play idea. Perhaps the area of effect of an antibiotic should not the complete screen.
@@ -163,8 +249,9 @@ Things I've learned so far
   That didn't work
 * Got on #haskell on irc.freenode.net. Was told that LLVM 3.6 is the one you need to use and
   must use branch `wip/llvm-3.6`.
-
 * "perf-cross" does not work as a target in `mk/builk.mk`. Will file ticket on GHC Trac.
+* You need to do a `git submodule update --init --recursive --rebase` when you are building
+  from HEAD. It syncs each submodule to the same date.
 * Had a problem with module System.Posix.Directory.Common not building because of `fdatasync`
 
     error: implicit declaration of function 'fdatasync' is invalid in C99 [-Werror,-Wimplicit-function-declaration]
