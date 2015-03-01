@@ -16,6 +16,9 @@ their birth rate as their generation increases.
 
 You can watch a video of this [here](https://www.youtube.com/watch?v=x8anPTr0C88).
 
+<iframe id="ytplayer" type="text/html" width="640" height="390"
+  src="http://www.youtube.com/embed/x8anPTr0C88"
+  frameborder="0"/>
 
 ## *2015-02-28* Antibiotic flasks add to game
 
