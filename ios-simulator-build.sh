@@ -1,5 +1,10 @@
 #!/bin/bash
 
+#
+# This script builds for iOS and then copies the static library to the Xcode
+# project. This requires that an environment variable has been set
+#
+
 if [ "$EPIDEMIC_IOS_BUILD_I386_LIB_DIR" = "" ]; then
   echo "You must set set EPIDEMIC_IOS_BUILD_I386_LIB_DIR"
   exit 1
