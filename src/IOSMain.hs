@@ -5,8 +5,6 @@
 --
 module IOSMain where
 
-import System.Environment
-
 -- friends
 import Game
 import Backend.SDL as B
