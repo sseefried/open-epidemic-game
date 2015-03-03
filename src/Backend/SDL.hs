@@ -235,7 +235,8 @@ initialize title mbResourcePath = do
                           , besSquishSound    = squishSound
                           }
   where
-    wflags = [S.WindowShown]
+    -- WindowBorderLess is required for iOS so that status bar does not show on iOS 6 and below.
+    wflags = [S.WindowShown] ++ (case platform of IOSPlatform -> [S.WindowBorderless]; _ -> [])
 
 ----------------------------------------------------------------------------------------------------
 --
