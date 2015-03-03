@@ -4,4 +4,5 @@ Sep: 52h04m12s (52.07 hours)
 Oct: 40h45m36s (40.76 hours)
 Nov: 60h51m00s (60.85 hours)
 Dec: 50h50m10s (50.84 hours)
-
+Jan: 94h49m13s (94.82 hours)
+Feb: 52h51m59s (52.87 hours)
