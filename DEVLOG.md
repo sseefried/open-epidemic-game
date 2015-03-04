@@ -1,3 +1,48 @@
+# Wed 4 Mar 2015
+
+Let me reason through a problem. On iOS the text is clipped a little. I can only assume this
+is because the values coming back from Cairo for text sizes are slightly different.
+
+I think I will log on Mac OS X and iOS and see what the differences are.
+
+I've done that now. The values coming out where not the same but they were close.
+
+     bx=29.97, by=-7730.06, tw=30830.39, th=8830.03
+
+vs.
+
+     bx=29.94, by=-7730.04, tw=30830.25, th=8830.02
+
+So, the problem must be somewhere else.
+
+Breakthrough! When I set the Mac OS X resolution to 960x640 I got the same problem as I get on
+iOS. So it has nothing to do with iOS and everything to do with an incorrect calculation somewhere.
+The aspect ratio is 3:2 in this case.
+
+Now testing with larger resolutions (at same aspect ratio)
+  1020x660: no bug
+  1284x856: no bug
+
+Now testing at sub 1000 pixel widths:
+
+  954x636: bug
+  966x644: bug
+  750x500: bug
+
+Okay, what do we know
+
+  * orthoBounds are correct
+  * renderToQuad correctly finds the right width and height of rectangle to render
+
+---
+
+It's now hours later. Seriously, it's about 7 hours later.
+Cairo just doesn't render fonts correctly at certain widths. I've added a kludge to scale the
+render by 0.97. This seems to fit now.
+
+I really wanted to solve this correctly, but it's not my issue it seems.
+
+
 # Sun 29 Feb 2015
 
 ## Building GHC from source
@@ -53,7 +98,8 @@ I now wanted to break down exactly what that does. Here are the relevant parts o
 
 The bit I'm confused about it `--rebase`. Is it a good idea?
 
-After a discussion with Erik, I've decided it's probably *not* what I want.
+After a discussion with Erik, I've decided it's probably *not* what I want. So I will no longer
+use the `--rebase` option.
 
 ## Configure command for GHC 7.11 on wip/llvm-3.6 branch
 
