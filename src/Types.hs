@@ -184,8 +184,8 @@ desiredFramerate = 60
 -- Derived constants. (Do not change)
 
 worldWidth, worldHeight :: Double
-worldHeight = fieldWidth
-worldWidth  = worldAspectRatio * worldHeight
+worldHeight = fieldHeight
+worldWidth  = worldAspectRatio * fieldWidth
 
 sideBarWidth :: Double
 sideBarWidth = worldWidth - fieldWidth
@@ -212,6 +212,15 @@ worldBottom = fieldBottom
 worldTop    = fieldTop
 
 antibioticWidth = sideBarWidth * 0.8
+
+--
+-- A factor to scale the font by. Normally the font is set to a size that will perfectly
+-- fit the width suggest. However, there seems to be a bug on iOS where the font
+-- doesn't quite render properly. I have not been able to track down this bug so
+-- we simple scale by this factor.
+--
+fontScaleFactor :: Double
+fontScaleFactor = 0.97
 
 startLevelGerms :: Int
 startLevelGerms = 4

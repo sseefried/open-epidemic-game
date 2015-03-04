@@ -510,7 +510,7 @@ textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = d
 --    setColor (Color 0.5 0.5 0.5 1)
 --    rectangle  (-1000) (-1000) 2000 2000
 --    fill
-    setFontSize (scale*fontSize)
+    setFontSize (scale*fontSize*fontScaleFactor)
     transform $ M.Matrix 1 0 0 (-1) 0 0
     moveTo x' y'
     textPath us
@@ -524,7 +524,7 @@ textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = d
 
 textLinesOfWidth :: FontFace -> Color -> CairoPoint -> Double -> [String] -> Render Double
 textLinesOfWidth fontFace c (x,y) w ss = do
-  let fontSize = 1000.0 -- scaling it up initially gives more accurate TextExtents
+  let fontSize = 1000 -- scaling it up initially gives more accurate TextExtents
   setFontSize fontSize
   setFontFace fontFace
   -- find the longest line
@@ -546,7 +546,7 @@ textLinesOfWidth fontFace c (x,y) w ss = do
   --rectangle  (-1000) (-1000) 2000 2000
   --fill
   setColor c
-  setFontSize (scale*fontSize)
+  setFontSize (scale*fontSize*fontScaleFactor)
   transform $ M.Matrix 1 0 0 (-1) 0 0
   mapM_ showLine lines
   return (lineH*scale*(fromIntegral ssLen))
@@ -562,10 +562,11 @@ textLinesOfWidth fontFace c (x,y) w ss = do
 --
 runWithoutRender :: Render a -> IO a
 runWithoutRender r =
-  allocaBytes bytesPerWord32 $ \buffer -> do
-    withImageSurfaceForData buffer FormatARGB32 1 1 bytesPerWord32 $ \surface -> do
+  allocaBytes (bytesPerWord32*n*n) $ \buffer -> do
+    withImageSurfaceForData buffer FormatARGB32 n n (n*bytesPerWord32) $ \surface -> do
       renderWith surface r
   where
+    n = 1
     bytesPerWord32 = 4
 
 ----------------------------------------------------------------------------------------------------
