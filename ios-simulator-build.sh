@@ -10,7 +10,7 @@ if [ "$EPIDEMIC_IOS_BUILD_DIR" = "" ]; then
   exit 1
 fi
 
-i386-apple-darwin11-cabal configure -fios && \
+i386-apple-darwin11-cabal configure -fios $@ && \
   i386-apple-darwin11-cabal build exe:EpidemicStaticLib
 [ $? -eq 0 ] || exit 1
 
