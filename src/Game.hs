@@ -156,7 +156,7 @@ initGameState bounds hipSpace germs =
     , gsGerms         = germMapList
     , gsNextGermId    = (length germs)
     , gsHipState      = hipSpace
-    , gsSoundQueue    = []
+    , gsSoundQueue    = [GameSoundLevelMusicStart]
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
     , gsScore         = 0
@@ -202,7 +202,6 @@ handleEvent fsmState ev = do
                  createGerm initSize hc
       modify $ \gs -> gs { gsGerms        = M.fromList (zip [0..] germs)
                          , gsNextGermId   = length germs
-                         , gsSoundQueue   = [GameSoundLevelMusicStart]
                          , gsCurrentLevel = i
                          }
       return $ FSMPlayingLevel

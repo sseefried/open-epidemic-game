@@ -208,13 +208,12 @@ initialize title mbResourcePath = do
   (levelMusic, squishSound) <- case platform of
     NoSound -> return (Nothing, Nothing)
     _       -> do
-      M.openAudio 44100 S.AudioS16Sys 1 1024
+      M.openAudio 44100 S.AudioS16Sys 2 1024
       M.allocateChannels 10
-      -- FIXME: Add new music in
-      -- levelMusic  <- M.loadMUS $ base ++ "/music.wav"
+      levelMusic  <- M.loadMUS $ resourcePath ++ "/music.ogg"
       rwOps       <- S.fromFile (resourcePath ++ "/slime-splash.wav") "r"
       squishSound <- M.loadWAVRW rwOps False
-      return (Nothing, Just squishSound)
+      return (Just levelMusic, Just squishSound)
   t     <- getCurrentTime
   frBuf <- initFRBuf
   gs    <- newGameState (w,h)
