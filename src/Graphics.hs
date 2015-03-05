@@ -5,7 +5,7 @@ module Graphics (
   randomGermGfx, germGfxRenderNucleus, germGfxRenderBody, germGfxRenderGerm,
   textOfWidth, textOfHeight, textConstrainedBy, textOfWidth_, textOfHeight_,
   textLinesOfWidth, movingPtToPt, movingPtToStaticPt, mutateGermGfx,
-  runWithoutRender, flask,
+  runWithoutRender, flask, fontInfoForWidth,
   --
   circle
 
@@ -15,13 +15,15 @@ module Graphics (
 import           Graphics.Rendering.Cairo
 import qualified Graphics.Rendering.Cairo.Matrix as M
 import           Control.Monad.Random
-import           Debug.Trace
 import           Foreign.Marshal.Alloc (allocaBytes)
 import           Data.List (maximumBy)
+import           Control.Monad
+import           Text.Printf
 
 -- friends
 import Types
 import Util
+import Platform
 
 {-
 
@@ -485,71 +487,116 @@ textOfHeight_ fontFace c (x,y) h s =  textOfHeight fontFace c (x,y) h s >> retur
 
 
 ----------------------------------------------------------------------------------------------------
-data TextConstraint = Width | Height
+data TextConstraint = Width | Height deriving (Show, Eq)
+
+ifWidthElse :: TextConstraint -> a -> a -> a
+ifWidthElse tc wa ha = case tc of Width -> wa; Height -> ha
+
+----------------------------------------------------------------------------------------------------
+
 
 textConstrainedBy :: TextConstraint -> FontFace -> Gradient -> CairoPoint -> Double -> String
                   -> Render Double
 textConstrainedBy tc fontFace (Color r g b a, Color r' g' b' a') (x,y) len s = do
-  let us = uppercase s
-  let fontSize = 1000 -- scaling it up initially gives more accurate TextExtents below.
-  setFontSize fontSize
+  fi <- fontInfoForConstraint tc fontFace len s
   setFontFace fontFace
-  (TextExtents bx by tw th _ _) <- textExtents us
-  let rth = th
-      bl = th + by
-      rtw = tw + bx
-      (len', lenD') = case tc of Width  -> (rtw, rth); Height -> (rth, rtw)
-      scale = len/len'
-      w     = tw*scale
-      x'    = -bx*scale + x - w/2
-      y'    = y + (th/2-bl)*scale
-  withLinearPattern 0 y' 0 (y'+th*scale) $ \p -> do
+  setFontSize (fiFontSize fi)
+  let (x', y') = (x + fiDx fi, y + fiDy fi)
+      lenD' = ifWidthElse tc (fiHeight fi) (fiWidth fi)
+  withLinearPattern 0 y' 0 (y'+ fiHeight fi) $ \p -> do
     patternSetExtend p ExtendRepeat
     patternAddColorStopRGBA p 0   r  g  b  a
     patternAddColorStopRGBA p 0.5 r' g' b' a'
---    setColor (Color 0.5 0.5 0.5 1)
---    rectangle  (-1000) (-1000) 2000 2000
---    fill
-    setFontSize (scale*fontSize*fontScaleFactor)
+    when False $ do
+      let (w,h) = (fiWidth fi, fiHeight fi)
+      setColor (Color 0.5 0.5 0.5 1)
+      rectangle  (-w/2) (-h/2) w h
+      fill
     transform $ M.Matrix 1 0 0 (-1) 0 0
     moveTo x' y'
-    textPath us
+    textPath s
     setSource p
     fillPreserve
-    --setSourceRGBA 0 0 0 1
-    --setLineWidth (th*scale/100)
-    --stroke
-    return (lenD'*scale)
+    return lenD'
+
 ----------------------------------------------------------------------------------------------------
 
 textLinesOfWidth :: FontFace -> Color -> CairoPoint -> Double -> [String] -> Render Double
-textLinesOfWidth fontFace c (x,y) w ss = do
-  let fontSize = 1000 -- scaling it up initially gives more accurate TextExtents
-  setFontSize fontSize
-  setFontFace fontFace
+textLinesOfWidth fontFace c (x,y) len ss = do
   -- find the longest line
-  let wid (TextExtents _ _ tw _ _ _) = tw
-      ssLen = length ss
-  tes <- mapM textExtents ss
-  let (TextExtents bx by tw th _ _) = maximumBy (\te te' -> compare (wid te) (wid te')) tes
-      lines = zipWith3 (,,) tes ss [0..]
-      lineH = th
-      lineW = tw + bx
-      bl    = th + by
-      h     = lineH*(fromIntegral ssLen)
-      scale = w/lineW
-      showLine (te,s,i) = do
-        moveTo (-bx*scale + x - (wid te*scale/2))
-               (y + (-h/2-bl)*scale + (i+1)*(lineH*scale))
+  fis <- mapM (fontInfoForWidth fontFace len) ss
+  let ssLen = length ss
+      FontInfo { fiFontSize = fontSize, fiHeight = lineH }  =
+        minimumBy (\fi fi' -> compare (fiFontSize fi) (fiFontSize fi'))
+                  (filter (\fi -> fiFontSize fi > 0) fis)
+      lines = zipWith3 (,,) fis ss [0..]
+      showLine (fi,s,i) = do
+        (TextExtents bx _ tw _ _ _) <- textExtents s
+        let w = tw + bx
+        moveTo (x - w/2) (y + fiDy fi + (-(fromIntegral ssLen/2)+i)*lineH)
         showText s
   --setColor (Color 0.5 0.5 0.5 1)
-  --rectangle  (-1000) (-1000) 2000 2000
+  --rectangle  (-lineW/2) (-h/2) lineW h
   --fill
+  setFontSize fontSize
+  setFontFace fontFace
   setColor c
-  setFontSize (scale*fontSize*fontScaleFactor)
   transform $ M.Matrix 1 0 0 (-1) 0 0
   mapM_ showLine lines
-  return (lineH*scale*(fromIntegral ssLen))
+  return (lineH*(fromIntegral ssLen))
+  where
+    minimumBy f = maximumBy (flip f)
+----------------------------------------------------------------------------------------------------
+
+-- The return type for the font size is [Double] even though it's an integral value.
+-- [setFontSize] takes a [Double] as an argument. Go figure.
+data FontInfo = FontInfo { fiFontSize :: Double
+                         , fiDx       :: Double
+                         , fiDy       :: Double
+                         , fiWidth    :: Double
+                         , fiHeight   :: Double
+                         } deriving (Show)
+
+----------------------------------------------------------------------------------------------------
+
+fontInfoForConstraint :: TextConstraint -> FontFace -> Double -> String
+                      -> Render FontInfo
+fontInfoForConstraint tc fontFace len s = do
+  inContext $ do
+    setFontFace fontFace
+    let initFontSize = 1000 -- scaling it up gives more accurate TextExtents
+    setFontSize initFontSize
+    (TextExtents bx _ tw th _ _)  <- textExtents s
+    let w      = tw + bx
+        h      = th
+        len'   = ifWidthElse tc w h
+        scaleF = len/len'
+        fractionalFontSize = scaleF*initFontSize
+        fontSize = fromIntegral $ floor $ fractionalFontSize
+    if len' > 0
+      then do
+        setFontSize fontSize
+        (TextExtents bx' by' tw' th' _ _) <- textExtents s
+        let w' = tw' + bx'
+            h' = th'
+            dx = -w'/2        -- distance to move in x direction right
+            dy = -by' - th'/2 -- distance to move in y direction up
+        -- _consoleLog $ printf "'%s', len=%.2f, w'=%.2f, h'=%.2f" s len w' h'
+        return $ FontInfo { fiFontSize = fontSize
+                          , fiDx = dx
+                          , fiDy = dy
+                          , fiWidth  = w' -- ifWidthElse tc len w'
+                          , fiHeight = h' -- ifWidthElse tc h' len
+                          }
+      else return $ FontInfo 0 0 0 0 0
+
+
+
+
+----------------------------------------------------------------------------------------------------
+fontInfoForWidth, _fontInfoForHeight :: FontFace -> Double -> String -> Render FontInfo
+fontInfoForWidth  = fontInfoForConstraint Width
+_fontInfoForHeight = fontInfoForConstraint Height
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -574,4 +621,4 @@ runWithoutRender r =
 -- Use [consoleLog] to print out values to the console inside the [Render] monad.
 --
 _consoleLog :: String -> Render ()
-_consoleLog s = trace s $ return ()
+_consoleLog = liftIO . debugLog

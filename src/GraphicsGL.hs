@@ -340,6 +340,7 @@ drawAntibiotic (R2 x y) ab effectiveness = do
     C.scale s s
     flask (antibioticColor ab effectiveness)
 ----------------------------------------------------------------------------------------------------
+-- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
 drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do
   st <- getGLSLState

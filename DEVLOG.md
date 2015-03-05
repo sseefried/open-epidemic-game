@@ -1,3 +1,28 @@
+# Thu 5 Mar 2015
+
+I'm still vaguely unsatisfied. What if I'm wrong. There needs to be an experiment that I can
+carry out that proves that the fonts don't render properly at certain sizes.
+
+---
+
+Okay, first I verified that when I try to render the text "SCORE:" at a length 114 pixels then
+it renders at a width of 116 pixels. I did this using the `cairo-interactive.sh` script I wrote
+a week ago. This proved that the problem was with Cairo (or Freetype) but not OpenGL.
+
+I then discovered the reason. Fractional font sizes are not supported! (See question 26
+[here](http://www.freetype.org/freetype1/docs/faq/freetype1.txt).) If you specify size=36.6
+then it acts as if it is size=37. Thus it renders larger than it should be and bursts out of its
+bounding box. It's just a stroke of luck that we noticed it at 960x640. It could have happened at
+any resolution.
+
+The solution is simple. Find the notional font size and *truncate* it. Then recalculate the
+"text extents" to find the true width and leave a little margin on either side. The "length"
+argument now specifies the *maximum* width for the text to display at, and the system tries
+its best to fit it in.
+
+I'm really pleased that I listen to my gut and kept beavering away at this problem until I had
+cracked it.
+
 # Wed 4 Mar 2015
 
 Let me reason through a problem. On iOS the text is clipped a little. I can only assume this

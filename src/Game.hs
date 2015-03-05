@@ -527,11 +527,12 @@ sideBarRender = do
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
   --
   let renderScore = do
-        let x = sideBarLeft + sideBarWidth/3
+        let x = sideBarLeft + w/2
             y = sideBarTop  - worldHeight/10
-            x' = sideBarLeft + sideBarWidth*5/6
-        h <- drawTextOfWidth scoreGrad (R2 x y) (sideBarWidth*2/3*0.8) "Score:"
-        drawTextOfHeight_ scoreGrad (R2 x' y) h $ printf "%4d" $ gsScore gs
+            w = (sideBarWidth*0.52)
+        h <- drawTextOfWidth scoreGrad (R2 x y) w "Score:"
+        let x' = x + w
+        drawTextOfHeight_ scoreGrad (R2 x' y) h $ printf "%04d" $ gsScore gs
   --
   addRender (renderAntibiotics >> renderScore)
 

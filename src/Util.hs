@@ -71,3 +71,9 @@ uppercase = map toUpper
 --
 (*>>) :: Monad m => m a -> m b -> m a
 m *>> m' = do { r <- m; m'; return r}
+
+--
+-- Swaps pair if condition is true
+--
+swapOn :: (b -> Bool) -> (a,a) -> b -> (a,a)
+swapOn f (x,y) b = if f b then (y,x) else (x,y)

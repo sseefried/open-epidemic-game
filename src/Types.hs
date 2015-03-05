@@ -211,16 +211,7 @@ worldRight  = fieldRight
 worldBottom = fieldBottom
 worldTop    = fieldTop
 
-antibioticWidth = sideBarWidth * 0.8
-
---
--- A factor to scale the font by. Normally the font is set to a size that will perfectly
--- fit the width suggest. However, there seems to be a bug on iOS where the font
--- doesn't quite render properly. I have not been able to track down this bug so
--- we simple scale by this factor.
---
-fontScaleFactor :: Double
-fontScaleFactor = 0.97
+antibioticWidth = sideBarWidth * 0.6
 
 startLevelGerms :: Int
 startLevelGerms = 4
@@ -332,6 +323,10 @@ data OrthoBounds =
 
 data GLM a = GLM { unGLM :: GLSLState -> IO a }
 
+--
+-- FIXME: This is not the right name of this data structure. glslFontFace? It has nothing
+-- to do with GLSL. It's more a "graphics state".
+--
 data GLSLState = GLSLState { glslPosition    :: AttributeLocation
                            , glslTexcoord    :: AttributeLocation
                            , glslDrawTexture :: UniformLocation
