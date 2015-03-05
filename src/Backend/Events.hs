@@ -63,6 +63,9 @@ whenLookup k m b io = do
     Nothing -> return b
 
 ----------------------------------------------------------------------------------------------------
+--
+-- This event handler is used while the game is in the foreground
+--
 eventHandler :: IORef PressHistory -> BackendToWorld -> IO MaybeEvents
 eventHandler phRef b2w = toMaybeEvents <$> go
   where
@@ -72,9 +75,13 @@ eventHandler phRef b2w = toMaybeEvents <$> go
       mbSDLEvent <- S.pollEvent
       mbEvs <- case mbSDLEvent of
         Just e -> do
-          case checkForQuit e of
-            True -> return Nothing
-            False -> do
+          case S.eventData e of
+            ed | checkForQuit ed -> return Nothing
+            S.AppDidEnterBackground -> do
+              debugLog $ "AppDidEnterBackground. Waiting for foreground event"
+              waitForForegroundEvent
+              go -- start handling events normally again
+            _ -> do
               mbEv   <- decodeEvent phRef b2w e
               mbEvs' <- go -- loop until no more events
               return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
@@ -82,6 +89,22 @@ eventHandler phRef b2w = toMaybeEvents <$> go
       let retval = maybe Nothing (Just . (evs++)) mbEvs
       when (debug && isJust retval && (not $ null $ fromJust retval)) $ putStrLn $ show retval
       return retval
+
+----------------------------------------------------------------------------------------------------
+--
+-- This event handler is used when the game has gone into the background. It uses
+-- [S.waitEvent] and hence, should mean that the game consumes almost no resources while
+-- in the background
+--
+-- It just waits for an [AppDidEnterForeground]
+waitForForegroundEvent :: IO ()
+waitForForegroundEvent = do
+  debugLog $ "Waiting for AppDidEnterForeground"
+  mbEv <- S.waitEvent
+  let handleEvent e = case S.eventData e of
+                        S.AppDidEnterForeground -> return ()
+                        _ -> waitForForegroundEvent
+  maybe (waitForForegroundEvent) handleEvent mbEv
 
 ----------------------------------------------------------------------------------------------------
 toMaybeEvents :: Maybe [Event] -> MaybeEvents
@@ -217,12 +240,13 @@ _printEvent e = do
     _ -> return ()
 
 ----------------------------------------------------------------------------------------------------
-checkForQuit e = case S.eventData e of
+checkForQuit :: S.EventData -> Bool
+checkForQuit ed = case ed of
       S.Quit                    -> True
-      _ | b <- isKeyDown e SK.Q -> b
+      _ | b <- isKeyDown ed SK.Q -> b
 
 ----------------------------------------------------------------------------------------------------
-isKeyDown :: S.Event -> SK.Keycode -> Bool
-isKeyDown e code = case S.eventData e of
+isKeyDown :: S.EventData -> SK.Keycode -> Bool
+isKeyDown ed code = case ed of
   S.Keyboard {  S.keyMovement = S.KeyDown, S.keySym = S.Keysym _ code' _ } -> code == code'
   _ -> False

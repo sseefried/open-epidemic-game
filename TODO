@@ -1,19 +1,19 @@
 High priority
 -------------
 
+[ ] Start respecting AppDidEnterBackground events and put the game in a
+    quiescent state.
+
 [ ] Bug: Show all the new germs before you show game over screen.
     I'm pretty sure this is not working.
 
 [ ] Create a small chance that mutated germs lose their immunity.
 
-[ ] Add back blobs to centres of germs.
+[ ] Add blobs to centres of germs.
 
-[ ] Centre the level finished text.
+[ ] Centre the level finished text?
 
 [ ] Fix the memory leak
-
-[ ] Start respecting AppDidEnterBackground events and put the game in a
-    quiescent state.
 
 [ ] Only draw what is absolutely necessary on the non-playing state screens.
     Try to keep gsRenderDirty False as much as possible.
