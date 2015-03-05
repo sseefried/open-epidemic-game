@@ -572,7 +572,10 @@ fontInfoForConstraint tc fontFace len s = do
         len'   = ifWidthElse tc w h
         scaleF = len/len'
         fractionalFontSize = scaleF*initFontSize
-        fontSize = fromIntegral $ floor $ fractionalFontSize
+        -- taking away -0.5 is very important. A fontSize of 9.33 is treated as 9, therefore
+        -- if this produces text that is too large we must use a font size of 8.
+        -- e.g. 9.7 goes to 9, 9.3 goes to 8
+        fontSize = fromIntegral $ floor $ fractionalFontSize - 0.5
     if len' > 0
       then do
         setFontSize fontSize
@@ -581,7 +584,6 @@ fontInfoForConstraint tc fontFace len s = do
             h' = th'
             dx = -w'/2        -- distance to move in x direction right
             dy = -by' - th'/2 -- distance to move in y direction up
-        -- _consoleLog $ printf "'%s', len=%.2f, w'=%.2f, h'=%.2f" s len w' h'
         return $ FontInfo { fiFontSize = fontSize
                           , fiDx = dx
                           , fiDy = dy
@@ -589,9 +591,6 @@ fontInfoForConstraint tc fontFace len s = do
                           , fiHeight = h' -- ifWidthElse tc h' len
                           }
       else return $ FontInfo 0 0 0 0 0
-
-
-
 
 ----------------------------------------------------------------------------------------------------
 fontInfoForWidth, _fontInfoForHeight :: FontFace -> Double -> String -> Render FontInfo

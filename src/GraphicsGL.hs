@@ -364,6 +364,7 @@ drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
+-- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
 drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
   st <- getGLSLState
