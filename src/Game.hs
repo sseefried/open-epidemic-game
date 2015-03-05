@@ -104,6 +104,7 @@ data FSMState = FSMLevel              Int -- level number
               | FSMAntibioticUnlocked UTCTime Antibiotic
               | FSMLevelComplete      UTCTime
               | FSMGameOver           UTCTime
+              | FSMPaused FSMState -- paused, what state was it in before?
               deriving (Show, Eq, Ord)
 
 
@@ -184,12 +185,15 @@ handleEvent fsmState ev = do
   -- events that can occur in any FSM State
   case ev of
     Reset  -> resetGameState >> (return $ FSMLevel startLevelGerms)
+    Pause  -> return $ FSMPaused fsmState
     _  -> (case fsmState of -- events that depend on current FSM State
              FSMLevel i                 -> fsmLevel i
              FSMPlayingLevel            -> fsmPlayingLevel
              FSMAntibioticUnlocked t ab -> fsmAntibioticUnlocked (t,ab)
              FSMLevelComplete      t    -> fsmLevelComplete t
-             FSMGameOver           t    -> fsmGameOver t)
+             FSMGameOver           t    -> fsmGameOver t
+             FSMPaused             s    -> fsmPaused s
+           )
   where
     fsmLevel i = do
       resetHipState
@@ -205,6 +209,12 @@ handleEvent fsmState ev = do
                          , gsCurrentLevel = i
                          }
       return $ FSMPlayingLevel
+    --------------------------------------
+    fsmPaused :: FSMState -> GameM FSMState
+    fsmPaused s = case ev of
+      Unpause -> return s
+      _       -> return $ FSMPaused s
+
     --------------------------------------
     fsmPlayingLevel :: GameM FSMState
     fsmPlayingLevel = do
@@ -592,7 +602,6 @@ modifyAntibiotic f ab = do
   let m = gsAntibiotics gs
   case M.lookup ab m of
     Just abd -> do
-      printStrLn "Antibiotic modified\n"
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()

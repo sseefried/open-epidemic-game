@@ -4,6 +4,7 @@ module Backend.Events (
   , PressHistory(..)
   -- functions
   , eventHandler
+  , waitForForegroundEvent
 
 
 ) where
@@ -76,12 +77,9 @@ eventHandler phRef b2w = toMaybeEvents <$> go
       mbEvs <- case mbSDLEvent of
         Just e -> do
           case S.eventData e of
-            ed | checkForQuit ed -> return Nothing
-            S.AppDidEnterBackground -> do
-              debugLog $ "AppDidEnterBackground. Waiting for foreground event"
-              waitForForegroundEvent
-              go -- start handling events normally again
-            _ -> do
+            ed | checkForQuit ed     -> return Nothing
+            S.AppWillEnterBackground -> return $ Just [Pause]
+            _                        -> do
               mbEv   <- decodeEvent phRef b2w e
               mbEvs' <- go -- loop until no more events
               return $ maybe Nothing (Just . (mbEv `consMaybe`)) mbEvs'
@@ -102,7 +100,7 @@ waitForForegroundEvent = do
   debugLog $ "Waiting for AppDidEnterForeground"
   mbEv <- S.waitEvent
   let handleEvent e = case S.eventData e of
-                        S.AppDidEnterForeground -> return ()
+                        S.AppDidEnterForeground  -> return ()
                         _ -> waitForForegroundEvent
   maybe (waitForForegroundEvent) handleEvent mbEv
 

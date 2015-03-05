@@ -27,5 +27,7 @@ data Event = Tap R2       -- location at which tap occurred.
            | Drag R2 R2
            | Physics Time -- how much time the last frame took
            | Reset
+           | Pause      -- home button pushed
+           | Unpause    -- back in the game
            deriving (Show, Eq, Ord)
 

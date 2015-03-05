@@ -1,3 +1,7 @@
+# Fri 6 Mar 2015
+
+The events management for the game is very brittle.
+
 # Thu 5 Mar 2015
 
 I'm still vaguely unsatisfied. What if I'm wrong. There needs to be an experiment that I can

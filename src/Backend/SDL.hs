@@ -369,9 +369,9 @@ runPhysicsEventHandler besRef handleEvent = do
                  , besFrames    = besFrames bes + 1 }
 
   -- Actions that should be run in various game states.
-  withIORef besRef $ \bes -> do
-    case besFSMState bes of
-      _ -> return bes
+  --withIORef besRef $ \bes -> do
+  --  case besFSMState bes of
+  --    _ -> return bes
 
 ----------------------------------------------------------------------------------------------------
 playSoundQueue :: BackendState -> [GameSound] -> IO ()
@@ -391,7 +391,17 @@ playSoundQueue bes sounds = mapM_ playSound sounds
 getEvents :: IORef BackendState -> IO (MaybeEvents)
 getEvents besRef = do
   bes <- readIORef besRef
-  eventHandler (besPressHistory bes) (besBackendToWorld bes)
+  case besFSMState bes of
+    FSMPaused _ -> pauseEventHandler besRef
+    _ -> eventHandler (besPressHistory bes) (besBackendToWorld bes)
+  where
+    pauseEventHandler besRef = do
+     debugLog $ "AppDidEnterBackground. Waiting for foreground event"
+     waitForForegroundEvent
+      -- need to reset last time to now since we have been paused.
+     t <- getCurrentTime
+     modifyIORef besRef $ \bes -> bes { besLastTime = t }
+     return $ Events [Unpause]
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState
