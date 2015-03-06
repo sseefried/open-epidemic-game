@@ -34,6 +34,10 @@ High priority
 ------------
 Low priority
 ------------
+[ ] Refactor the setup-ios-*-wrapper.sh scripts and the .rc files
+    Fix up
+
+
 [ ] Refactor the GameState to be opaque so that you can hide annoying
     stuff like the gsRenderDirty/gsRender pair behind one concept.
 
