@@ -5,5 +5,5 @@
 # static library to the Xcode
 
 for arch in i386 arm aarch64; do
-  ./ios-$arch-build.sh
+  env -i IOS_SCRIPTS=$IOS_SCRIPTS ./ios-$arch-build.sh
 done
