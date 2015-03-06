@@ -564,6 +564,7 @@ playingLevelUnselect p = do
 -- FIXME: Move somewhere else
 unselect :: Germ -> Germ
 unselect g = g { germSelected = False }
+
 ----------------------------------------------------------------------------------------------------
 playingLevelDrag :: R2 -> R2 -> GameM FSMState
 playingLevelDrag p p' = do
@@ -581,6 +582,7 @@ playingLevelDrag p p' = do
       gs <- get
       R2 x y <- runHipM (gsHipState gs) $ getHipCircPos $ germHipCirc g
       return $ x >= fieldLeft && x <= fieldRight && y >= fieldBottom && y <= fieldTop
+
 ----------------------------------------------------------------------------------------------------
 -- FIXME: Use a bloody lens!
 enableAntibiotic :: Antibiotic -> GameM ()
@@ -588,12 +590,10 @@ enableAntibiotic ab = do
   let enable abd = abd { abEnabled = True }
   modifyAntibiotic enable ab
 
-
 -- FIXME: use a bloody lens!
 modifyAntibioticEffectiveness :: (Double -> Double) -> Antibiotic -> GameM ()
 modifyAntibioticEffectiveness f ab = do
   let mod abd = abd  { abEffectiveness = f (abEffectiveness abd) }
-
   modifyAntibiotic mod ab
 
 modifyAntibiotic :: (AntibioticData -> AntibioticData) -> Antibiotic -> GameM ()
@@ -605,6 +605,7 @@ modifyAntibiotic f ab = do
       let m' = M.insert ab (f abd) m
       put $ gs { gsAntibiotics = m' }
     Nothing -> return ()
+
 ----------------------------------------------------------------------------------------------------
 whenEventsMutedOtherwise :: UTCTime -> GameM a -> GameM a -> GameM a
 whenEventsMutedOtherwise t dflt gm = do

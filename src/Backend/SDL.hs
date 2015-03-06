@@ -398,8 +398,11 @@ getEvents besRef = do
     pauseEventHandler besRef = do
      debugLog $ "AppDidEnterBackground. Waiting for foreground event"
      waitForForegroundEvent
-      -- need to reset last time to now since we have been paused.
-     t <- getCurrentTime
+     -- need to reset last time to now since we have been paused.
+     -- Need to pretend it was one frame ago so that we don't pass a 0 duration to the physics
+     -- engine which causes problems.
+     t <- (addUTCTime $ -1/(realToFrac desiredFramerate)) <$> getCurrentTime
+     --
      modifyIORef besRef $ \bes -> bes { besLastTime = t }
      return $ Events [Unpause]
 
