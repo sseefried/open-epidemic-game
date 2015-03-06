@@ -5,10 +5,12 @@
 # project. This requires that an environment variable has been set
 #
 
-if [ "$EPIDEMIC_IOS_BUILD_DIR" = "" ]; then
-  echo "You must set set EPIDEMIC_IOS_BUILD_LIB_DIR"
+if [ "$IOS_SCRIPTS" = "" ]; then
+  echo "IOS_SCRIPTS environment variable is not set"
   exit 1
 fi
+
+source $IOS_SCRIPTS/ios-i386-env.rc
 
 i386-apple-darwin11-cabal configure -fios $@ && \
   i386-apple-darwin11-cabal build exe:EpidemicStaticLib
