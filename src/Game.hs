@@ -542,7 +542,7 @@ sideBarRender = do
   let renderScore = do
         let x = sideBarLeft + sideBarWidth/2
             y = sideBarTop  - worldHeight/10
-        drawTextOfWidth_ scoreGrad (R2 x y) (sideBarWidth*0.9) $ printf "%04d" $ gsScore gs
+        drawTextOfHeight_ scoreGrad (R2 x y) (sideBarWidth*0.20) $ printf "%d" $ gsScore gs
   --
   addRender (renderAntibiotics >> renderScore)
 
