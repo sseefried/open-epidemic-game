@@ -1,9 +1,6 @@
 High priority
 -------------
 
-[ ] Start respecting AppDidEnterBackground events and put the game in a
-    quiescent state.
-
 [ ] Bug: Show all the new germs before you show game over screen.
     I'm pretty sure this is not working.
 
@@ -34,8 +31,14 @@ High priority
 ------------
 Low priority
 ------------
-[ ] Refactor the setup-ios-*-wrapper.sh scripts and the .rc files
-    Fix up
+[ ] Refactor the setup-ios-*-wrapper.sh scripts and the .rc files.
+    Basic idea is that to use any of these scripts a special
+    "ghc-ios.rc" file must exist which sets a whole bunch of environment
+    variables that are required. Things such as:
+    - $HOME
+    - path LLVM 3.0
+    - path to LLVM 3.6
+    - paths to sysroots
 
 
 [ ] Refactor the GameState to be opaque so that you can hide annoying
@@ -73,6 +76,10 @@ Low priority
 ----
 DONE
 ----
+[X] Start respecting AppDidEnterBackground events and put the game in a
+    quiescent state.
+
+
 [X] Increase the doubling speed so you can't just stay in level 1
 
 [X] Make sure germ being dragged stays in bounds!

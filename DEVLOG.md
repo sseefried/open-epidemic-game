@@ -1,6 +1,9 @@
-# Fri 6 Mar 2015
+# Sat 7 Mar 2015
 
-The events management for the game is very brittle.
+More game design ideas:
+
+* Add Konami code to unlock some kind of easter egg.
+* Vibrate the phone when the germs die.
 
 # Thu 5 Mar 2015
 
