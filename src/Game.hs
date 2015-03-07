@@ -157,7 +157,7 @@ initGameState bounds hipSpace germs =
     , gsGerms         = germMapList
     , gsNextGermId    = (length germs)
     , gsHipState      = hipSpace
-    , gsSoundQueue    = [GameSoundLevelMusicStart]
+    , gsSoundQueue    = [GSLevelMusicStart]
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
     , gsScore         = 0
@@ -212,9 +212,12 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmPaused :: FSMState -> GameM FSMState
     fsmPaused s = case ev of
-      Unpause -> return s
-      _       -> return $ FSMPaused s
-
+      Resume -> do
+        addToSoundQueue GSLevelMusicResume
+        return s
+      _       -> do
+        addToSoundQueue GSLevelMusicPause
+        return $ FSMPaused s
     --------------------------------------
     fsmPlayingLevel :: GameM FSMState
     fsmPlayingLevel = do
@@ -223,7 +226,7 @@ handleEvent fsmState ev = do
        then do
          t <- getTime
          addRender $ drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
-         modify $ \gs -> gs {  gsSoundQueue = [GameSoundLevelMusicStop] }
+         addToSoundQueue GSLevelMusicStop
          return $ FSMGameOver t
        else do
         case ev of
@@ -342,7 +345,7 @@ killGerm p = do
         let germs    = gsGerms gs
             newGerms = M.delete germId germs
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
-                           , gsSoundQueue = GameSoundSquish:gsSoundQueue gs
+                           , gsSoundQueue = gsSoundQueue gs ++ [GSSquish]
                            , gsScore = gsScore gs + 1 }
         runGLM . germGLFinaliser . germGL $ germ
         return $ M.size newGerms < M.size germs
@@ -364,7 +367,7 @@ applyAntibiotics (R2 x y)= do
     (ab,_):_ -> do
       let germs' = killWithAB ab gs
       modify $ \gs -> gs { gsGerms      = germs'
-                         , gsSoundQueue = GameSoundSquish:gsSoundQueue gs }
+                         , gsSoundQueue = gsSoundQueue gs ++ [GSSquish] }
       modifyAntibioticEffectiveness (effectivenessDilutionFactor*) ab
 
 ----------------------------------------------------------------------------------------------------
@@ -613,3 +616,6 @@ whenEventsMutedOtherwise t dflt gm = do
   if (d >= eventMuteTime) then gm else dflt
 
 ----------------------------------------------------------------------------------------------------
+
+addToSoundQueue :: GameSound -> GameM ()
+addToSoundQueue sound = modify $ \gs -> gs { gsSoundQueue = gsSoundQueue gs ++ [sound] }

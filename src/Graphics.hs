@@ -18,7 +18,6 @@ import           Control.Monad.Random
 import           Foreign.Marshal.Alloc (allocaBytes)
 import           Data.List (maximumBy)
 import           Control.Monad
-import           Text.Printf
 
 -- friends
 import Types

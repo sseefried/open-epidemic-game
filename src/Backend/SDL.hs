@@ -379,11 +379,13 @@ playSoundQueue bes sounds = mapM_ playSound sounds
   where
     playSound :: GameSound -> IO ()
     playSound s = case s of
-      GameSoundLevelMusicStart -> do
+      GSLevelMusicStart -> do
         maybe (return ()) (\wav -> M.playMusic wav 10000) -- loop a lot of times
               (besLevelMusic  bes)
-      GameSoundLevelMusicStop  -> M.haltMusic
-      GameSoundSquish          -> do
+      GSLevelMusicStop  -> M.haltMusic
+      GSLevelMusicPause -> M.pauseMusic >> M.pause (-1)
+      GSLevelMusicResume -> M.resumeMusic >> M.resume (-1)
+      GSSquish          -> do
          maybe (return ()) (\wav -> M.playChannelTimed (-1) wav 0 (-1) >> return ())
                (besSquishSound bes)
 
@@ -404,7 +406,7 @@ getEvents besRef = do
      t <- (addUTCTime $ -1/(realToFrac desiredFramerate)) <$> getCurrentTime
      --
      modifyIORef besRef $ \bes -> bes { besLastTime = t }
-     return $ Events [Unpause]
+     return $ Events [Resume]
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef BackendState

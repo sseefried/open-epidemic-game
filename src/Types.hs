@@ -380,7 +380,8 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> Double -- radius
                                  -> Double -- amplitude scale
                                  -> GLM ()
-                     , germGLFinaliser :: GLM () }
+                     , germGLFinaliser :: GLM ()
+                     }
 
 ----------------------------------------------------------------------------------------------------
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }
@@ -399,6 +400,7 @@ data GameState = GameState { gsRender        :: GLM () -- GL commands
                            , gsAntibiotics   :: Map Antibiotic AntibioticData
                            , gsScore         :: Int
                            }
+
 data AntibioticData = AntibioticData { abEffectiveness :: Double
                                      , abEnabled       :: Bool
                                      , abInitPos       :: R2     -- init position on screen
@@ -406,10 +408,11 @@ data AntibioticData = AntibioticData { abEffectiveness :: Double
                                      , abSelected      :: Bool
                                      }
 
-
-data GameSound = GameSoundLevelMusicStart -- start level music
-               | GameSoundLevelMusicStop  -- stop level music
-               | GameSoundSquish
+data GameSound = GSLevelMusicStart -- start level music
+               | GSLevelMusicPause -- pause level music
+               | GSLevelMusicResume
+               | GSLevelMusicStop  -- stop level music
+               | GSSquish
 
 ----------------------------------------------------------------------------------------------------
 data Antibiotic = Penicillin
