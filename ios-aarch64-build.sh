@@ -8,8 +8,8 @@
 ARCH_OS=aarch64-apple-darwin14
 ARCH=aarch64
 
-if [ "$IOS_SCRIPTS" = "" ]; then
-  echo "IOS_SCRIPTS environment variable is not set"
+if [ "$IOS_SCRIPTS" = "" -o "$EPIDEMIC_IOS_BUILD_DIR" = "" ]; then
+  echo "Either IOS_SCRIPTS or EPIDEMIC_IOS_BUILD_DIR is not set"
   exit 1
 fi
 

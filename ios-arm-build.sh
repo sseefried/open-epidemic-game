@@ -7,8 +7,8 @@
 
 ARCH_OS=arm-apple-darwin10
 
-if [ "$IOS_SCRIPTS" = "" ]; then
-  echo "IOS_SCRIPTS environment variable is not set"
+if [ "$IOS_SCRIPTS" = "" -o "$EPIDEMIC_IOS_BUILD_DIR" = "" ]; then
+  echo "Either IOS_SCRIPTS or EPIDEMIC_IOS_BUILD_DIR is not set"
   exit 1
 fi
 
