@@ -167,15 +167,15 @@ eventMuteTime = 1.5 -- seconds
 
 unlockAntibioticsMap :: Map Int Antibiotic
 unlockAntibioticsMap = M.fromList $ case debugGame of
-  True  -> [(5, Penicillin), (10, Cyprofloxacin)]
-  False -> [(25, Penicillin), (100, Cyprofloxacin)]
+  True  -> [(5, Penicillin), (10, Ciprofloxacin)]
+  False -> [(25, Penicillin), (100, Ciprofloxacin)]
 
 -- [antibioticColor] generates a color for the liquid in the antibiotic based on
 -- the antibiotic and its effectiveness
 antibioticRGB :: Antibiotic -> (Double,Double,Double)
 antibioticRGB ab = case ab of
   Penicillin    -> (0,1,0)
-  Cyprofloxacin -> (1,0,1)
+  Ciprofloxacin -> (1,0,1)
 
 desiredFramerate :: Double
 desiredFramerate = 60
@@ -416,7 +416,7 @@ data GameSound = GSLevelMusicStart -- start level music
 
 ----------------------------------------------------------------------------------------------------
 data Antibiotic = Penicillin
-                | Cyprofloxacin
+                | Ciprofloxacin
                 deriving (Eq, Show, Ord, Enum)
 
 allAntibiotics :: [Antibiotic]
