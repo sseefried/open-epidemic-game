@@ -1,3 +1,3 @@
 #!/bin/bash
 
-scp * 'playspace:~/sites/declarative-games.com/public/epidemic'
+rsync -avz . 'playspace:~/sites/declarative-games.com/public/epidemic'

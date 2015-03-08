@@ -1,0 +1,137 @@
+<DOCTYPE !html>
+<html>
+<head>
+<script type="text/javascript" src="jquery-2.1.1.min.js"></script>
+
+<script type="text/javascript">
+  $(function() {
+    var resize = function() {
+      var w = $(window).width(),
+          title = Math.round(w*0.1) + "px",
+          large = Math.round(w*0.025) + "px";
+      $('.title').css("font-size", title);
+      $('.large').css("font-size", large);
+    }
+    resize();
+    $(window).resize(resize);
+  })
+</script>
+
+<style>
+  @font-face {
+    font-family: 'ElliotSix';
+    src: url('font.ttf');
+  }
+
+  .elliot-six {
+    font-family: 'ElliotSix';
+  }
+
+  .title {
+    font-family: 'ElliotSix';
+    text-align: center;
+    padding-top: 20px;
+    color: #095720;
+    background: -webkit-linear-gradient(#095720, #16AA30);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  body {
+    background: #333333;
+    font-family: Helvetica;
+    margin: 0;
+    z-index: 0;
+  }
+
+  .background {
+    width: 60%;
+    margin: auto;
+    background: white;
+    background-image: url("background.png");
+    background-repeat: repeat-y;
+    background-position: center;
+    background-size: 90%;
+    z-index: 1;
+    padding: 2%;
+  }
+
+  .content {
+    z-index: 10;
+
+  }
+
+  img {
+     padding:2px;
+     border:1px solid #021a40;
+     background-color:#ffF;
+  }
+
+  .large {
+    font-family: 'ElliotSix';
+    margin-top: 20%;
+    text-align: center;
+  }
+
+
+
+</style>
+</head>
+<body>
+  <div class="background">
+
+    <div class="content">
+      <div class="title">Epidemic</div>
+      <h2>How to install on your Android device</h2>
+
+
+      <p>First, join the <a href="https://groups.google.com/forum/#!forum/declarative-games-epidemic-testers">
+       Epidemic Testers</a> group. If you're already a member all you have to do is follow this
+       link:
+      </p>
+      <p>
+        <a href="https://play.google.com/apps/testing/com.declarative.games.epidemic.beta">
+        https://play.google.com/apps/testing/com.declarative.games.epidemic.beta</a>
+      </p>
+
+      <p>You have two choices, either you can do this on your Android device or on your computer.</p>
+
+      <h2>Doing this on your Android device</h2>
+
+      <h3>Follow the link</h3>
+
+      <div><img src="android-1.png" width="400px"/></div>
+
+      <h3>Tap on "Install"</h3>
+
+      <div><img src="android-2.png" width="400px"/></div>
+
+      <h2>Doing this on your computer</h2>
+
+      <p>In order for this to work you will have be signed in on your computer on the same
+         Google account that you are signed in on your phone</p>
+
+      <h3>Click on "Become a Tester"</h3>
+
+      <div><img src="computer-1.png"/ width="100%"></div>
+
+      <h3>Install on a linked device</h3>
+
+      <div><img src="computer-2.png"/ width="100%"></div>
+
+      <h3>Click on "download it from the Play Store"</h3>
+
+      Now install it on a device attached to the Google account you're currently signed into.
+
+      <div><img src="computer-3.png"/></div>
+
+    </div>
+
+
+
+  </div>
+
+
+
+</body>
+</html>

@@ -1,9 +1,28 @@
+
+
 # Sat 7 Mar 2015
 
 More game design ideas:
 
 * Add Konami code to unlock some kind of easter egg.
 * Vibrate the phone when the germs die.
+
+---
+
+I've found a great utility that compresses executables. I added a new "Run Script" phase
+to the Xcode build and then used this script
+
+${SRCROOT}/upx --lzma ${CONFIGURATION_BUILD_DIR}/${EXECUTABLE_PATH}
+
+Worked like a charm right up to the code signing. Code signing used to work with UPX but not at
+present. I found a bug report and I think if I pester the developers I might get this
+added.
+
+http://sourceforge.net/p/upx/bugs/229/
+
+It significantly compresses the executables so it will be worth it.
+
+---
 
 # Thu 5 Mar 2015
 
