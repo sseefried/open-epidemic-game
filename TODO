@@ -1,6 +1,8 @@
 High priority
 -------------
 
+[ ] Add main menu. Allow control of things like SFX volume and music volume.
+
 [ ] Bug: Show all the new germs before you show game over screen.
     I'm pretty sure this is not working.
 
@@ -21,8 +23,6 @@ High priority
 
 [ ] Remove the status bar on iOS version
 
-[ ] Game does not save state when you hit home button to pause. Reported
-    by Andy. Check.
 
 [ ] Add liquid from bottle sound effect for antibiotics
 
@@ -76,6 +76,10 @@ Low priority
 ----
 DONE
 ----
+[X] Game does not save state when you hit home button to pause. Reported
+    by Andy. Check.
+
+
 [X] Start respecting AppDidEnterBackground events and put the game in a
     quiescent state.
 

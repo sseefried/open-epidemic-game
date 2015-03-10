@@ -1,4 +1,9 @@
+# Sun 8 Mar 2015
 
+A check list for debugging on Android
+
+* Make sure you used the `adb shell setprop log.redirect-stdio true` trick below to see all
+  messages using `adb logcat`
 
 # Sat 7 Mar 2015
 
