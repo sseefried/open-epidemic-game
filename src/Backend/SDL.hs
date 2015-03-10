@@ -104,7 +104,7 @@ initOpenGL window (w,h) resourcePath = do
   glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST
   glDepthFunc gl_LESS
-  programId <- compileGLSLProgram textureProgram
+  programId <- compileGLSLProgram textureGLSLProgram
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
   glUseProgram programId
   --
@@ -129,14 +129,14 @@ initOpenGL window (w,h) resourcePath = do
   glRenderbufferStorage gl_RENDERBUFFER  gl_RGBA8  glW glH
   glFramebufferRenderbuffer gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_RENDERBUFFER renderBuf
   --
-  let gfxs = GfxState { gfxProgramId   = programId
-                      , gfxPosition    = positionLoc
-                      , gfxTexcoord    = texCoordLoc
-                      , gfxDrawTexture = drawTextureLoc
-                      , gfxColor       = colorLoc
-                      , gfxOrthoBounds = bds
-                      , gfxFontFace    = fontFace
-                      , gfxMainFBO     = mainFBO
+  let gfxs = GfxState { gfxPosition           = positionLoc
+                      , gfxTexcoord           = texCoordLoc
+                      , gfxTexGLSLDrawTexture = drawTextureLoc
+                      , gfxTexGLSLColor       = colorLoc
+                      , gfxTexGLSLProgramId   = programId
+                      , gfxOrthoBounds        = bds
+                      , gfxFontFace           = fontFace
+                      , gfxMainFBO            = mainFBO
                       }
   return (gfxs, context)
   where
@@ -492,10 +492,8 @@ loadShader src typ = do
 data GLSLProgram = GLSLProgram { glslVertexShader :: String
                                , glslFragmentShader :: String }
 
-textureProgram :: GLSLProgram
-textureProgram =
-  GLSLProgram {
-      glslVertexShader =
+glslVertexShaderDefault :: String
+glslVertexShaderDefault =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
           , "precision mediump float;"
@@ -503,14 +501,20 @@ textureProgram =
           , "attribute vec3 position;"
           , "attribute vec2 texCoord;"
           , "uniform mat4 modelView;"
-          , "varying vec2 texCoordVar;"
+          , "varying vec2 vTexCoord;"
           , ""
           , "void main()"
           , "{"
           , "  gl_Position = modelView * vec4(position,1);"
-          , "  texCoordVar = texCoord;"
+          , "  vTexCoord = texCoord;"
           , "}"
           ]
+
+
+textureGLSLProgram :: GLSLProgram
+textureGLSLProgram =
+  GLSLProgram {
+      glslVertexShader = glslVertexShaderDefault
     , glslFragmentShader =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
@@ -520,17 +524,64 @@ textureProgram =
           , "uniform bool drawTexture;"
           , "uniform vec4 color;"
           , " "
-          , "varying vec2 texCoordVar;"
+          , "varying vec2 vTexCoord;"
           , " "
           , "void main()"
           , "{"
           , "  if (drawTexture) {"
           , "    // sample the texture at the interpolated texture coordinate"
           , "    // and write it to gl_FragColor "
-          , "    gl_FragColor = texture2D(texture, texCoordVar);"
+          , "    gl_FragColor = texture2D(texture, vTexCoord);"
           , "  } else {"
           , "    gl_FragColor = color;"
           , "  }"
           , "}"
           ]
+  }
+
+blurGLSLProgram :: GLSLProgram
+blurGLSLProgram =
+  GLSLProgram {
+      glslVertexShader = glslVertexShaderDefault
+    , glslFragmentShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "sampler2D texture;"
+          , "varying vec2 vTexCoord;"
+          , ""
+          , "uniform float blurFactor0;"
+          , "uniform float blurFactor1;"
+          , "uniform float blurFactor2;"
+          , "uniform float blurFactor3;"
+          , "uniform float blurFactor4;"
+          , ""
+          , "//the direction of our blur"
+          , "//(1.0, 0.0) -> x-axis blur"
+          , "//(0.0, 1.0) -> y-axis blur"
+          , "//(1.0, 1.0) -> radial blur"
+          , "uniform vec2 dir;"
+          , ""
+          , "float blurComponent(float dist, float blurFactor) {"
+          , ""
+          , "   return texture2D(texture, vec2(vTexCoord.x - dist*dir.x,"
+          , "                                  vTexCoord.y - dist*dir.y)) * blurFactor;"
+          , "}"
+          , ""
+          , "void main() {"
+          , "  vec4 sum = vec4(0.0);"
+
+          , "  sum += blurComponent( 0.0, blurFactor0);"
+          , "  sum += blurComponent( 1.0, blurFactor1);"
+          , "  sum += blurComponent(-1.0, blurFactor1);"
+          , "  sum += blurComponent( 2.0, blurFactor2);"
+          , "  sum += blurComponent(-2.0, blurFactor2);"
+          , "  sum += blurComponent( 3.0, blurFactor3);"
+          , "  sum += blurComponent(-3.0, blurFactor3);"
+          , "  sum += blurComponent( 4.0, blurFactor4);"
+          , "  sum += blurComponent(-4.0, blurFactor4);"
+          , ""
+          , "  gl_FragColor = vec4(sum.xyz, 1.0);"
+        ]
   }

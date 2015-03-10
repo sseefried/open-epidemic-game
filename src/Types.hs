@@ -323,17 +323,22 @@ data OrthoBounds =
 
 data GLM a = GLM { unGLM :: GfxState -> IO a }
 
---
--- FIXME: This is not the right name of this data structure. glslFontFace? It has nothing
--- to do with GLSL. It's more a "graphics state".
---
-data GfxState = GfxState { gfxPosition    :: AttributeLocation
-                         , gfxTexcoord    :: AttributeLocation
-                         , gfxDrawTexture :: UniformLocation
-                         , gfxColor       :: UniformLocation
-                         , gfxProgramId   :: ProgramId
+data GfxState = GfxState { gfxPosition    :: AttributeLocation -- common to all shaders
+                         , gfxTexcoord    :: AttributeLocation -- common to all shaders
+                         -- texture shader
+                         , gfxTexGLSLDrawTexture :: UniformLocation
+                         , gfxTexGLSLColor       :: UniformLocation
+                         , gfxTexGLSLProgramId   :: ProgramId
+                         -- blur shader
+                         , gfxBlurGLSLFactor0   :: UniformLocation
+                         , gfxBlurGLSLFactor1   :: UniformLocation
+                         , gfxBlurGLSLFactor2   :: UniformLocation
+                         , gfxBlurGLSLFactor3   :: UniformLocation
+                         , gfxBlurGLSLFactor4   :: UniformLocation
+                         , gfxBlurGLSLDir       :: UniformLocation
+                         , gfxBlurGLSLProgramId :: ProgramId
+                         --
                          , gfxOrthoBounds :: OrthoBounds
-                         -- FIXME: not really GLSL... Maybe rename this state?
                          , gfxFontFace    :: FontFace
                          , gfxMainFBO     :: FrameBufferId
                          }

@@ -141,7 +141,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
   --
   let positionIdx = gfxPosition gfxAttrs
       texCoordIdx = gfxTexcoord gfxAttrs
-      drawTextureLoc = gfxDrawTexture gfxAttrs
+      drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
       (x,y,w,h) = (f2gl (x' - w'/2), f2gl (y' - h'/2), f2gl w', f2gl h')
       scale     = realToFrac . screenScale . gfxOrthoBounds $ gfxAttrs
       cw        = w' * scale
@@ -178,7 +178,6 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
     glEnableVertexAttribArray (gfxPosition gfxAttrs)
     glEnableVertexAttribArray (gfxTexcoord gfxAttrs)
 
-
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
       pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
                    , x+w, y  , zMax, 1, 0  -- upper-left
@@ -195,8 +194,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxAttrs -> do
   let positionLoc = gfxPosition gfxAttrs
-      drawTextureLoc = gfxDrawTexture gfxAttrs
-      colorLoc       = gfxColor gfxAttrs
+      drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
+      colorLoc       = gfxTexGLSLColor gfxAttrs
       ptsInPos  = 3
       ptsInQuad = 4
       i2i = fromIntegral
@@ -296,7 +295,7 @@ germGfxToGermGL gfx = GLM $ const $ do
       germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \gfxAttrs -> do
         let positionIdx    = gfxPosition gfxAttrs
             texCoordIdx    = gfxTexcoord gfxAttrs
-            drawTextureLoc = gfxDrawTexture gfxAttrs
+            drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
 
         glBindTexture gl_TEXTURE_2D textureId
         glUniform1i drawTextureLoc 1 -- set to 'true'
