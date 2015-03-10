@@ -335,6 +335,7 @@ data GfxState = GfxState { gfxPosition    :: AttributeLocation
                          , gfxOrthoBounds :: OrthoBounds
                          -- FIXME: not really GLSL... Maybe rename this state?
                          , gfxFontFace    :: FontFace
+                         , gfxMainFBO     :: FrameBufferId
                          }
 
 instance Functor GLM where
@@ -374,6 +375,9 @@ type AttributeLocation = GLuint
 type UniformLocation   = GLint
 type VariableLocation  = GLuint
 type TextureId         = GLuint
+type RenderBufferId    = GLuint
+type FrameBufferId     = GLuint
+
 data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> R2     -- position
                                  -> Time   -- cumulative animation time

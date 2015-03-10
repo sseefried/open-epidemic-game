@@ -119,6 +119,16 @@ initOpenGL window (w,h) resourcePath = do
   drawTextureLoc <- getUniformLocation   programId "drawTexture"
   colorLoc       <- getUniformLocation   programId "color"
   fontFace       <- loadFontFace $ resourcePath ++ "/font.ttf"
+  --
+  -- Allocate FBO and color render buffer
+  --
+  mainFBO <- genFrameBuffer
+  glBindFramebuffer gl_FRAMEBUFFER mainFBO
+  renderBuf <- genRenderBuffer
+  glBindRenderbuffer gl_RENDERBUFFER renderBuf
+  glRenderbufferStorage gl_RENDERBUFFER  gl_RGBA8  glW glH
+  glFramebufferRenderbuffer gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_RENDERBUFFER renderBuf
+  --
   let gfxs = GfxState { gfxProgramId   = programId
                       , gfxPosition    = positionLoc
                       , gfxTexcoord    = texCoordLoc
@@ -126,9 +136,12 @@ initOpenGL window (w,h) resourcePath = do
                       , gfxColor       = colorLoc
                       , gfxOrthoBounds = bds
                       , gfxFontFace    = fontFace
+                      , gfxMainFBO     = mainFBO
                       }
   return (gfxs, context)
   where
+    glW = fromIntegral w
+    glH = fromIntegral h
 ----------------------------------------------------------------------------------------------------
 getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
                   -> IO VariableLocation
@@ -278,9 +291,10 @@ runFrameUpdate besRef = do
       glsls = besGfxState bes
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
+    glBindFramebuffer gl_FRAMEBUFFER 0
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-    runGLMIO glsls (gsRender gs)
+    runGLMIO glsls $ gsRender gs
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
     mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (gfxOrthoBounds glsls)
     when debugSystem $ renderDebugInfo besRef

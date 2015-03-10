@@ -3,7 +3,7 @@ module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
     drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic,
-    renderQuadWithColor
+    renderQuadWithColor, genTexture, genFrameBuffer, genRenderBuffer
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -45,8 +45,15 @@ floatSize = sizeOf (undefined :: GLfloat)
 
 ----------------------------------------------------------------------------------------------------
 genTexture :: IO TextureId
-genTexture =
-  alloca $ \(ptr :: Ptr GLuint) -> do { glGenTextures 1 ptr; peek ptr }
+genTexture = alloca $ \(ptr :: Ptr TextureId) -> do { glGenTextures 1 ptr; peek ptr }
+
+----------------------------------------------------------------------------------------------------
+genFrameBuffer :: IO FrameBufferId
+genFrameBuffer = alloca $ \(ptr :: Ptr FrameBufferId) -> do { glGenFramebuffers 1 ptr; peek ptr }
+
+----------------------------------------------------------------------------------------------------
+genRenderBuffer :: IO RenderBufferId
+genRenderBuffer = alloca $ \(ptr :: Ptr RenderBufferId) -> do { glGenRenderbuffers 1 ptr; peek ptr }
 
 ----------------------------------------------------------------------------------------------------
 --
