@@ -43,7 +43,7 @@ import FreeType
 data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besLastTime       :: UTCTime
                                  , _besDims          :: (Int, Int)
-                                 , besGLSLState      :: GLSLState
+                                 , besGfxState       :: GfxState
                                  , _besGLContext     :: S.GLContext
                                  , besGameState      :: GameState
                                  , besPressHistory   :: IORef PressHistory
@@ -85,7 +85,7 @@ compileGLSLProgram p = do
 
 ----------------------------------------------------------------------------------------------------
 
-initOpenGL :: S.Window -> (Int, Int) -> String -> IO (GLSLState, S.GLContext)
+initOpenGL :: S.Window -> (Int, Int) -> String -> IO (GfxState, S.GLContext)
 initOpenGL window (w,h) resourcePath = do
   --
   -- On iOS the you must set these attributes *before* the gl context is created.
@@ -119,15 +119,15 @@ initOpenGL window (w,h) resourcePath = do
   drawTextureLoc <- getUniformLocation   programId "drawTexture"
   colorLoc       <- getUniformLocation   programId "color"
   fontFace       <- loadFontFace $ resourcePath ++ "/font.ttf"
-  let glsls = GLSLState { glslProgramId   = programId
-                        , glslPosition    = positionLoc
-                        , glslTexcoord    = texCoordLoc
-                        , glslDrawTexture = drawTextureLoc
-                        , glslColor       = colorLoc
-                        , glslOrthoBounds = bds
-                        , glslFontFace    = fontFace
-                        }
-  return (glsls, context)
+  let gfxs = GfxState { gfxProgramId   = programId
+                      , gfxPosition    = positionLoc
+                      , gfxTexcoord    = texCoordLoc
+                      , gfxDrawTexture = drawTextureLoc
+                      , gfxColor       = colorLoc
+                      , gfxOrthoBounds = bds
+                      , gfxFontFace    = fontFace
+                      }
+  return (gfxs, context)
   where
 ----------------------------------------------------------------------------------------------------
 getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
@@ -204,7 +204,7 @@ initialize title mbResourcePath = do
   dirExists <- doesDirectoryExist resourcePath
   when (not dirExists ) $ exitWithError $
     printf "Resource path `%s' does not exist" resourcePath
-  (glslState, context) <- initOpenGL window (w,h) resourcePath
+  (gfxState, context) <- initOpenGL window (w,h) resourcePath
   (levelMusic, squishSound) <- case platform of
     NoSound -> return (Nothing, Nothing)
     _       -> do
@@ -221,7 +221,7 @@ initialize title mbResourcePath = do
   newIORef $ BackendState { _besStartTime     = t
                           , besLastTime       = t
                           , _besDims          = dims
-                          , besGLSLState      = glslState
+                          , besGfxState       = gfxState
                           , _besGLContext     = context
                           , besGameState      = gs
                           , besPressHistory   = pressHistory
@@ -249,7 +249,7 @@ _runOnGameState :: (a -> BackendState -> BackendState)
                -> IO ()
 _runOnGameState upd besRef gameM cont  = do
   bes     <- readIORef besRef
-  (a, gs) <- runGameM (besGLSLState bes) (besGameState bes) gameM
+  (a, gs) <- runGameM (besGfxState bes) (besGameState bes) gameM
   writeIORef besRef $ upd a $ bes { besGameState = gs }
   cont gs
 
@@ -275,14 +275,14 @@ runFrameUpdate besRef = do
   bes <- readIORef besRef
   let gs  = besGameState bes
       (Color r g b _) = backgroundColor -- FIXME: Shouldn't be transparent
-      glsls = besGLSLState bes
+      glsls = besGfxState bes
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
     runGLMIO glsls (gsRender gs)
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
-    mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (glslOrthoBounds glsls)
+    mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (gfxOrthoBounds glsls)
     when debugSystem $ renderDebugInfo besRef
     glFlush
     S.glSwapWindow (besWindow bes)
@@ -290,7 +290,7 @@ runFrameUpdate besRef = do
 renderDebugInfo :: IORef BackendState -> IO ()
 renderDebugInfo besRef = do
   bes <- readIORef besRef
-  let glsls = besGLSLState bes
+  let glsls = besGfxState bes
   runGLMIO glsls $ drawTextLinesOfWidth_ (Color 0 0 0 1) (R2 0 0) fieldWidth
                      [show $ _besDims bes]
 
@@ -333,7 +333,7 @@ runInputEventHandler besRef handleEvent = do
         bes <- readIORef besRef
         let fsmState = besFSMState bes
             gs = besGameState bes
-        (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState ev)
+        (fsmState', gs') <- runGameM (besGfxState bes) gs (handleEvent fsmState ev)
         writeIORef besRef $ bes { besGameState = gs', besFSMState = fsmState' }
         if fsmState == fsmState' then runUntilFSMStateChange evs else return ()
 
@@ -360,7 +360,7 @@ runPhysicsEventHandler besRef handleEvent = do
     addTick (besFRBuf bes) duration
     let gs       = besGameState bes
         fsmState = besFSMState  bes
-    (fsmState', gs') <- runGameM (besGLSLState bes) gs (handleEvent fsmState (Physics duration))
+    (fsmState', gs') <- runGameM (besGfxState bes) gs (handleEvent fsmState (Physics duration))
     playSoundQueue bes (gsSoundQueue gs')
     -- update the fsmState and gameState.
     return $ bes { besFSMState  = fsmState'

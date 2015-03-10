@@ -321,21 +321,21 @@ data OrthoBounds =
               , screenScale  :: Double -- convert from world distance to screen distance
               } deriving (Show, Eq)
 
-data GLM a = GLM { unGLM :: GLSLState -> IO a }
+data GLM a = GLM { unGLM :: GfxState -> IO a }
 
 --
 -- FIXME: This is not the right name of this data structure. glslFontFace? It has nothing
 -- to do with GLSL. It's more a "graphics state".
 --
-data GLSLState = GLSLState { glslPosition    :: AttributeLocation
-                           , glslTexcoord    :: AttributeLocation
-                           , glslDrawTexture :: UniformLocation
-                           , glslColor       :: UniformLocation
-                           , glslProgramId   :: ProgramId
-                           , glslOrthoBounds :: OrthoBounds
-                           -- FIXME: not really GLSL... Maybe rename this state?
-                           , glslFontFace    :: FontFace
-                           }
+data GfxState = GfxState { gfxPosition    :: AttributeLocation
+                         , gfxTexcoord    :: AttributeLocation
+                         , gfxDrawTexture :: UniformLocation
+                         , gfxColor       :: UniformLocation
+                         , gfxProgramId   :: ProgramId
+                         , gfxOrthoBounds :: OrthoBounds
+                         -- FIXME: not really GLSL... Maybe rename this state?
+                         , gfxFontFace    :: FontFace
+                         }
 
 instance Functor GLM where
   -- (a -> b) -> (GLM a -> GLM b)
@@ -356,8 +356,8 @@ instance Applicative GLM where
 liftGLM :: IO a -> GLM a
 liftGLM io = GLM . const $ io
 
-getGLSLState :: GLM GLSLState
-getGLSLState = GLM return
+getGfxState :: GLM GfxState
+getGfxState = GLM return
 
 --
 -- Magnitude of near and far planes in orthographic project

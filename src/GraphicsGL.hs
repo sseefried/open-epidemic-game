@@ -126,17 +126,17 @@ withNewTexture f = do
 -- *centre* of the quad.
 --
 renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
-renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
+renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
   -- we take the ceiling of [w] and [h] and use that as our bounds.
   -- We then scale the [cairoRender] by that amount (which will be very close to 1.)
   --
-  let positionIdx = glslPosition glslAttrs
-      texCoordIdx = glslTexcoord glslAttrs
-      drawTextureLoc = glslDrawTexture glslAttrs
+  let positionIdx = gfxPosition gfxAttrs
+      texCoordIdx = gfxTexcoord gfxAttrs
+      drawTextureLoc = gfxDrawTexture gfxAttrs
       (x,y,w,h) = (f2gl (x' - w'/2), f2gl (y' - h'/2), f2gl w', f2gl h')
-      scale     = realToFrac . screenScale . glslOrthoBounds $ glslAttrs
+      scale     = realToFrac . screenScale . gfxOrthoBounds $ gfxAttrs
       cw        = w' * scale
       ch        = h' * scale
       wi        = ceiling cw
@@ -168,8 +168,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
 
-    glEnableVertexAttribArray (glslPosition glslAttrs)
-    glEnableVertexAttribArray (glslTexcoord glslAttrs)
+    glEnableVertexAttribArray (gfxPosition gfxAttrs)
+    glEnableVertexAttribArray (gfxTexcoord gfxAttrs)
 
 
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
@@ -186,10 +186,10 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \glslAttrs -> do
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
-renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
-  let positionLoc = glslPosition glslAttrs
-      drawTextureLoc = glslDrawTexture glslAttrs
-      colorLoc       = glslColor glslAttrs
+renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxAttrs -> do
+  let positionLoc = gfxPosition gfxAttrs
+      drawTextureLoc = gfxDrawTexture gfxAttrs
+      colorLoc       = gfxColor gfxAttrs
       ptsInPos  = 3
       ptsInQuad = 4
       i2i = fromIntegral
@@ -199,7 +199,7 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \glslAttrs -> do
   glUniform1i drawTextureLoc 0 -- set to 'false'
   glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
 
-  glEnableVertexAttribArray (glslPosition glslAttrs)
+  glEnableVertexAttribArray (gfxPosition gfxAttrs)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
     pokeArray vs [ x',    y'   , zMax  -- bottom-left
                  , x'+w', y'   , zMax  -- upper-left
@@ -286,16 +286,16 @@ germGfxToGermGL gfx = GLM $ const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \glslAttrs -> do
-        let positionIdx    = glslPosition glslAttrs
-            texCoordIdx    = glslTexcoord glslAttrs
-            drawTextureLoc = glslDrawTexture glslAttrs
+      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \gfxAttrs -> do
+        let positionIdx    = gfxPosition gfxAttrs
+            texCoordIdx    = gfxTexcoord gfxAttrs
+            drawTextureLoc = gfxDrawTexture gfxAttrs
 
         glBindTexture gl_TEXTURE_2D textureId
         glUniform1i drawTextureLoc 1 -- set to 'true'
 
-        glEnableVertexAttribArray (glslPosition glslAttrs)
-        glEnableVertexAttribArray (glslTexcoord glslAttrs)
+        glEnableVertexAttribArray (gfxPosition gfxAttrs)
+        glEnableVertexAttribArray (gfxTexcoord gfxAttrs)
 
         -- Create a star polygon.
         let drawPolys n arrayType movingPts = do
@@ -343,9 +343,9 @@ drawAntibiotic (R2 x y) ab effectiveness = do
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
 drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do
-  st <- getGLSLState
+  st <- getGfxState
   let textR :: Render Double
-      textR = textConstrainedBy tc (glslFontFace st) grad (0,0) len s
+      textR = textConstrainedBy tc (gfxFontFace st) grad (0,0) len s
   lenD <- liftGLM $ runWithoutRender textR
   let (w',h') = case tc of
                   Width  -> (len,  lenD)
@@ -367,9 +367,9 @@ drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
 drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
-  st <- getGLSLState
+  st <- getGfxState
   let textR :: Render Double
-      textR = textLinesOfWidth (glslFontFace st) color (0,0) w ss
+      textR = textLinesOfWidth (gfxFontFace st) color (0,0) w ss
   h <- liftGLM $ runWithoutRender textR
   renderCairoToQuad (x, y) (w,h) $ textR
 

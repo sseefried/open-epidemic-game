@@ -191,7 +191,7 @@ germPos g = runOnHipState $ getHipCircPos (germHipCirc g)
 
 
 
-runGameM :: GLSLState -> GameState -> GameM b -> IO (b, GameState)
+runGameM :: GfxState -> GameState -> GameM b -> IO (b, GameState)
 runGameM glsls gs gameM = do
   gsRef <- newIORef gs
   a <- go gsRef gameM
@@ -283,5 +283,5 @@ runHipMIO space = go
       H.spaceRemove space s
 
 ----------------------------------------------------------------------------------------------------
-runGLMIO :: GLSLState -> GLM a -> IO a
+runGLMIO :: GfxState -> GLM a -> IO a
 runGLMIO glsls (GLM f) = f glsls
