@@ -323,25 +323,30 @@ data OrthoBounds =
 
 data GLM a = GLM { unGLM :: GfxState -> IO a }
 
-data GfxState = GfxState { gfxPosition    :: AttributeLocation -- common to all shaders
-                         , gfxTexcoord    :: AttributeLocation -- common to all shaders
-                         -- texture shader
-                         , gfxTexGLSLDrawTexture :: UniformLocation
-                         , gfxTexGLSLColor       :: UniformLocation
-                         , gfxTexGLSLProgramId   :: ProgramId
-                         -- blur shader
-                         , gfxBlurGLSLFactor0   :: UniformLocation
-                         , gfxBlurGLSLFactor1   :: UniformLocation
-                         , gfxBlurGLSLFactor2   :: UniformLocation
-                         , gfxBlurGLSLFactor3   :: UniformLocation
-                         , gfxBlurGLSLFactor4   :: UniformLocation
-                         , gfxBlurGLSLDir       :: UniformLocation
-                         , gfxBlurGLSLProgramId :: ProgramId
-                         --
-                         , gfxOrthoBounds :: OrthoBounds
-                         , gfxFontFace    :: FontFace
-                         , gfxMainFBO     :: FrameBufferId
+data GfxState = GfxState { gfxBlurGLSL :: BlurGLSL
+                         , gfxTexGLSL  :: TextureGLSL
+                         , gfxFontFace :: FontFace
+                         , gfxMainFBO  :: FrameBufferId
                          }
+
+data TextureGLSL = TextureGLSL {
+                     texGLSLPosition    :: AttributeLocation
+                   , texGLSLTexcoord    :: AttributeLocation
+                   , texGLSLDrawTexture :: UniformLocation
+                   , texGLSLColor       :: UniformLocation
+                   , texGLSLOrthoBounds :: OrthoBounds
+                   , texGLSLProgramId   :: ProgramId
+                   }
+
+data BlurGLSL = BlurGLSL {
+                  blurGLSLFactor0   :: UniformLocation
+                , blurGLSLFactor1   :: UniformLocation
+                , blurGLSLFactor2   :: UniformLocation
+                , blurGLSLFactor3   :: UniformLocation
+                , blurGLSLFactor4   :: UniformLocation
+                , blurGLSLDir       :: UniformLocation
+                , blurGLSLProgramId :: ProgramId
+                }
 
 instance Functor GLM where
   -- (a -> b) -> (GLM a -> GLM b)

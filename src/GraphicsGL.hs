@@ -133,17 +133,18 @@ withNewTexture f = do
 -- *centre* of the quad.
 --
 renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
-renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
+renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
   -- we take the ceiling of [w] and [h] and use that as our bounds.
   -- We then scale the [cairoRender] by that amount (which will be very close to 1.)
   --
-  let positionIdx = gfxPosition gfxAttrs
-      texCoordIdx = gfxTexcoord gfxAttrs
-      drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
+  let ts = gfxTexGLSL gfxs
+      positionIdx = texGLSLPosition ts
+      texCoordIdx = texGLSLTexcoord ts
+      drawTextureLoc = texGLSLDrawTexture ts
       (x,y,w,h) = (f2gl (x' - w'/2), f2gl (y' - h'/2), f2gl w', f2gl h')
-      scale     = realToFrac . screenScale . gfxOrthoBounds $ gfxAttrs
+      scale     = realToFrac . screenScale . texGLSLOrthoBounds $ ts
       cw        = w' * scale
       ch        = h' * scale
       wi        = ceiling cw
@@ -175,8 +176,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
 
-    glEnableVertexAttribArray (gfxPosition gfxAttrs)
-    glEnableVertexAttribArray (gfxTexcoord gfxAttrs)
+    glEnableVertexAttribArray (texGLSLPosition ts)
+    glEnableVertexAttribArray (texGLSLTexcoord ts)
 
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
       pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
@@ -192,10 +193,11 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxAttrs -> do
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
-renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxAttrs -> do
-  let positionLoc = gfxPosition gfxAttrs
-      drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
-      colorLoc       = gfxTexGLSLColor gfxAttrs
+renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxs -> do
+  let ts = gfxTexGLSL gfxs
+      positionLoc    = texGLSLPosition ts
+      drawTextureLoc = texGLSLDrawTexture ts
+      colorLoc       = texGLSLColor ts
       ptsInPos  = 3
       ptsInQuad = 4
       i2i = fromIntegral
@@ -205,7 +207,7 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxAttrs -> do
   glUniform1i drawTextureLoc 0 -- set to 'false'
   glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
 
-  glEnableVertexAttribArray (gfxPosition gfxAttrs)
+  glEnableVertexAttribArray (texGLSLPosition ts)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
     pokeArray vs [ x',    y'   , zMax  -- bottom-left
                  , x'+w', y'   , zMax  -- upper-left
@@ -292,16 +294,16 @@ germGfxToGermGL gfx = GLM $ const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \gfxAttrs -> do
-        let positionIdx    = gfxPosition gfxAttrs
-            texCoordIdx    = gfxTexcoord gfxAttrs
-            drawTextureLoc = gfxTexGLSLDrawTexture gfxAttrs
-
+      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \gfxs -> do
+        let ts = gfxTexGLSL gfxs
+            positionIdx    = texGLSLPosition ts
+            texCoordIdx    = texGLSLTexcoord ts
+            drawTextureLoc = texGLSLDrawTexture ts
         glBindTexture gl_TEXTURE_2D textureId
         glUniform1i drawTextureLoc 1 -- set to 'true'
 
-        glEnableVertexAttribArray (gfxPosition gfxAttrs)
-        glEnableVertexAttribArray (gfxTexcoord gfxAttrs)
+        glEnableVertexAttribArray (texGLSLPosition ts)
+        glEnableVertexAttribArray (texGLSLTexcoord ts)
 
         -- Create a star polygon.
         let drawPolys n arrayType movingPts = do

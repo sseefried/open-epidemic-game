@@ -104,21 +104,10 @@ initOpenGL window (w,h) resourcePath = do
   glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST
   glDepthFunc gl_LESS
-  programId <- compileGLSLProgram textureGLSLProgram
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
-  glUseProgram programId
-  --
-  -- The co-ordinates are set to be the world co-ordinate system. This saves us
-  -- converting for OpenGL calls
-  --
-  -- [ortho2D] must appear after glUseProgram programId
-  let bds = orthoBounds (w,h)
-  ortho2D programId bds
-  positionLoc    <- getAttributeLocation programId "position"
-  texCoordLoc    <- getAttributeLocation programId "texCoord"
-  drawTextureLoc <- getUniformLocation   programId "drawTexture"
-  colorLoc       <- getUniformLocation   programId "color"
-  fontFace       <- loadFontFace $ resourcePath ++ "/font.ttf"
+  texGLSL  <- initTextureGLSL (w,h)
+  blurGLSL <- initBlurGLSL (w,h)
+  fontFace <- loadFontFace $ resourcePath ++ "/font.ttf"
   --
   -- Allocate FBO and color render buffer
   --
@@ -129,19 +118,41 @@ initOpenGL window (w,h) resourcePath = do
   glRenderbufferStorage gl_RENDERBUFFER  gl_RGBA8  glW glH
   glFramebufferRenderbuffer gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_RENDERBUFFER renderBuf
   --
-  let gfxs = GfxState { gfxPosition           = positionLoc
-                      , gfxTexcoord           = texCoordLoc
-                      , gfxTexGLSLDrawTexture = drawTextureLoc
-                      , gfxTexGLSLColor       = colorLoc
-                      , gfxTexGLSLProgramId   = programId
-                      , gfxOrthoBounds        = bds
-                      , gfxFontFace           = fontFace
-                      , gfxMainFBO            = mainFBO
+  let gfxs = GfxState { gfxTexGLSL  = texGLSL
+                      , gfxBlurGLSL = blurGLSL
+                      , gfxFontFace = fontFace
+                      , gfxMainFBO  = mainFBO
                       }
   return (gfxs, context)
   where
     glW = fromIntegral w
     glH = fromIntegral h
+
+initTextureGLSL :: (Int, Int) -> IO TextureGLSL
+initTextureGLSL (w,h) = do
+  programId <- compileGLSLProgram textureGLSLProgram
+  --
+  -- The co-ordinates are set to be the world co-ordinate system. This saves us
+  -- converting for OpenGL calls
+  --
+  let bds = orthoBounds (w,h)
+  ortho2D programId bds
+  positionLoc    <- getAttributeLocation programId "position"
+  texCoordLoc    <- getAttributeLocation programId "texCoord"
+  drawTextureLoc <- getUniformLocation   programId "drawTexture"
+  colorLoc       <- getUniformLocation   programId "color"
+  return $ TextureGLSL { texGLSLPosition    = positionLoc
+                       , texGLSLTexcoord    = texCoordLoc
+                       , texGLSLDrawTexture = drawTextureLoc
+                       , texGLSLColor       = colorLoc
+                       , texGLSLOrthoBounds = bds
+                       , texGLSLProgramId   = programId
+                       }
+
+initBlurGLSL :: (Int, Int) -> IO BlurGLSL
+initBlurGLSL (w,h) = return $ error "initBlurGLSL unimplemented"
+
+
 ----------------------------------------------------------------------------------------------------
 getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
                   -> IO VariableLocation
@@ -171,8 +182,9 @@ getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation
 --
 --
 ortho2D :: ProgramId -> OrthoBounds -> IO ()
-ortho2D programId bds = do
-  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
+ortho2D texGLSLProgramId bds = do
+  glUseProgram texGLSLProgramId
+  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation texGLSLProgramId cstr
   when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
   allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
     pokeArray ortho $ map d2gl
@@ -288,15 +300,16 @@ runFrameUpdate besRef = do
   bes <- readIORef besRef
   let gs  = besGameState bes
       (Color r g b _) = backgroundColor -- FIXME: Shouldn't be transparent
-      glsls = besGfxState bes
+      gfxs = besGfxState bes
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
     glBindFramebuffer gl_FRAMEBUFFER 0
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-    runGLMIO glsls $ gsRender gs
+    runGLMIO gfxs $ gsRender gs
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
-    mapM_ (runGLMIO glsls . (uncurry drawLetterBox)) $ letterBoxes (gfxOrthoBounds glsls)
+    mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
+          (letterBoxes . texGLSLOrthoBounds . gfxTexGLSL $ gfxs)
     when debugSystem $ renderDebugInfo besRef
     glFlush
     S.glSwapWindow (besWindow bes)
