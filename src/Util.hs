@@ -77,3 +77,10 @@ m *>> m' = do { r <- m; m'; return r}
 --
 swapOn :: (b -> Bool) -> (a,a) -> b -> (a,a)
 swapOn f (x,y) b = if f b then (y,x) else (x,y)
+
+partitionM :: Monad m => (a -> m Bool) -> [a] -> m ([a],[a])
+partitionM f []     = return ([], [])
+partitionM f (x:xs) = do
+  b <- f x
+  (as,bs) <- partitionM f xs
+  return $ if b then (x:as, bs) else (as, x:bs)

@@ -362,19 +362,40 @@ antibioticUnlocked = do
 --
 killGerm :: R2 -> GameM Bool
 killGerm p = do
-  germsToKill <- germsSatisfyingM (pointCollides p)
+  (germsToKill, germToEscape) <- germsPartitionM (pointCollides p)
   let kkk (germId, germ) = do
         gs <- get
-        runOnHipState $ removeHipCirc (germHipCirc germ)
-        let germs    = gsGerms gs
-            newGerms = M.delete germId germs
+        let hc = germHipCirc germ
+        pos <- runOnHipState $ do
+                  pos' <- getHipCircPos hc
+                  removeHipCirc hc
+                  return pos'
         modify $ \gs -> gs { gsGerms = M.delete germId (gsGerms gs)
                            , gsSoundQueue = gsSoundQueue gs ++ [GSSquish]
                            , gsScore = gsScore gs + 1 }
         runGLM . germGLFinaliser . germGL $ germ
-        return $ M.size newGerms < M.size germs
-  bs <- mapM kkk germsToKill
-  return $ any id bs -- were any germs killed?
+        return pos
+  let escape (R2 x y) (_, germ) = do
+        let hc = germHipCirc germ
+        (R2 x' y', R2 vx vy) <- runOnHipState $ do
+                                   p <- getHipCircPos hc
+                                   v <- getHipCircVel hc
+                                   return (p, v)
+
+        let (R2 a b) = R2 (x' - x) (y' - y)
+            (R2 a' b') = normalise (R2 a b)
+            mag = sqrt (a*a + b*b)
+            scale = 20*1/mag -- FIXME: Magic number, FIXME: use germ constant
+        runOnHipState $ setHipCircVel hc (R2 (vx + a'*scale) (vy + b'*scale))
+  poses <- mapM kkk germsToKill
+  let anyKilled = length poses > 0
+  when anyKilled $ mapM_ (escape p) germToEscape
+  return anyKilled -- were any germs killed?
+
+----------------------------------------------------------------------------------------------------
+normalise :: R2 -> R2
+normalise (R2 x y) = R2 (x/mag) (y/mag)
+  where mag = sqrt(x*x + y*y)
 
 ----------------------------------------------------------------------------------------------------
 applyAntibiotics :: R2 -> GameM ()
@@ -486,6 +507,15 @@ germsSatisfying :: (Germ -> Bool) -> GameM [(GermId, Germ)]
 germsSatisfying f = do
   gs<- get
   return . M.toList . M.filter f $ gsGerms gs
+
+----------------------------------------------------------------------------------------------------
+germsPartitionM :: (Germ -> GameM Bool) -> GameM ([(GermId, Germ)], [(GermId, Germ)])
+germsPartitionM f = do
+  gs<- get
+  let germPs = M.toList $ gsGerms gs
+      f' :: (GermId, Germ) -> GameM Bool
+      f' (_, g) = f g
+  partitionM f' germPs
 
 ----------------------------------------------------------------------------------------------------
 germsSatisfyingM :: (Germ -> GameM Bool) -> GameM [(GermId, Germ)]
