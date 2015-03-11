@@ -56,7 +56,7 @@ import           Data.Time (getCurrentTime, diffUTCTime, UTCTime)
 -- friends
 import Types
 import Game.Types
-import Types.GLM
+import GLM
 import Platform
 
 data GameScript next =

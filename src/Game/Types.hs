@@ -9,7 +9,7 @@ import           Control.Applicative
 
 -- friends
 import Types.Basic
-import Types.GLM
+import GLM
 
 
 data GermGL = GermGL { germGLFun :: Int    -- z index

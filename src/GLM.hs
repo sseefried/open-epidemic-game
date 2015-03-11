@@ -13,7 +13,7 @@
 -- For now, try to enforce the discipline of only creating GLM things from the building blocks
 -- in module [GraphicsGL]
 --
-module Types.GLM (
+module GLM (
   GLM, -- opaque
   glm, -- smart constructor
   liftGLM,
