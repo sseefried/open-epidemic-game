@@ -446,8 +446,12 @@ blur :: GLM WorldGLSL () -> GLM Screen ()
 blur m = do
   gfxs <- getGfxState
   let mainFBO = gfxMainFBO gfxs
-  unsafeChangeProgramGLM m -- GLM Screen ()
-  unsafeChangeProgramGLM (blurOnAxis False mainFBO Nothing) -- GLM Screen ()
+      phase1FBO = blurGLSLPhase1FBO $ gfxBlurGLSL gfxs
+      blur1 :: GLM BlurGLSL ()
+      blur1 = blurOnAxis False mainFBO (Just phase1FBO)
+      blur2 = blurOnAxis True  phase1FBO Nothing
+  m `unsafeSequenceGLM` (blur1 >> blur2) `unsafeSequenceGLM` return ()
+
 
 ----------------------------------------------------------------------------------------------------
 --

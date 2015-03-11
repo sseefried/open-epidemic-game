@@ -39,7 +39,7 @@ module GLM (
   liftGLM,
   getGfxState,
   runGLMIO, -- FIXME: Change to runIOGLM or even just runGLM
-  unsafeChangeProgramGLM
+  unsafeSequenceGLM
 ) where
 
 import Graphics.Rendering.Cairo (FontFace)
@@ -90,6 +90,7 @@ data BlurGLSL = BlurGLSL {
                 , blurGLSLFactor3   :: UniformLocation
                 , blurGLSLFactor4   :: UniformLocation
                 , blurGLSLAxis      :: UniformLocation
+                , blurGLSLPhase1FBO :: FBO
                 , blurGLSLProgramId :: ProgramId
                 }
 
@@ -129,5 +130,5 @@ getGfxState = GLM return
 runGLMIO :: GfxState -> GLM p a -> IO a
 runGLMIO glsls (GLM f) = f glsls
 
-unsafeChangeProgramGLM :: GLM p1 a -> GLM p2 a
-unsafeChangeProgramGLM (GLM f) = GLM f
+unsafeSequenceGLM :: GLM p1 a -> GLM p2 b -> GLM p2 b
+unsafeSequenceGLM (GLM f) glm' = (GLM f) >> glm'

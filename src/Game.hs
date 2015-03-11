@@ -304,8 +304,10 @@ handleEvent fsmState ev = do
           _ -> idle *>> tapToContinue
 
 tapToContinue :: GameM ()
-tapToContinue = addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
-                  "Tap to continue"
+tapToContinue = do
+  addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
+                "Tap to continue"
+  screenRender
 
 ----------------------------------------------------------------------------------------------------
 isContinue :: Event -> Bool

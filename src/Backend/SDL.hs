@@ -158,6 +158,7 @@ initBlurGLSL (w, h) = do
   [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
   [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
                                                  ("axis":"radius":blurFactorNames)
+  fbo <- genFBO (w,h)
   glUniform1f radius (fromIntegral $ min w h)
   return $ BlurGLSL { blurGLSLPosition  = positionLoc
                     , blurGLSLTexcoord  = texCoordLoc
@@ -167,6 +168,7 @@ initBlurGLSL (w, h) = do
                     , blurGLSLFactor3   = bf3
                     , blurGLSLFactor4   = bf4
                     , blurGLSLAxis      = axis
+                    , blurGLSLPhase1FBO = fbo
                     , blurGLSLProgramId = programId
                     }
 
