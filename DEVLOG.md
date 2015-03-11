@@ -20,14 +20,19 @@ let us know which of the GLSL programs to run.
 e.g. if type is `GLM Foreground a` then use the `textureGLSLProgram` (which should probably be
 renamed to `foregroundGLSLProgram`)
 
+---
 
-glm :: GLM Foreground ()
+Hack, hack, hack. Yes, this technique worked and it's quite good! It prevents me from
+combining GLM functions in the wrong order in module Game.
 
-foregroundToBlur :: GLM Foreground -> GLM Blur
--- this function starts using the Blue program.
+I now have two "layers" in the GameState, one for the "world" GLSL program and one for "screen".
+I have to make sure to update "screen" each frame. Soon I'll add a "background" too.
 
-glm' :: GLM Blur ()
+---
 
+Another game design idea:
+
+* The play must bring the petrie dish into focus.
 
 # Sun 8 Mar 2015
 
