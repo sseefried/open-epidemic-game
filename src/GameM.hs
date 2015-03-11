@@ -145,7 +145,7 @@ newHipSpace :: GameM HipSpace
 newHipSpace = Impure (NewHipSpace Pure)
 
 runGLM :: GLM a -> GameM a
-runGLM glm = Impure (RunGLM glm Pure)
+runGLM glm' = Impure (RunGLM glm' Pure)
 
 runHipM :: HipSpace -> HipM a -> GameM a
 runHipM space hipM = Impure (RunHipM space hipM Pure)
@@ -212,7 +212,7 @@ runGameM glsls gs gameM = do
         (Impure (TimeSince t f))        -> timeSince' t >>= go' . f
         (Impure (NewHipSpace f))        -> H.initChipmunk >> H.newSpace >>= go' . f
         (Impure (RunHipM space hipM f)) -> runHipMIO space hipM >>= go' . f
-        (Impure (RunGLM glm f))         -> runGLMIO glsls glm  >>= go' . f
+        (Impure (RunGLM glm' f))         -> runGLMIO glsls glm' >>= go' . f
         (Pure x)                        -> return x
     timeSince' :: UTCTime -> IO Double
     timeSince' t = do
@@ -283,5 +283,3 @@ runHipMIO space = go
       H.spaceRemove space s
 
 ----------------------------------------------------------------------------------------------------
-runGLMIO :: GfxState -> GLM a -> IO a
-runGLMIO glsls (GLM f) = f glsls

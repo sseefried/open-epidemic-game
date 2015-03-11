@@ -1,3 +1,14 @@
+# Wed 11 Mar 2015
+
+It seems it may have become necessary for me to introduce a new abstraction to the Game layer.
+The game is responsible for drawing things to the screen so we can't escape the fact that
+it has to "know" about the screen. What I wanted to avoid however, was it having to know
+anything about OpenGL. I wanted to keep that part of the game safely encapsulated.
+
+Thus was born the GLM monad. However, it's currently not very opaque at all.
+
+
+
 # Sun 8 Mar 2015
 
 A check list for debugging on Android

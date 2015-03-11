@@ -159,7 +159,7 @@ withNewTexture f = do
 -- *centre* of the quad.
 --
 renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
-renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxs -> do
+renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
   -- we take the ceiling of [w] and [h] and use that as our bounds.
@@ -220,7 +220,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxs -> do
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
-renderQuadWithColor (x,y) (w, h) (Color r g b a) = GLM $ \gfxs -> do
+renderQuadWithColor (x,y) (w, h) (Color r g b a) = glm $ \gfxs -> do
   let ts = gfxTexGLSL gfxs
       positionLoc    = texGLSLPosition ts
       drawTextureLoc = texGLSLDrawTexture ts
@@ -304,7 +304,7 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- while [movingPtToPt] is used for the polygon vertices.
 --
 germGfxToGermGL :: GermGfx -> GLM GermGL
-germGfxToGermGL gfx = GLM $ const $ do
+germGfxToGermGL gfx = glm $ const $ do
   textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
   --
   -- We pre-allocate a bunch of unboxed vectors (from Data.Vector). (Data.Vector uses
@@ -321,7 +321,7 @@ germGfxToGermGL gfx = GLM $ const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-      germGLFun = \zIndex (R2 x' y') t r scale -> GLM $ \gfxs -> do
+      germGLFun = \zIndex (R2 x' y') t r scale -> glm $ \gfxs -> do
         let ts = gfxTexGLSL gfxs
             positionIdx    = texGLSLPosition ts
             texCoordIdx    = texGLSLTexcoord ts
@@ -362,7 +362,7 @@ germGfxToGermGL gfx = GLM $ const $ do
         -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
         -- because there is texture to be drawn in these valleys.)
         drawPolys lenTri gl_TRIANGLES triPts
-      finaliser = GLM . const $ delTexture textureId
+      finaliser = glm . const $ delTexture textureId
   return $ GermGL germGLFun finaliser
 
 ----------------------------------------------------------------------------------------------------
@@ -425,7 +425,7 @@ drawLetterBox pos (w,h) =
 -- Renders to [destFBO] if [mbDestFBO] is [Just destFBO] and to screen if [Nothing]
 --
 blurOnAxis :: Bool -> FBO -> Maybe FBO -> GLM ()
-blurOnAxis axis srcFBO mbDestFBO = GLM $ \gfxs -> do
+blurOnAxis axis srcFBO mbDestFBO = glm $ \gfxs -> do
   let bs = gfxBlurGLSL gfxs
       frameBufferId = maybe 0 fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
