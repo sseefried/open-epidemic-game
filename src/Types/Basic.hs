@@ -1,9 +1,7 @@
 {-# LANGUAGE TypeFamilies #-}
 module Types.Basic where
 
-import           Graphics.Rendering.Cairo (Render, FontFace)
-import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum, GLfloat)
--- import qualified Graphics.Rendering.OpenGL.Raw as GL
+import           Graphics.Rendering.Cairo (Render)
 import qualified Physics.Hipmunk as H
 
 ----------------------------------------------------------------------------------------------------
@@ -88,55 +86,6 @@ data OrthoBounds =
               , orthoTop     :: Double
               , screenScale  :: Double -- convert from world distance to screen distance
               } deriving (Show, Eq)
-
-
-data GfxState = GfxState { gfxBlurGLSL    :: BlurGLSL
-                         , gfxTexGLSL     :: TextureGLSL
-                         , gfxFontFace    :: FontFace
-                         , gfxMainFBO     :: FBO
-                         }
-
-data TextureGLSL = TextureGLSL {
-                     texGLSLPosition    :: AttributeLocation
-                   , texGLSLTexcoord    :: AttributeLocation
-                   , texGLSLDrawTexture :: UniformLocation
-                   , texGLSLColor       :: UniformLocation
-                   , texGLSLOrthoBounds :: OrthoBounds
-                   , texGLSLProgramId   :: ProgramId
-                   }
-
-data BlurGLSL = BlurGLSL {
-                  blurGLSLPosition  :: AttributeLocation
-                , blurGLSLTexcoord  :: AttributeLocation
-                , blurGLSLFactor0   :: UniformLocation
-                , blurGLSLFactor1   :: UniformLocation
-                , blurGLSLFactor2   :: UniformLocation
-                , blurGLSLFactor3   :: UniformLocation
-                , blurGLSLFactor4   :: UniformLocation
-                , blurGLSLAxis      :: UniformLocation
-                , blurGLSLProgramId :: ProgramId
-                }
-
-data FBO = FBO { fboFrameBuffer :: FrameBufferId, fboTexture :: TextureId }
-
-
---
--- Magnitude of near and far planes in orthographic project
---
-zMin, zMax :: GLfloat
-zMin = -10000
-zMax = 10000
-
-type MipMapIndex       = GLint
-type ProgramId         = GLuint
-type ShaderId          = GLuint
-type ShaderType        = GLenum
-type AttributeLocation = GLuint
-type UniformLocation   = GLint
-type VariableLocation  = GLuint
-type TextureId         = GLuint
-type FrameBufferId     = GLuint
-
 
 ----------------------------------------------------------------------------------------------------
 data HipCirc  = HipCirc  { _hipCircShape  :: !H.Shape }

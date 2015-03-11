@@ -13,7 +13,20 @@ Now that this is opaque I think I want to introduce the concept of a background 
 screen. I then want to layer these two on top of each other. (In future I want to have blurred
 germs in the background that you can't interact there, just for eye candy.)
 
+I probably need to move a whole bunch of functionality from the Backend.SDL to GraphicsGL
+(so it's all self-contained). We could then tag the GLM monad with a type that will
+let us know which of the GLSL programs to run.
 
+e.g. if type is `GLM Foreground a` then use the `textureGLSLProgram` (which should probably be
+renamed to `foregroundGLSLProgram`)
+
+
+glm :: GLM Foreground ()
+
+foregroundToBlur :: GLM Foreground -> GLM Blur
+-- this function starts using the Blue program.
+
+glm' :: GLM Blur ()
 
 
 # Sun 8 Mar 2015

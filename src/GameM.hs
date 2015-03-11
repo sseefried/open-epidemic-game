@@ -68,7 +68,7 @@ data GameScript next =
   |                       PrintStr     !String next
   |                       GetTime      (UTCTime -> next)
   |                       TimeSince    UTCTime (Double -> next)
-  | forall a.             RunGLM       (GLM a) (a -> next)
+  | forall p a.           RunGLM       (GLM p a) (a -> next)
   |                       NewHipSpace  (HipSpace -> next)
   | forall a.             RunHipM      !HipSpace (HipM a) (a -> next)
 
@@ -146,7 +146,7 @@ timeSince t = Impure (TimeSince t Pure)
 newHipSpace :: GameM HipSpace
 newHipSpace = Impure (NewHipSpace Pure)
 
-runGLM :: GLM a -> GameM a
+runGLM :: GLM p a -> GameM a
 runGLM glm' = Impure (RunGLM glm' Pure)
 
 runHipM :: HipSpace -> HipM a -> GameM a

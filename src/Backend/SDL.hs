@@ -28,6 +28,7 @@ import qualified Data.Map as M
 -- friends
 import Backend.Events
 import Types
+import GLM
 import Game.Types
 import Game
 import GameM
@@ -107,22 +108,22 @@ initOpenGL window (w,h) resourcePath = do
   glDepthFunc gl_LESS
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
 
-  mainFBO  <- genFBO (w,h)
-  texGLSL  <- initTextureGLSL (w,h)
-  blurGLSL <- initBlurGLSL (w,h)
-  fontFace <- loadFontFace $ resourcePath ++ "/font.ttf"
+  mainFBO   <- genFBO (w,h)
+  worldGLSL <- initWorldGLSL (w,h)
+  blurGLSL  <- initBlurGLSL (w,h)
+  fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
 
   --
-  let gfxs = GfxState { gfxTexGLSL     = texGLSL
+  let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
                       , gfxBlurGLSL    = blurGLSL
                       , gfxFontFace    = fontFace
                       , gfxMainFBO     = mainFBO
                       }
   return (gfxs, context)
 
-initTextureGLSL :: (Int, Int) -> IO TextureGLSL
-initTextureGLSL (w,h) = do
-  programId <- compileGLSLProgram textureGLSLProgram
+initWorldGLSL :: (Int, Int) -> IO WorldGLSL
+initWorldGLSL (w,h) = do
+  programId <- compileGLSLProgram worldGLSLProgram
   --
   -- The co-ordinates are set to be the world co-ordinate system. This saves us
   -- converting for OpenGL calls
@@ -131,13 +132,13 @@ initTextureGLSL (w,h) = do
   ortho2D programId bds
   [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
   [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
-  return $ TextureGLSL { texGLSLPosition    = positionLoc
-                       , texGLSLTexcoord    = texCoordLoc
-                       , texGLSLDrawTexture = drawTextureLoc
-                       , texGLSLColor       = colorLoc
-                       , texGLSLOrthoBounds = bds
-                       , texGLSLProgramId   = programId
-                       }
+  return $ WorldGLSL { worldGLSLPosition    = positionLoc
+                     , worldGLSLTexcoord    = texCoordLoc
+                     , worldGLSLDrawTexture = drawTextureLoc
+                     , worldGLSLColor       = colorLoc
+                     , worldGLSLOrthoBounds = bds
+                     , worldGLSLProgramId   = programId
+                     }
 
 initBlurGLSL :: (Int, Int) -> IO BlurGLSL
 initBlurGLSL (w, h) = do
@@ -323,14 +324,12 @@ runFrameUpdate besRef = do
   when (gsRenderDirty gs) $ do
     glBindFramebuffer gl_FRAMEBUFFER (fboFrameBuffer mainFBO)
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
-    glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-    runGLMIO gfxs $ do
-      gsRender gs
-      blur mainFBO
+    glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
+    runGLMIO gfxs $ gsScreenRender gs
     mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
-          (letterBoxes . texGLSLOrthoBounds . gfxTexGLSL $ gfxs)
+          (letterBoxes . worldGLSLOrthoBounds . gfxWorldGLSL $ gfxs)
     when debugSystem $ renderDebugInfo besRef
-    ---
+    glFlush
     ---
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
     S.glSwapWindow (besWindow bes)
@@ -544,8 +543,8 @@ glslVertexShaderDefault =
           , "}"
           ]
 
-textureGLSLProgram :: GLSLProgram
-textureGLSLProgram =
+worldGLSLProgram :: GLSLProgram
+worldGLSLProgram =
   GLSLProgram {
       glslVertexShader = glslVertexShaderDefault
     , glslFragmentShader =

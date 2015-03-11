@@ -160,19 +160,19 @@ withNewTexture f = do
 -- The relative co-ordinate system for the Cairo graphics will have its origin at the
 -- *centre* of the quad.
 --
-renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
+renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM WorldGLSL a
 renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
   -- we take the ceiling of [w] and [h] and use that as our bounds.
   -- We then scale the [cairoRender] by that amount (which will be very close to 1.)
   --
-  let ts = gfxTexGLSL gfxs
-      positionIdx = texGLSLPosition ts
-      texCoordIdx = texGLSLTexcoord ts
-      drawTextureLoc = texGLSLDrawTexture ts
+  let ts = gfxWorldGLSL gfxs
+      positionIdx = worldGLSLPosition ts
+      texCoordIdx = worldGLSLTexcoord ts
+      drawTextureLoc = worldGLSLDrawTexture ts
       (x,y,w,h) = (f2gl (x' - w'/2), f2gl (y' - h'/2), f2gl w', f2gl h')
-      scale     = realToFrac . screenScale . texGLSLOrthoBounds $ ts
+      scale     = realToFrac . screenScale . worldGLSLOrthoBounds $ ts
       cw        = w' * scale
       ch        = h' * scale
       wi        = ceiling cw
@@ -185,7 +185,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
-  glUseProgram $ texGLSLProgramId ts
+  glUseProgram $ worldGLSLProgramId ts
   withNewTexture $ \tid -> do
     res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
@@ -205,8 +205,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
 
-    glEnableVertexAttribArray (texGLSLPosition ts)
-    glEnableVertexAttribArray (texGLSLTexcoord ts)
+    glEnableVertexAttribArray (worldGLSLPosition ts)
+    glEnableVertexAttribArray (worldGLSLTexcoord ts)
 
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
       pokeArray vs [ x  , y  , zMax, 0, 0  -- left-bottom
@@ -221,12 +221,12 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       return res
 
 ----------------------------------------------------------------------------------------------------
-renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
+renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM p ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = glm $ \gfxs -> do
-  let ts = gfxTexGLSL gfxs
-      positionLoc    = texGLSLPosition ts
-      drawTextureLoc = texGLSLDrawTexture ts
-      colorLoc       = texGLSLColor ts
+  let ts = gfxWorldGLSL gfxs
+      positionLoc    = worldGLSLPosition ts
+      drawTextureLoc = worldGLSLDrawTexture ts
+      colorLoc       = worldGLSLColor ts
       ptsInPos  = 3
       ptsInQuad = 4
       i2i = fromIntegral
@@ -236,7 +236,7 @@ renderQuadWithColor (x,y) (w, h) (Color r g b a) = glm $ \gfxs -> do
   glUniform1i drawTextureLoc 0 -- set to 'false'
   glUniform4f colorLoc (f2f r) (f2f g) (f2f b) (f2f a) -- set the color
 
-  glEnableVertexAttribArray (texGLSLPosition ts)
+  glEnableVertexAttribArray (worldGLSLPosition ts)
   allocaArray (ptsInQuad*ptsInPos*floatSize) $ \(vs :: Ptr GLfloat) -> do
     pokeArray vs [ x',    y'   , zMax  -- bottom-left
                  , x'+w', y'   , zMax  -- upper-left
@@ -305,7 +305,7 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- returns the position of the point at time zero. This is used for the texture co-ordinates,
 -- while [movingPtToPt] is used for the polygon vertices.
 --
-germGfxToGermGL :: GermGfx -> GLM GermGL
+germGfxToGermGL :: GermGfx -> GLM WorldGLSL GermGL
 germGfxToGermGL gfx = glm $ const $ do
   textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
   --
@@ -324,16 +324,16 @@ germGfxToGermGL gfx = glm $ const $ do
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
       germGLFun = \zIndex (R2 x' y') t r scale -> glm $ \gfxs -> do
-        let ts = gfxTexGLSL gfxs
-            positionIdx    = texGLSLPosition ts
-            texCoordIdx    = texGLSLTexcoord ts
-            drawTextureLoc = texGLSLDrawTexture ts
-        glUseProgram $ texGLSLProgramId ts
+        let ts = gfxWorldGLSL gfxs
+            positionIdx    = worldGLSLPosition ts
+            texCoordIdx    = worldGLSLTexcoord ts
+            drawTextureLoc = worldGLSLDrawTexture ts
+        glUseProgram $ worldGLSLProgramId ts
         glBindTexture gl_TEXTURE_2D textureId
         glUniform1i drawTextureLoc 1 -- set to 'true'
 
-        glEnableVertexAttribArray (texGLSLPosition ts)
-        glEnableVertexAttribArray (texGLSLTexcoord ts)
+        glEnableVertexAttribArray (worldGLSLPosition ts)
+        glEnableVertexAttribArray (worldGLSLTexcoord ts)
 
         -- Create a star polygon.
         let drawPolys n arrayType movingPts = do
@@ -371,7 +371,7 @@ germGfxToGermGL gfx = glm $ const $ do
 --
 -- Draw antibiotic *centred* at (x, y)
 --
-drawAntibiotic :: R2 -> Antibiotic -> Double -> GLM ()
+drawAntibiotic :: R2 -> Antibiotic -> Double -> GLM WorldGLSL ()
 drawAntibiotic (R2 x y) ab effectiveness = do
   let s = antibioticWidth
   renderCairoToQuad (x,y) (s,s) $ do
@@ -379,7 +379,7 @@ drawAntibiotic (R2 x y) ab effectiveness = do
     flask (antibioticColor ab effectiveness)
 ----------------------------------------------------------------------------------------------------
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
-drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
+drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM WorldGLSL Double
 drawText tc grad (R2 x y) len s = do
   st <- getGfxState
   let textR :: Render Double
@@ -392,18 +392,18 @@ drawText tc grad (R2 x y) len s = do
 
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth, drawTextOfHeight :: Gradient -> R2 -> Double -> String -> GLM Double
+drawTextOfWidth, drawTextOfHeight :: Gradient -> R2 -> Double -> String -> GLM WorldGLSL Double
 drawTextOfWidth  = drawText Width
 drawTextOfHeight = drawText Height
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM ()
+drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM WorldGLSL ()
 drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
-drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
+drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM WorldGLSL Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
   st <- getGfxState
   let textR :: Render Double
@@ -412,11 +412,11 @@ drawTextLinesOfWidth color (R2 x y) w ss = do
   renderCairoToQuad (x, y) (w,h) $ textR
 
 ----------------------------------------------------------------------------------------------------
-drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM ()
+drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM WorldGLSL ()
 drawTextLinesOfWidth_ a b c d = drawTextLinesOfWidth a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
-drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
+drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM WorldGLSL ()
 drawLetterBox pos (w,h) =
   when (w > 0 && h > 0 ) $ renderQuadWithColor pos (w,h) (Color 0 0 0 1)
 
@@ -426,7 +426,7 @@ drawLetterBox pos (w,h) =
 -- Reads from [srcFBO]
 -- Renders to [destFBO] if [mbDestFBO] is [Just destFBO] and to screen if [Nothing]
 --
-blurOnAxis :: Bool -> FBO -> Maybe FBO -> GLM ()
+blurOnAxis :: Bool -> FBO -> Maybe FBO -> GLM BlurGLSL ()
 blurOnAxis axis srcFBO mbDestFBO = glm $ \gfxs -> do
   let bs = gfxBlurGLSL gfxs
       frameBufferId = maybe 0 fboFrameBuffer mbDestFBO
@@ -441,11 +441,13 @@ blurOnAxis axis srcFBO mbDestFBO = glm $ \gfxs -> do
   drawScreenSizedTexture (fboTexture srcFBO) (blurGLSLPosition bs) (blurGLSLTexcoord bs)
 
 ----------------------------------------------------------------------------------------------------
-
 -- FIXME:: Needs to do both axes.
-blur :: FBO -> GLM ()
-blur srcFBO = blurOnAxis False srcFBO Nothing
-
+blur :: GLM WorldGLSL () -> GLM Screen ()
+blur m = do
+  gfxs <- getGfxState
+  let mainFBO = gfxMainFBO gfxs
+  unsafeChangeProgramGLM m -- GLM Screen ()
+  unsafeChangeProgramGLM (blurOnAxis False mainFBO Nothing) -- GLM Screen ()
 
 ----------------------------------------------------------------------------------------------------
 --

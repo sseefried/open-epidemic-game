@@ -1,11 +1,14 @@
 module Game.Types (
   module Game.Types,
-  GLM -- re-export this
+  -- re-export these types
+  GLM,
+  WorldGLSL,
+  BlurGLSL,
+  Screen,
 ) where
 
 
 import           Data.Map (Map)
-import           Control.Applicative
 
 -- friends
 import Types.Basic
@@ -17,11 +20,12 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> Time   -- cumulative animation time
                                  -> Double -- radius
                                  -> Double -- amplitude scale
-                                 -> GLM ()
-                     , germGLFinaliser :: GLM ()
+                                 -> GLM WorldGLSL ()
+                     , germGLFinaliser :: GLM WorldGLSL ()
                      }
 
-data GameState = GameState { gsRender        :: GLM () -- GL commands
+data GameState = GameState { gsScreenRender  :: GLM Screen () -- GL commands
+                           , gsWorldRender   :: GLM WorldGLSL ()
                            , gsRenderDirty   :: Bool
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)

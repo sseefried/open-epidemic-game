@@ -19,7 +19,7 @@ import           Data.Maybe (catMaybes, isJust, fromJust)
 -- friends
 import Types
 import Game.Types
--- DO NOT import Types.GLM. Should only be using building blocks in GraphicsGL
+-- DO NOT import GLM. Should only be using building blocks in GraphicsGL
 import GameEvent
 import GameM
 import Graphics   -- vector graphics
@@ -153,7 +153,8 @@ addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
   GameState {
-      gsRender        = (return ())
+      gsWorldRender   = return ()
+    , gsScreenRender  = return ()
     , gsRenderDirty   = False
     , gsBounds        = bounds
     , gsGerms         = germMapList
@@ -228,6 +229,7 @@ handleEvent fsmState ev = do
        then do
          t <- getTime
          addRender $ drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
+         screenRender
          addToSoundQueue GSLevelMusicStop
          return $ FSMGameOver t
        else do
@@ -258,6 +260,7 @@ handleEvent fsmState ev = do
                             , "the chance of germ"
                             , "immunity increases!" ]
             sideBarRender
+            screenRender
             return $ FSMAntibioticUnlocked t ab
       whenEventsMutedOtherwise t unlockedMsg $ do
         case ev of
@@ -281,6 +284,7 @@ handleEvent fsmState ev = do
             clearRender
             sideBarRender
             addRender textRender
+            screenRender
             return $ FSMLevelComplete t
       whenEventsMutedOtherwise t levelCompleteMsg $ do
         case ev of
@@ -500,17 +504,23 @@ physics duration = do
   clearRender
   gameFieldRender
   sideBarRender
+  screenRender
 
 ----------------------------------------------------------------------------------------------------
-addRender :: GLM () -> GameM ()
-addRender glm = modify $ \gs -> gs { gsRender = gsRender gs >> glm
+addRender :: GLM WorldGLSL () -> GameM ()
+addRender glm = modify $ \gs -> gs { gsWorldRender = gsWorldRender gs >> glm
                                    , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
-
 clearRender :: GameM ()
-clearRender = modify $ \gs -> gs { gsRender = return ()
-                                 , gsRenderDirty = True }
+clearRender = modify $ \gs -> gs { gsWorldRender  = return ()
+                                 , gsScreenRender = return ()
+                                 , gsRenderDirty  = True }
+
+----------------------------------------------------------------------------------------------------
+screenRender :: GameM ()
+screenRender = modify $ \gs -> gs { gsScreenRender = blur (gsWorldRender gs)
+                                  , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -519,7 +529,7 @@ clearRender = modify $ \gs -> gs { gsRender = return ()
 gameFieldRender :: GameM ()
 gameFieldRender = do
   gs <- get
-  let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
+  let drawOneGerm :: (Int, Germ) -> GameM (GLM WorldGLSL ())
       drawOneGerm (i,g) = do
         pos <- germPos g
         let (ampScale, timeScale) = scales g
@@ -536,7 +546,7 @@ gameFieldRender = do
 sideBarRender :: GameM ()
 sideBarRender = do
   gs <- get
-  let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
+  let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM WorldGLSL()
       drawOneAntibiotic (ab, abd) =
         when (abEnabled abd) $ drawAntibiotic (abPos abd) ab (abEffectiveness abd)
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)
