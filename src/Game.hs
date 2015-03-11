@@ -385,7 +385,7 @@ killGerm p = do
         let (R2 a b) = R2 (x' - x) (y' - y)
             (R2 a' b') = normalise (R2 a b)
             mag = sqrt (a*a + b*b)
-            scale = 20*1/mag -- FIXME: Magic number, FIXME: use germ constant
+            scale = 100*1/mag -- FIXME: Magic number, FIXME: use germ constant
         runOnHipState $ setHipCircVel hc (R2 (vx + a'*scale) (vy + b'*scale))
   poses <- mapM kkk germsToKill
   let anyKilled = length poses > 0

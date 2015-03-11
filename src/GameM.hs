@@ -112,7 +112,7 @@ instance Functor HipScript where
     HipStep dt hs             -> HipStep dt (f hs)
     AddHipCirc a b g          -> AddHipCirc a b (f . g)
     GetHipCircPos a g         -> GetHipCircPos a (f . g)
-    GetHipCircVel a g         -> GetHipCircPos a (f . g)
+    GetHipCircVel a g         -> GetHipCircVel a (f . g)
     SetHipCircPos a b hs      -> SetHipCircPos a b (f hs)
     SetHipCircVel a b hs      -> SetHipCircVel a b (f hs)
     SetHipCircRadius a b hs   -> SetHipCircRadius a b (f hs)
