@@ -35,6 +35,7 @@ data GameState = GameState { gsScreenRender  :: GLM Screen () -- GL commands
                            , gsCurrentLevel  :: !Int
                            , gsAntibiotics   :: Map Antibiotic AntibioticData
                            , gsScore         :: Int
+                           , gsLevelTime     :: Time
                            }
 
 --

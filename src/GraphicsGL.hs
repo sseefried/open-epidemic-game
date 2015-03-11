@@ -426,30 +426,44 @@ drawLetterBox pos (w,h) =
 -- Reads from [srcFBO]
 -- Renders to [destFBO] if [mbDestFBO] is [Just destFBO] and to screen if [Nothing]
 --
-blurOnAxis :: Bool -> FBO -> Maybe FBO -> GLM BlurGLSL ()
-blurOnAxis axis srcFBO mbDestFBO = glm $ \gfxs -> do
+blurOnAxis :: Double -> Bool -> FBO -> Maybe FBO -> GLM BlurGLSL ()
+blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
   let bs = gfxBlurGLSL gfxs
       frameBufferId = maybe 0 fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
   glUseProgram (blurGLSLProgramId bs)
-  glUniform1f (blurGLSLFactor0 bs) 0.2270270270
-  glUniform1f (blurGLSLFactor1 bs) 0.1945945946
-  glUniform1f (blurGLSLFactor2 bs) 0.1216216216
-  glUniform1f (blurGLSLFactor3 bs) 0.0540540541
-  glUniform1f (blurGLSLFactor4 bs) 0.0162162162
+  let [bf0, bf1, bf2, bf3, bf4] = map f2gl $ gaussSample sigma 4
+  glUniform1f (blurGLSLFactor0 bs) bf0
+  glUniform1f (blurGLSLFactor1 bs) bf1
+  glUniform1f (blurGLSLFactor2 bs) bf2
+  glUniform1f (blurGLSLFactor3 bs) bf3
+  glUniform1f (blurGLSLFactor4 bs) bf4
   glUniform1i (blurGLSLAxis bs)    (if axis then 1 else 0)
   drawScreenSizedTexture (fboTexture srcFBO) (blurGLSLPosition bs) (blurGLSLTexcoord bs)
 
 ----------------------------------------------------------------------------------------------------
+gauss :: Double -> Double -> Double
+gauss sigma x = (1 / sqrt (2*pi*sigmaSquared)) * exp (-(x*x)/(2*sigmaSquared))
+  where
+    sigmaSquared = sigma*sigma
+gaussSample :: Double -> Int -> [Double]
+gaussSample sigma n = map (/total) (center:xs)
+   where
+    center = gauss sigma 0
+    xs     = map (\i -> gauss sigma (fromIntegral i)) [1..n]
+    total  = center + 2*sum xs
+
+
+----------------------------------------------------------------------------------------------------
 -- FIXME:: Needs to do both axes.
-blur :: GLM WorldGLSL () -> GLM Screen ()
-blur m = do
+blur :: Double -> GLM WorldGLSL () -> GLM Screen ()
+blur sigma m = do
   gfxs <- getGfxState
   let mainFBO = gfxMainFBO gfxs
       phase1FBO = blurGLSLPhase1FBO $ gfxBlurGLSL gfxs
       blur1 :: GLM BlurGLSL ()
-      blur1 = blurOnAxis False mainFBO (Just phase1FBO)
-      blur2 = blurOnAxis True  phase1FBO Nothing
+      blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
+      blur2 = blurOnAxis sigma True  phase1FBO Nothing
   m `unsafeSequenceGLM` (blur1 >> blur2) `unsafeSequenceGLM` return ()
 
 

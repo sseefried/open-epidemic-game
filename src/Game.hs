@@ -26,6 +26,20 @@ import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
 import Util
 
+
+--
+-- At the beginning of each level I want it to look like the germs are being
+-- brought into focus. It will osscilate for a little while and then come into
+-- sharpness.
+--
+blurSigma :: Time -> Double
+blurSigma t =
+  let endTime  = 3 -- seconds
+      maxSigma = 3
+      periods = 1 -- number of "focussing attempts"
+      damping t = (endTime - t) / endTime -- 1 at t=0, 0 at t=1
+  in if t > endTime then 0.01 else (damping t) * maxSigma * sin (periods*2*pi/endTime*t)
+
 ----------------------------------------------------------------------------------------------------
 --
 -- Given an initial size [initSize] and a time that the germ should multiply at [multiplyAt]
@@ -164,6 +178,7 @@ initGameState bounds hipSpace germs =
     , gsCurrentLevel  = 1 -- current level
     , gsAntibiotics   = M.fromList $ map initAntibiotic $ allAntibiotics
     , gsScore         = 0
+    , gsLevelTime     = 0
     }
   where
     germMapList = M.fromList $ zip [0..] germs
@@ -210,6 +225,7 @@ handleEvent fsmState ev = do
       modify $ \gs -> gs { gsGerms        = M.fromList (zip [0..] germs)
                          , gsNextGermId   = length germs
                          , gsCurrentLevel = i
+                         , gsLevelTime    = 0
                          }
       return $ FSMPlayingLevel
     --------------------------------------
@@ -507,6 +523,7 @@ physics duration = do
   gameFieldRender
   sideBarRender
   screenRender
+  modify $ \gs -> gs { gsLevelTime = gsLevelTime gs + duration }
 
 ----------------------------------------------------------------------------------------------------
 addRender :: GLM WorldGLSL () -> GameM ()
@@ -521,8 +538,9 @@ clearRender = modify $ \gs -> gs { gsWorldRender  = return ()
 
 ----------------------------------------------------------------------------------------------------
 screenRender :: GameM ()
-screenRender = modify $ \gs -> gs { gsScreenRender = blur (gsWorldRender gs)
-                                  , gsRenderDirty = True }
+screenRender = modify $ \gs ->
+   gs { gsScreenRender = blur (blurSigma (gsLevelTime gs)) (gsWorldRender gs)
+     , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
 --
