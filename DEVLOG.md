@@ -6,6 +6,13 @@ it has to "know" about the screen. What I wanted to avoid however, was it having
 anything about OpenGL. I wanted to keep that part of the game safely encapsulated.
 
 Thus was born the GLM monad. However, it's currently not very opaque at all.
+...
+Okay I just fixed that.
+
+Now that this is opaque I think I want to introduce the concept of a background and a foreground
+screen. I then want to layer these two on top of each other. (In future I want to have blurred
+germs in the background that you can't interact there, just for eye candy.)
+
 
 
 

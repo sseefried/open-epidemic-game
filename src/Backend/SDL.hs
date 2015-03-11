@@ -28,6 +28,7 @@ import qualified Data.Map as M
 -- friends
 import Backend.Events
 import Types
+import Types.Game
 import Game
 import GameM
 import GameEvent

@@ -1,4 +1,7 @@
-module Types.Game where
+module Types.Game (
+  module Types.Game,
+  GLM -- re-export this
+) where
 
 
 import           Data.Map (Map)
