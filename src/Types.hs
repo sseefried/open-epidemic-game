@@ -323,10 +323,10 @@ data OrthoBounds =
 
 data GLM a = GLM { unGLM :: GfxState -> IO a }
 
-data GfxState = GfxState { gfxBlurGLSL :: BlurGLSL
-                         , gfxTexGLSL  :: TextureGLSL
-                         , gfxFontFace :: FontFace
-                         , gfxMainFBO  :: FrameBufferId
+data GfxState = GfxState { gfxBlurGLSL    :: BlurGLSL
+                         , gfxTexGLSL     :: TextureGLSL
+                         , gfxFontFace    :: FontFace
+                         , gfxMainFBO     :: FBO
                          }
 
 data TextureGLSL = TextureGLSL {
@@ -339,14 +339,18 @@ data TextureGLSL = TextureGLSL {
                    }
 
 data BlurGLSL = BlurGLSL {
-                  blurGLSLFactor0   :: UniformLocation
+                  blurGLSLPosition  :: AttributeLocation
+                , blurGLSLTexcoord  :: AttributeLocation
+                , blurGLSLFactor0   :: UniformLocation
                 , blurGLSLFactor1   :: UniformLocation
                 , blurGLSLFactor2   :: UniformLocation
                 , blurGLSLFactor3   :: UniformLocation
                 , blurGLSLFactor4   :: UniformLocation
-                , blurGLSLDir       :: UniformLocation
+                , blurGLSLAxis      :: UniformLocation
                 , blurGLSLProgramId :: ProgramId
                 }
+
+data FBO = FBO { fboFrameBuffer :: FrameBufferId, fboTexture :: TextureId }
 
 instance Functor GLM where
   -- (a -> b) -> (GLM a -> GLM b)
@@ -385,7 +389,6 @@ type AttributeLocation = GLuint
 type UniformLocation   = GLint
 type VariableLocation  = GLuint
 type TextureId         = GLuint
-type RenderBufferId    = GLuint
 type FrameBufferId     = GLuint
 
 data GermGL = GermGL { germGLFun :: Int    -- z index

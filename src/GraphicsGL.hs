@@ -2,8 +2,8 @@
 module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
-    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic,
-    renderQuadWithColor, genTexture, genFrameBuffer, genRenderBuffer
+    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic, genFBO,
+    renderQuadWithColor, genTexture, genFrameBuffer, rgbFormat, blur
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -14,7 +14,7 @@ import           Foreign.Ptr
 import           Foreign.Storable
 import           GHC.Word (Word8)
 import           Control.Monad
-
+import           Data.Bits
 import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
 
@@ -22,6 +22,7 @@ import qualified Data.Vector.Unboxed as V
 import Types
 import Graphics
 import Platform
+import Util
 
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLint
@@ -52,16 +53,41 @@ genFrameBuffer :: IO FrameBufferId
 genFrameBuffer = alloca $ \(ptr :: Ptr FrameBufferId) -> do { glGenFramebuffers 1 ptr; peek ptr }
 
 ----------------------------------------------------------------------------------------------------
-genRenderBuffer :: IO RenderBufferId
-genRenderBuffer = alloca $ \(ptr :: Ptr RenderBufferId) -> do { glGenRenderbuffers 1 ptr; peek ptr }
-
-----------------------------------------------------------------------------------------------------
 --
 -- Frees the [textureId] for reuse and deletes any bound textures.
 --
 delTexture :: TextureId -> IO ()
 delTexture textureId =
   alloca $ \(ptr :: Ptr GLuint) -> do { poke ptr textureId; glDeleteTextures 1 ptr }
+
+----------------------------------------------------------------------------------------------------
+--
+-- Generates an FBO, which is a framebuffer plus its associated color texture. (We are not
+-- dealing with depth textures in this game).
+--
+
+genFBO :: (Int, Int) -> IO FBO
+genFBO (w,h) = do
+  fb <- genFrameBuffer
+  glBindFramebuffer gl_FRAMEBUFFER fb
+
+  texture <- genTexture
+  glBindTexture gl_TEXTURE_2D texture
+  glTexImage2D gl_TEXTURE_2D 0 rgbFormat glW glH 0 gl_BGRA gl_UNSIGNED_BYTE nullPtr
+  -- Required for non-power-of-two textures in GL ES 2.0
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_S     (fromIntegral gl_CLAMP_TO_EDGE)
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_T     (fromIntegral gl_CLAMP_TO_EDGE)
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_NEAREST)
+  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_NEAREST)
+  glFramebufferTexture2D gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_TEXTURE_2D texture 0
+
+  status <- glCheckFramebufferStatus gl_FRAMEBUFFER
+  when (status /= gl_FRAMEBUFFER_COMPLETE) $ do
+    exitWithError "Framebuffer error"
+  return $ FBO { fboFrameBuffer = fb, fboTexture = texture }
+  where
+    glW = fromIntegral w
+    glH = fromIntegral h
 
 ----------------------------------------------------------------------------------------------------
 {-# INLINE forN #-}
@@ -157,6 +183,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxs -> do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
+  glUseProgram $ texGLSLProgramId ts
   withNewTexture $ \tid -> do
     res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
@@ -180,10 +207,10 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = GLM $ \gfxs -> do
     glEnableVertexAttribArray (texGLSLTexcoord ts)
 
     allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
-      pokeArray vs [ x  , y  , zMax, 0, 0  -- bottom-left
-                   , x+w, y  , zMax, 1, 0  -- upper-left
-                   , x  , y+h, zMax, 0, 1  -- bottom-right
-                   , x+w, y+h, zMax, 1, 1  -- upper-right
+      pokeArray vs [ x  , y  , zMax, 0, 0  -- left-bottom
+                   , x+w, y  , zMax, 1, 0  -- right-bottom
+                   , x  , y+h, zMax, 0, 1  -- left-top
+                   , x+w, y+h, zMax, 1, 1  -- right-top
                    ]
       glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
       glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
@@ -299,6 +326,7 @@ germGfxToGermGL gfx = GLM $ const $ do
             positionIdx    = texGLSLPosition ts
             texCoordIdx    = texGLSLTexcoord ts
             drawTextureLoc = texGLSLDrawTexture ts
+        glUseProgram $ texGLSLProgramId ts
         glBindTexture gl_TEXTURE_2D textureId
         glUniform1i drawTextureLoc 1 -- set to 'true'
 
@@ -389,3 +417,63 @@ drawTextLinesOfWidth_ a b c d = drawTextLinesOfWidth a b c d >> return ()
 drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
 drawLetterBox pos (w,h) =
   when (w > 0 && h > 0 ) $ renderQuadWithColor pos (w,h) (Color 0 0 0 1)
+
+----------------------------------------------------------------------------------------------------
+--
+--
+-- Reads from [srcFBO]
+-- Renders to [destFBO] if [mbDestFBO] is [Just destFBO] and to screen if [Nothing]
+--
+blurOnAxis :: Bool -> FBO -> Maybe FBO -> GLM ()
+blurOnAxis axis srcFBO mbDestFBO = GLM $ \gfxs -> do
+  let bs = gfxBlurGLSL gfxs
+      frameBufferId = maybe 0 fboFrameBuffer mbDestFBO
+  glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
+  glUseProgram (blurGLSLProgramId bs)
+  glUniform1f (blurGLSLFactor0 bs) 0.2270270270
+  glUniform1f (blurGLSLFactor1 bs) 0.1945945946
+  glUniform1f (blurGLSLFactor2 bs) 0.1216216216
+  glUniform1f (blurGLSLFactor3 bs) 0.0540540541
+  glUniform1f (blurGLSLFactor4 bs) 0.0162162162
+  glUniform1i (blurGLSLAxis bs)    (if axis then 1 else 0)
+  drawScreenSizedTexture (fboTexture srcFBO) (blurGLSLPosition bs) (blurGLSLTexcoord bs)
+
+----------------------------------------------------------------------------------------------------
+
+-- FIXME:: Needs to do both axes.
+blur :: FBO -> GLM ()
+blur srcFBO = blurOnAxis False srcFBO Nothing
+
+
+----------------------------------------------------------------------------------------------------
+--
+-- Renders a screen sized texture to the screen using identity modelView matrix.
+-- (i.e. -1 <= x <= 1, -1 <= y <= 1)
+--
+-- Precondition: You must be currently using a GLSL program (with [glUseProgram]) that has a [pos]
+-- attribute for specifying the position of vertices, and a [texCoord] attribute for specifiying
+-- the texture-coordinates.
+-- The program must use an identity modelView transform matrix.
+--
+-- The destination of the texture at [texId] will depend on the last called to
+-- [glBindFramebuffer].
+--
+drawScreenSizedTexture :: TextureId -> AttributeLocation -> AttributeLocation -> IO ()
+drawScreenSizedTexture texId pos texCoord = do
+  let stride = fromIntegral $ 4 * floatSize
+      floatSize = sizeOf (undefined :: GLfloat)
+  glBindTexture gl_TEXTURE_2D texId
+  glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
+  glEnableVertexAttribArray pos
+  glEnableVertexAttribArray texCoord
+  -- FIXME: sseefried: Needs a depth
+  allocaArray (4*4*floatSize) $ \(vs :: Ptr GLfloat) -> do
+    pokeArray vs [ -1, -1, 0, 0  -- left-bottom
+                 ,  1, -1, 1, 0  -- right-bottom
+                 , -1,  1, 0, 1  -- left-top
+                 ,  1,  1, 1, 1  -- right-top
+                 ]
+    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride vs
+    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
+                                                 (vs `plusPtr` (2*floatSize))
+    glDrawArrays gl_TRIANGLE_STRIP 0 4

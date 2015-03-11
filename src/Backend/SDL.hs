@@ -80,7 +80,7 @@ compileGLSLProgram p = do
   return programId
   where
     exitOnLeft et = case et of
-                      Left error -> putStrLn error >> exitWith (ExitFailure 1)
+                      Left error -> debugLog error >> exitWith (ExitFailure 1)
                       Right val  -> return val
 
 ----------------------------------------------------------------------------------------------------
@@ -105,28 +105,19 @@ initOpenGL window (w,h) resourcePath = do
   glEnable gl_DEPTH_TEST
   glDepthFunc gl_LESS
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
+
+  mainFBO  <- genFBO (w,h)
   texGLSL  <- initTextureGLSL (w,h)
   blurGLSL <- initBlurGLSL (w,h)
   fontFace <- loadFontFace $ resourcePath ++ "/font.ttf"
+
   --
-  -- Allocate FBO and color render buffer
-  --
-  mainFBO <- genFrameBuffer
-  glBindFramebuffer gl_FRAMEBUFFER mainFBO
-  renderBuf <- genRenderBuffer
-  glBindRenderbuffer gl_RENDERBUFFER renderBuf
-  glRenderbufferStorage gl_RENDERBUFFER  gl_RGBA8  glW glH
-  glFramebufferRenderbuffer gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_RENDERBUFFER renderBuf
-  --
-  let gfxs = GfxState { gfxTexGLSL  = texGLSL
-                      , gfxBlurGLSL = blurGLSL
-                      , gfxFontFace = fontFace
-                      , gfxMainFBO  = mainFBO
+  let gfxs = GfxState { gfxTexGLSL     = texGLSL
+                      , gfxBlurGLSL    = blurGLSL
+                      , gfxFontFace    = fontFace
+                      , gfxMainFBO     = mainFBO
                       }
   return (gfxs, context)
-  where
-    glW = fromIntegral w
-    glH = fromIntegral h
 
 initTextureGLSL :: (Int, Int) -> IO TextureGLSL
 initTextureGLSL (w,h) = do
@@ -137,10 +128,8 @@ initTextureGLSL (w,h) = do
   --
   let bds = orthoBounds (w,h)
   ortho2D programId bds
-  positionLoc    <- getAttributeLocation programId "position"
-  texCoordLoc    <- getAttributeLocation programId "texCoord"
-  drawTextureLoc <- getUniformLocation   programId "drawTexture"
-  colorLoc       <- getUniformLocation   programId "color"
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
   return $ TextureGLSL { texGLSLPosition    = positionLoc
                        , texGLSLTexcoord    = texCoordLoc
                        , texGLSLDrawTexture = drawTextureLoc
@@ -150,7 +139,34 @@ initTextureGLSL (w,h) = do
                        }
 
 initBlurGLSL :: (Int, Int) -> IO BlurGLSL
-initBlurGLSL (w,h) = return $ error "initBlurGLSL unimplemented"
+initBlurGLSL (w, h) = do
+  programId <- compileGLSLProgram blurGLSLProgram
+  glUseProgram programId
+  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
+  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
+  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
+    pokeArray ortho $
+      [ 1, 0, 0, 0
+      , 0, 1, 0, 0
+      , 0, 0, 1, 0
+      , 0, 0, 0, 1 ]
+    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
+
+  let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
+                                                 ("axis":"radius":blurFactorNames)
+  glUniform1f radius (fromIntegral $ min w h)
+  return $ BlurGLSL { blurGLSLPosition  = positionLoc
+                    , blurGLSLTexcoord  = texCoordLoc
+                    , blurGLSLFactor0   = bf0
+                    , blurGLSLFactor1   = bf1
+                    , blurGLSLFactor2   = bf2
+                    , blurGLSLFactor3   = bf3
+                    , blurGLSLFactor4   = bf4
+                    , blurGLSLAxis      = axis
+                    , blurGLSLProgramId = programId
+                    }
 
 
 ----------------------------------------------------------------------------------------------------
@@ -178,7 +194,7 @@ getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation
 --
 -- One of the particularly confusing aspects of the orthographic projection is the
 -- definitions of the terms "near" and "far". (See http://math.hws.edu/graphicsnotes/c3/s5.html)
--- 'near' is actually negative 'zMax' and 'far' is negative 'zMin'
+-- 'near = -zMax' and 'far = -zMin'
 --
 --
 ortho2D :: ProgramId -> OrthoBounds -> IO ()
@@ -301,17 +317,21 @@ runFrameUpdate besRef = do
   let gs  = besGameState bes
       (Color r g b _) = backgroundColor -- FIXME: Shouldn't be transparent
       gfxs = besGfxState bes
+      mainFBO = gfxMainFBO gfxs
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
-    glBindFramebuffer gl_FRAMEBUFFER 0
+    glBindFramebuffer gl_FRAMEBUFFER (fboFrameBuffer mainFBO)
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT  .|. gl_COLOR_BUFFER_BIT)
-    runGLMIO gfxs $ gsRender gs
-    modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
+    runGLMIO gfxs $ do
+      gsRender gs
+      blur mainFBO
     mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
           (letterBoxes . texGLSLOrthoBounds . gfxTexGLSL $ gfxs)
     when debugSystem $ renderDebugInfo besRef
-    glFlush
+    ---
+    ---
+    modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
     S.glSwapWindow (besWindow bes)
 
 renderDebugInfo :: IORef BackendState -> IO ()
@@ -523,7 +543,6 @@ glslVertexShaderDefault =
           , "}"
           ]
 
-
 textureGLSLProgram :: GLSLProgram
 textureGLSLProgram =
   GLSLProgram {
@@ -561,7 +580,7 @@ blurGLSLProgram =
             "#ifdef GL_ES"
           , "precision mediump float;"
           , "#endif"
-          , "sampler2D texture;"
+          , "uniform sampler2D texture;"
           , "varying vec2 vTexCoord;"
           , ""
           , "uniform float blurFactor0;"
@@ -569,22 +588,21 @@ blurGLSLProgram =
           , "uniform float blurFactor2;"
           , "uniform float blurFactor3;"
           , "uniform float blurFactor4;"
+          , "uniform float radius;"
           , ""
-          , "//the direction of our blur"
-          , "//(1.0, 0.0) -> x-axis blur"
-          , "//(0.0, 1.0) -> y-axis blur"
-          , "//(1.0, 1.0) -> radial blur"
-          , "uniform vec2 dir;"
+          , "uniform bool axis;"
           , ""
-          , "float blurComponent(float dist, float blurFactor) {"
-          , ""
-          , "   return texture2D(texture, vec2(vTexCoord.x - dist*dir.x,"
-          , "                                  vTexCoord.y - dist*dir.y)) * blurFactor;"
+          , "float scale = 1.0/radius;"
+          , "vec4 blurComponent(float dist, float blurFactor) {"
+          , "  if (axis) { // y-axis"
+          , "   return texture2D(texture, vec2(vTexCoord.x, vTexCoord.y + dist*scale))*blurFactor;"
+          , "  } else {"
+          , "   return texture2D(texture, vec2(vTexCoord.x + dist*scale, vTexCoord.y))*blurFactor;"
+          , "  }"
           , "}"
           , ""
           , "void main() {"
           , "  vec4 sum = vec4(0.0);"
-
           , "  sum += blurComponent( 0.0, blurFactor0);"
           , "  sum += blurComponent( 1.0, blurFactor1);"
           , "  sum += blurComponent(-1.0, blurFactor1);"
@@ -596,5 +614,42 @@ blurGLSLProgram =
           , "  sum += blurComponent(-4.0, blurFactor4);"
           , ""
           , "  gl_FragColor = vec4(sum.xyz, 1.0);"
+          , "}"
         ]
+  }
+
+--
+-- A GLSL program that just passes a texture straight through.
+--
+_idGLSLProgram :: GLSLProgram
+_idGLSLProgram =
+  GLSLProgram {
+      glslVertexShader   =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "attribute vec3 position;"
+          , "attribute vec2 texCoord;"
+          , "varying vec2 vTexCoord;"
+          , ""
+          , "void main()"
+          , "{"
+          , "  gl_Position = vec4(position,1);"
+          , "  vTexCoord = texCoord;"
+          , "}"
+          ]
+    , glslFragmentShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "uniform sampler2D texture;"
+          , "varying vec2 vTexCoord;"
+          , ""
+          , "void main()"
+          , "{"
+          , "  gl_FragColor = texture2D(texture, vTexCoord);"
+          , "}"
+          ]
   }

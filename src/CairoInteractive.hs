@@ -112,3 +112,19 @@ fontInfoTest = do
   return ()
 
 
+-------
+--
+-- We're going to be lazy and just sample at the midpoint.
+-- This is 1-dimensional. We use it in a 2-pass filter
+--
+gauss :: Double -> Double -> Double
+gauss sigma x = (1 / sqrt (2*pi*sigmaSquared)) * exp (-(x*x)/(2*sigmaSquared))
+  where
+    sigmaSquared = sigma*sigma
+
+gaussSample :: Double -> Int -> [Double]
+gaussSample sigma n = map (/total) (center:xs)
+   where
+    center = gauss sigma 0
+    xs     = map (\i -> gauss sigma (fromIntegral i)) [1..n]
+    total  = center + 2*sum xs
