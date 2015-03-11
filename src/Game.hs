@@ -18,7 +18,7 @@ import           Data.Maybe (catMaybes, isJust, fromJust)
 
 -- friends
 import Types
-import Types.Game
+import Game.Types
 -- DO NOT import Types.GLM. Should only be using building blocks in GraphicsGL
 import GameEvent
 import GameM

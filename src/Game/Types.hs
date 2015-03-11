@@ -1,5 +1,5 @@
-module Types.Game (
-  module Types.Game,
+module Game.Types (
+  module Game.Types,
   GLM -- re-export this
 ) where
 

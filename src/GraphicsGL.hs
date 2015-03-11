@@ -21,7 +21,7 @@ import qualified Data.Vector.Unboxed as V
 -- friends
 import Types
 import Types.GLM
-import Types.Game (GermGL(..))
+import Game.Types (GermGL(..))
 import Graphics
 import Platform
 import Util

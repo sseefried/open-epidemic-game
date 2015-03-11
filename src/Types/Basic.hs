@@ -5,13 +5,6 @@ import           Graphics.Rendering.Cairo (Render, FontFace)
 import           Graphics.Rendering.OpenGL.Raw (GLint, GLuint, GLenum, GLfloat)
 -- import qualified Graphics.Rendering.OpenGL.Raw as GL
 import qualified Physics.Hipmunk as H
-import           Data.Map (Map)
-import qualified Data.Map as M
-import           Control.Applicative
-
--- friends
-import Platform
-
 
 ----------------------------------------------------------------------------------------------------
 --
