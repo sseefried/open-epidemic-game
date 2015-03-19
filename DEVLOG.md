@@ -1,3 +1,26 @@
+# Wed 18 Mar 2015
+
+Game design:
+
+* in app purchases
+* sharing top scores with social media
+
+# Tue 17 Mar 2015
+
+Game design feedback.
+
+My friend Tim mentioned that the exponential nature of the game is what makes it surprising.
+Unless you get the germs nice and early you suddently lose control. It's how things work, but is
+this fun?
+
+---
+
+Game design idea:
+
+* focus at germs on different "levels" to kill them all. This might be a way to slow the action
+  of the game down.
+
+
 # Wed 11 Mar 2015
 
 It seems it may have become necessary for me to introduce a new abstraction to the Game layer.
