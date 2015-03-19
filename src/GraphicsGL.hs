@@ -3,7 +3,7 @@ module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
     drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic, genFBO,
-    renderQuadWithColor, genTexture, genFrameBuffer, rgbFormat, blur
+    renderQuadWithColor, genTexture, genFrameBuffer, getScreenFrameBufferId, rgbFormat, blur
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -55,6 +55,15 @@ genFrameBuffer :: IO FrameBufferId
 genFrameBuffer = alloca $ \(ptr :: Ptr FrameBufferId) -> do { glGenFramebuffers 1 ptr; peek ptr }
 
 ----------------------------------------------------------------------------------------------------
+getScreenFrameBufferId :: IO FrameBufferId
+getScreenFrameBufferId = do
+  alloca $ \(ptr :: Ptr GLint) ->
+    do glGetIntegerv gl_FRAMEBUFFER_BINDING ptr
+       fbId <- peek ptr
+       return $ fromIntegral fbId
+
+----------------------------------------------------------------------------------------------------
+
 --
 -- Frees the [textureId] for reuse and deletes any bound textures.
 --
@@ -429,7 +438,7 @@ drawLetterBox pos (w,h) =
 blurOnAxis :: Double -> Bool -> FBO -> Maybe FBO -> GLM BlurGLSL ()
 blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
   let bs = gfxBlurGLSL gfxs
-      frameBufferId = maybe 0 fboFrameBuffer mbDestFBO
+      frameBufferId = maybe (gfxScreenFBId gfxs) fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
   glUseProgram (blurGLSLProgramId bs)
   let [bf0, bf1, bf2, bf3, bf4] = map f2gl $ gaussSample sigma 4

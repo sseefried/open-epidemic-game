@@ -60,7 +60,6 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besSquishSound    :: Maybe M.Chunk
                                  }
 
-
 ----------------------------------------------------------------------------------------------------
 compileGLSLProgram :: GLSLProgram -> IO ProgramId
 compileGLSLProgram p = do
@@ -101,7 +100,8 @@ initOpenGL window (w,h) resourcePath = do
   mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
-  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
+  screenFBId <- getScreenFrameBufferId -- get this value before any new frame buffers created.
+  --  glEnable gl_TEXTURE_2D is meaningless in GLSL  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
   glEnable gl_BLEND
   glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST
@@ -113,11 +113,13 @@ initOpenGL window (w,h) resourcePath = do
   blurGLSL  <- initBlurGLSL (w,h)
   fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
 
+
   --
   let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
                       , gfxBlurGLSL    = blurGLSL
                       , gfxFontFace    = fontFace
                       , gfxMainFBO     = mainFBO
+                      , gfxScreenFBId  = screenFBId
                       }
   return (gfxs, context)
 
@@ -375,8 +377,6 @@ runInputEventHandler besRef handleEvent = do
         (fsmState', gs') <- runGameM (besGfxState bes) gs (handleEvent fsmState ev)
         writeIORef besRef $ bes { besGameState = gs', besFSMState = fsmState' }
         if fsmState == fsmState' then runUntilFSMStateChange evs else return ()
-
-
 
 ----------------------------------------------------------------------------------------------------
 --

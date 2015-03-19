@@ -70,6 +70,8 @@ data GfxState = GfxState { gfxBlurGLSL    :: BlurGLSL
                          , gfxWorldGLSL   :: WorldGLSL
                          , gfxFontFace    :: FontFace
                          , gfxMainFBO     :: FBO
+                         -- on iOS this is not 0!
+                         , gfxScreenFBId  :: FrameBufferId
                          }
 
 data WorldGLSL = WorldGLSL {
