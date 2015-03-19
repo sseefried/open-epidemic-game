@@ -144,16 +144,6 @@ initBlurGLSL :: (Int, Int) -> IO BlurGLSL
 initBlurGLSL (w, h) = do
   programId <- compileGLSLProgram blurGLSLProgram
   glUseProgram programId
-  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation programId cstr
-  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
-  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
-    pokeArray ortho $
-      [ 1, 0, 0, 0
-      , 0, 1, 0, 0
-      , 0, 0, 1, 0
-      , 0, 0, 0, 1 ]
-    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
-
   let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
   [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
   [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
@@ -535,6 +525,25 @@ glslVertexShaderDefault =
           , "#endif"
           , "attribute vec3 position;"
           , "attribute vec2 texCoord;"
+          , "varying vec2   vTexCoord;"
+          , ""
+          , "void main()"
+          , "{"
+          , "  gl_Position = vec4(position,1);"
+          , "  vTexCoord = texCoord;"
+          , "}"
+          ]
+
+worldGLSLProgram :: GLSLProgram
+worldGLSLProgram =
+  GLSLProgram {
+      glslVertexShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "attribute vec3 position;"
+          , "attribute vec2 texCoord;"
           , "uniform mat4 modelView;"
           , "varying vec2 vTexCoord;"
           , ""
@@ -545,10 +554,6 @@ glslVertexShaderDefault =
           , "}"
           ]
 
-worldGLSLProgram :: GLSLProgram
-worldGLSLProgram =
-  GLSLProgram {
-      glslVertexShader = glslVertexShaderDefault
     , glslFragmentShader =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
@@ -616,6 +621,8 @@ blurGLSLProgram =
           , "  sum += blurComponent(-4.0, blurFactor4);"
           , ""
           , "  gl_FragColor = vec4(sum.xyz, 1.0);"
+          --,  "if ((axis ? 1.0 : 1.0) + (blurFactor0 + blurFactor1 + blurFactor2 +"
+          --,  "  blurFactor3 + blurFactor4) > 0.0) {gl_FragColor =  texture2D(texture, vTexCoord); } else { gl_FragColor =  texture2D(texture, vTexCoord); }"
           , "}"
         ]
   }
