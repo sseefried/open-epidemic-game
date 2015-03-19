@@ -1,3 +1,18 @@
+# Thu 19 Mar 2015
+
+I spent almost all day working out why I had a "magenta screen of death" on the iOS Simuator.
+The answer was really hard to track down, but was actually aided by going back through my
+repository and finding the commit that introduced the bug in the first place. It turns out that
+
+    glBindFramebuffer gl_FRAMEBUFFER 0
+
+does not work on iOS! The frame buffer ID for the screen is simply not zero. You can, however, get
+it with (in C)
+
+    glGetIntergerv(GL_FRAMEBUFFER_BINDING, &val)
+
+Now we have the problem that the game is a *lot* slower on Android and iOS with the blur effect.
+
 # Wed 18 Mar 2015
 
 Game design:
