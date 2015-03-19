@@ -1,0 +1,6 @@
+talk-notes.txt
+
+* Just need more resources put into Haskell! The problem is NOT with the
+  language.
+
+* Could not have done this without the bindings already being in place.
