@@ -63,6 +63,14 @@ getScreenFrameBufferId = do
        return $ fromIntegral fbId
 
 ----------------------------------------------------------------------------------------------------
+withBoundTexture :: TextureId -> IO a -> IO a
+withBoundTexture textureId io = do
+  glBindTexture gl_TEXTURE_2D textureId
+  res <- io
+  glBindTexture gl_TEXTURE_2D 0
+  return res
+
+----------------------------------------------------------------------------------------------------
 
 --
 -- Frees the [textureId] for reuse and deletes any bound textures.
@@ -83,19 +91,19 @@ genFBO (w,h) = do
   glBindFramebuffer gl_FRAMEBUFFER fb
 
   texture <- genTexture
-  glBindTexture gl_TEXTURE_2D texture
-  glTexImage2D gl_TEXTURE_2D 0 rgbFormat glW glH 0 gl_BGRA gl_UNSIGNED_BYTE nullPtr
-  -- Required for non-power-of-two textures in GL ES 2.0
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_S     (fromIntegral gl_CLAMP_TO_EDGE)
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_T     (fromIntegral gl_CLAMP_TO_EDGE)
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_NEAREST)
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_NEAREST)
-  glFramebufferTexture2D gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_TEXTURE_2D texture 0
+  withBoundTexture texture $ do
+    glTexImage2D gl_TEXTURE_2D 0 rgbFormat glW glH 0 gl_BGRA gl_UNSIGNED_BYTE nullPtr
+    -- Required for non-power-of-two textures in GL ES 2.0
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_S     (fromIntegral gl_CLAMP_TO_EDGE)
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_WRAP_T     (fromIntegral gl_CLAMP_TO_EDGE)
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_NEAREST)
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_NEAREST)
+    glFramebufferTexture2D gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_TEXTURE_2D texture 0
 
-  status <- glCheckFramebufferStatus gl_FRAMEBUFFER
-  when (status /= gl_FRAMEBUFFER_COMPLETE) $ do
-    exitWithError "Framebuffer error"
-  return $ FBO { fboFrameBuffer = fb, fboTexture = texture }
+    status <- glCheckFramebufferStatus gl_FRAMEBUFFER
+    when (status /= gl_FRAMEBUFFER_COMPLETE) $ do
+      exitWithError "Framebuffer error"
+    return $ FBO { fboFrameBuffer = fb, fboTexture = texture }
   where
     glW = fromIntegral w
     glH = fromIntegral h
@@ -132,9 +140,9 @@ renderCairoToTexture textureId mbIdx (w,h) cairoRender = do
     clearBuffer backgroundColor (w*h) buffer
     res <- C.withImageSurfaceForData buffer C.FormatARGB32 w h (w*bytesPerWord32) $ \surface -> do
       C.renderWith surface cairoRender
-    glBindTexture gl_TEXTURE_2D textureId
-    glTexImage2D gl_TEXTURE_2D index rgbFormat w' h' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
-    return res
+    withBoundTexture textureId $ do
+      glTexImage2D gl_TEXTURE_2D index rgbFormat w' h' 0 gl_BGRA gl_UNSIGNED_BYTE buffer
+      return res
   where
     w' = fromIntegral w
     h' = fromIntegral h
@@ -201,33 +209,33 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       C.translate (w'/2) (h'/2)
       cairoRender
 
-    glBindTexture gl_TEXTURE_2D tid
-    glUniform1i drawTextureLoc 1 -- set to 'true'
+    withBoundTexture tid $ do
+      glUniform1i drawTextureLoc 1 -- set to 'true'
 
-    --
-    -- On GL ES 2.0 with "non power of two" width textures (as these ones usually
-    -- are) you must set the texture wrap parameters below to "clamp to edge"
-    --
-    glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_S (fromIntegral gl_CLAMP_TO_EDGE)
-    glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_T (fromIntegral gl_CLAMP_TO_EDGE)
+      --
+      -- On GL ES 2.0 with "non power of two" width textures (as these ones usually
+      -- are) you must set the texture wrap parameters below to "clamp to edge"
+      --
+      glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_S (fromIntegral gl_CLAMP_TO_EDGE)
+      glTexParameteri gl_TEXTURE_2D  gl_TEXTURE_WRAP_T (fromIntegral gl_CLAMP_TO_EDGE)
 
-    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
-    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
+      glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR)
+      glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
 
-    glEnableVertexAttribArray (worldGLSLPosition ts)
-    glEnableVertexAttribArray (worldGLSLTexcoord ts)
+      glEnableVertexAttribArray (worldGLSLPosition ts)
+      glEnableVertexAttribArray (worldGLSLTexcoord ts)
 
-    allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
-      pokeArray vs [ x  , y  , zMax, 0, 0  -- left-bottom
-                   , x+w, y  , zMax, 1, 0  -- right-bottom
-                   , x  , y+h, zMax, 0, 1  -- left-top
-                   , x+w, y+h, zMax, 1, 1  -- right-top
-                   ]
-      glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
-      glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
-                                    (vs `plusPtr` (ptsInPos*floatSize))
-      glDrawArrays gl_TRIANGLE_STRIP 0 (fromIntegral ptsInQuad)
-      return res
+      allocaArray (ptsInQuad*perVertex*floatSize) $ \(vs :: Ptr GLfloat) -> do
+        pokeArray vs [ x  , y  , zMax, 0, 0  -- left-bottom
+                     , x+w, y  , zMax, 1, 0  -- right-bottom
+                     , x  , y+h, zMax, 0, 1  -- left-top
+                     , x+w, y+h, zMax, 1, 1  -- right-top
+                     ]
+        glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride vs
+        glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                      (vs `plusPtr` (ptsInPos*floatSize))
+        glDrawArrays gl_TRIANGLE_STRIP 0 (fromIntegral ptsInQuad)
+        return res
 
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM p ()
@@ -263,15 +271,15 @@ f2gl = realToFrac
 drawToMipmapTexture :: (Double -> C.Render ()) -> IO TextureId
 drawToMipmapTexture renderFun = do
   textureId <- genTexture
-  glBindTexture gl_TEXTURE_2D textureId
-  -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
-  -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR_MIPMAP_LINEAR)
-  -- gl_TEXTURE_MAG_FILTER accepts gl_NEAREST or gl_LINEAR
-  glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
-  forM_ (zip textureWidths [0..]) $ \(x,i) -> do
-    renderCairoToTexture textureId (Just i) (x,x) $ renderFun (fromIntegral x/2)
-  return textureId
+  withBoundTexture textureId $ do
+    -- gl_TEXTURE_MIN_FILTER accepts gl_NEAREST, gl_LINEAR, gl_NEAREST_MIPMAP_NEAREST,
+    -- gl_NEAREST_MIPMAP_LINEAR, gl_LINEAR_MIPMAP_NEAREST or gl_LINEAR_MIPMAP_LINEAR
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_LINEAR_MIPMAP_LINEAR)
+    -- gl_TEXTURE_MAG_FILTER accepts gl_NEAREST or gl_LINEAR
+    glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_LINEAR)
+    forM_ (zip textureWidths [0..]) $ \(x,i) -> do
+      renderCairoToTexture textureId (Just i) (x,x) $ renderFun (fromIntegral x/2)
+    return textureId
   where
     textureWidths = map (2^) [powOfTwo, powOfTwo-1..0]
 ----------------------------------------------------------------------------------------------------
@@ -332,48 +340,48 @@ germGfxToGermGL gfx = glm $ const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
+      finaliser = glm . const $ delTexture textureId
       germGLFun = \zIndex (R2 x' y') t r scale -> glm $ \gfxs -> do
         let ts = gfxWorldGLSL gfxs
             positionIdx    = worldGLSLPosition ts
             texCoordIdx    = worldGLSLTexcoord ts
             drawTextureLoc = worldGLSLDrawTexture ts
         glUseProgram $ worldGLSLProgramId ts
-        glBindTexture gl_TEXTURE_2D textureId
-        glUniform1i drawTextureLoc 1 -- set to 'true'
+        withBoundTexture textureId $ do
+          glUniform1i drawTextureLoc 1 -- set to 'true'
 
-        glEnableVertexAttribArray (worldGLSLPosition ts)
-        glEnableVertexAttribArray (worldGLSLTexcoord ts)
+          glEnableVertexAttribArray (worldGLSLPosition ts)
+          glEnableVertexAttribArray (worldGLSLTexcoord ts)
 
-        -- Create a star polygon.
-        let drawPolys n arrayType movingPts = do
-              allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
-                forMi_ movingPts $ \i movingPt -> do
-                  let (x,y)    = movingPtToStaticPt movingPt
-                      (mx, my) = movingPtToPt t scale movingPt
-                      vx       = (r*x + x')
-                      vy       = (r*y + y')
-                      vz       = fromIntegral zIndex * 0.001
-                      tx       = (mx+1)/2
-                      ty       = (my+1)/2
-                      base     = i*perVertex*floatSize
-                      texBase  = base + ptsInPos*floatSize
-                      pk :: Int -> Double -> IO ()
-                      pk off x = pokeByteOff vertices off (f2gl x)
-                  pk base                vx
-                  pk (base+  floatSize)  vy
-                  pk (base+2*floatSize)  vz
-                  pk texBase             tx
-                  pk (texBase+floatSize) ty
-                glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride
-                                      vertices
-                glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
-                                      (vertices `plusPtr` (ptsInPos*floatSize))
-                glDrawArrays arrayType 0 (fromIntegral n)
-        drawPolys (len+2) gl_TRIANGLE_FAN fanPts
-        -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
-        -- because there is texture to be drawn in these valleys.)
-        drawPolys lenTri gl_TRIANGLES triPts
-      finaliser = glm . const $ delTexture textureId
+          -- Create a star polygon.
+          let drawPolys n arrayType movingPts = do
+                allocaArray (n*perVertex) $ \(vertices :: Ptr Float) -> do
+                  forMi_ movingPts $ \i movingPt -> do
+                    let (x,y)    = movingPtToStaticPt movingPt
+                        (mx, my) = movingPtToPt t scale movingPt
+                        vx       = (r*x + x')
+                        vy       = (r*y + y')
+                        vz       = fromIntegral zIndex * 0.001
+                        tx       = (mx+1)/2
+                        ty       = (my+1)/2
+                        base     = i*perVertex*floatSize
+                        texBase  = base + ptsInPos*floatSize
+                        pk :: Int -> Double -> IO ()
+                        pk off x = pokeByteOff vertices off (f2gl x)
+                    pk base                vx
+                    pk (base+  floatSize)  vy
+                    pk (base+2*floatSize)  vz
+                    pk texBase             tx
+                    pk (texBase+floatSize) ty
+                  glVertexAttribPointer positionIdx ptsInPos' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                        vertices
+                  glVertexAttribPointer texCoordIdx ptsInTex' gl_FLOAT (fromIntegral gl_FALSE) stride
+                                        (vertices `plusPtr` (ptsInPos*floatSize))
+                  glDrawArrays arrayType 0 (fromIntegral n)
+          drawPolys (len+2) gl_TRIANGLE_FAN fanPts
+          -- Add extra triangles in the "valleys" of the star to turn this into an n-gon. (Needed
+          -- because there is texture to be drawn in these valleys.)
+          drawPolys lenTri gl_TRIANGLES triPts
   return $ GermGL germGLFun finaliser
 
 ----------------------------------------------------------------------------------------------------
@@ -493,18 +501,19 @@ drawScreenSizedTexture :: TextureId -> AttributeLocation -> AttributeLocation ->
 drawScreenSizedTexture texId pos texCoord = do
   let stride = fromIntegral $ 4 * floatSize
       floatSize = sizeOf (undefined :: GLfloat)
-  glBindTexture gl_TEXTURE_2D texId
-  glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
-  glEnableVertexAttribArray pos
-  glEnableVertexAttribArray texCoord
-  -- FIXME: sseefried: Needs a depth
-  allocaArray (4*4*floatSize) $ \(vs :: Ptr GLfloat) -> do
-    pokeArray vs [ -1, -1, 0, 0  -- left-bottom
-                 ,  1, -1, 1, 0  -- right-bottom
-                 , -1,  1, 0, 1  -- left-top
-                 ,  1,  1, 1, 1  -- right-top
-                 ]
-    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride vs
-    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
-                                                 (vs `plusPtr` (2*floatSize))
-    glDrawArrays gl_TRIANGLE_STRIP 0 4
+  withBoundTexture texId $ do
+    glBindTexture gl_TEXTURE_2D texId
+    glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
+    glEnableVertexAttribArray pos
+    glEnableVertexAttribArray texCoord
+    -- FIXME: sseefried: Needs a depth
+    allocaArray (4*4*floatSize) $ \(vs :: Ptr GLfloat) -> do
+      pokeArray vs [ -1, -1, 0, 0  -- left-bottom
+                   ,  1, -1, 1, 0  -- right-bottom
+                   , -1,  1, 0, 1  -- left-top
+                   ,  1,  1, 1, 1  -- right-top
+                   ]
+      glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride vs
+      glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
+                                                   (vs `plusPtr` (2*floatSize))
+      glDrawArrays gl_TRIANGLE_STRIP 0 4
