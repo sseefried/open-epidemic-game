@@ -177,6 +177,46 @@ executable         Epidemic
       cpp-options: -DDEBUG_SYSTEM
       cc-options:  -DDEBUG_SYSTEM
 
+-- For profile graphics and just graphics.
+executable         ProfileGraphics
+    hs-source-dirs : src
+    default-language:  Haskell2010
+    ghc-options: -W -threaded -O2
+    ghc-prof-options: -prof -auto-all
+
+    main-is:       ProfileGraphics.hs
+
+    build-depends: Hipmunk
+                 , MonadRandom
+                 , SDL2
+                 , OpenGLRaw
+                 , sdl2-mixer
+                 , cairo
+                 , control-monad-free
+                 -- everything below this line is a dependency of above
+                 -- the line. We fix to specific versions
+                 , base
+                 , array
+                 , containers
+                 , time
+                 , StateVar
+                 , mtl
+                 , primitive
+                 , random
+                 , text
+                 , transformers
+                 , utf8-string
+                 , vector
+                 , directory
+
+    c-sources: src/util.c src/freetype_util.c src/objc_util.m
+    pkgconfig-depends: freetype2, cairo
+
+    if flag(android) || flag(ios)
+      Buildable: False
+    else
+      Buildable: True
+
 executable         GenerateIcons
     hs-source-dirs:    src
     default-language:  Haskell2010
