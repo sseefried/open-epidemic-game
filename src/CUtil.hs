@@ -1,8 +1,9 @@
 {-# LANGUAGE ForeignFunctionInterface, CPP #-}
 module CUtil where
 
-import Foreign.C.Types
-import Foreign.C.String
+-- friends
+import Foreign
+
 
 --
 -- When compiling the GHC ARM cross-compiler with LLVM 3.0 it produces incorrect

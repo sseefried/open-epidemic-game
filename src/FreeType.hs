@@ -1,10 +1,11 @@
 {-# LANGUAGE ForeignFunctionInterface, CPP #-}
 module FreeType where
 
--- import Foreign.C.Types
-import Foreign.Ptr
-import Foreign.C.String
 import Graphics.Rendering.Cairo.Types (FontFace, mkFontFace)
+
+-- friends
+import Foreign
+
 
 
 foreign import ccall "load_font_face" cLoadFontFace :: CString -> IO (Ptr FontFace)

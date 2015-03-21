@@ -9,12 +9,6 @@ module GraphicsGL (
 
 import qualified Graphics.Rendering.Cairo as C
 import           Graphics.Rendering.OpenGL.Raw
-import           Foreign.Marshal.Alloc (allocaBytes)
-import           Foreign.Marshal.Array (allocaArray, pokeArray)
-import           Foreign.Ptr
-import           Foreign.Storable
-import           Foreign.C.String (withCString)
-import           Control.Monad
 import           Data.Bits
 import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
@@ -29,6 +23,7 @@ import Util
 import FreeType (loadFontFace)
 import GLSLPrograms
 import Coordinate
+import Foreign
 
 
 ----------------------------------------------------------------------------------------------------

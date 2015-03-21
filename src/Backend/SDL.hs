@@ -11,7 +11,6 @@ import           Graphics.Rendering.OpenGL.Raw
 import           Data.Bits
 import           Data.IORef
 import           Data.Time
-import           Foreign.C.Types (CFloat)
 import           System.Directory (doesDirectoryExist)
 import qualified Data.Map as M
 
@@ -29,6 +28,7 @@ import Util
 import FrameRateBuffer
 import GraphicsGL
 import Coordinate
+import Foreign (CFloat)
 
 
 ----------------------------------------------------------------------------------------------------

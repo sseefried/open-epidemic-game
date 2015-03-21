@@ -5,11 +5,12 @@
 --
 module AndroidMain where
 
-import Foreign.C.String
+
 
 -- friends
 import Game
 import Backend.SDL as B
+import Foreign
 
 foreign export ccall "haskell_main" main :: CString -> IO ()
 

@@ -1,11 +1,9 @@
 module Coordinate where
 
-
-import Foreign.C.Types (CFloat)
-
 -- friends
 import Types
 import CUtil
+import Foreign (CFloat)
 
 
 ----------------------------------------------------------------------------------------------------

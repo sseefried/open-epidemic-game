@@ -19,13 +19,14 @@ import Text.Printf
 import Data.Maybe
 
 
-import Foreign.C.Types (CFloat(..))
+
 import Data.Char (toUpper)
 
 
 -- friends
 import CUtil
 import Platform
+import Foreign (CFloat(..))
 
 exitWithError :: String -> IO a
 exitWithError errorStr = debugLog errorStr >> exitWith (ExitFailure 1)
