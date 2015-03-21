@@ -1,11 +1,27 @@
 --
 -- Just a grab-bag of useful utilities.
 --
-module Util where
+module Util (
+  module Util,
+  module Control.Applicative,
+  module Control.Monad,
+  module System.Exit,
+  module Text.Printf,
+  module Data.Maybe
+)
+  where
 
+-- re-exported modules
+import Control.Applicative
+import Control.Monad
 import System.Exit
+import Text.Printf
+import Data.Maybe
+
+
 import Foreign.C.Types (CFloat(..))
 import Data.Char (toUpper)
+
 
 -- friends
 import CUtil
@@ -84,3 +100,9 @@ partitionM f (x:xs) = do
   b <- f x
   (as,bs) <- partitionM f xs
   return $ if b then (x:as, bs) else (as, x:bs)
+
+----------------------------------------------------------------------------------------------------
+{-# INLINE forN #-}
+forN :: Int -> Int -> (Int -> IO ()) -> IO ()
+forN n i f | i < n = f i >> forN n (i+1) f
+           | otherwise = return ()

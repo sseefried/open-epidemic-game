@@ -8,13 +8,8 @@ module Game where
 
 -- system imports
 import           Control.Monad.Random hiding (getRandom, evalRand)
-import           Control.Monad (replicateM)
-import           Control.Applicative
-import           Text.Printf
 import qualified Data.Map as M
 import           Data.Map (Map)
-import           Control.Monad (filterM, when)
-import           Data.Maybe (catMaybes, isJust, fromJust)
 
 -- friends
 import Types

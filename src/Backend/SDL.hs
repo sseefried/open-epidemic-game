@@ -11,11 +11,7 @@ import           Graphics.Rendering.OpenGL.Raw
 import           Data.Bits
 import           Data.IORef
 import           Data.Time
-import           Text.Printf
-import           Control.Monad
-import           System.Exit
 import           Foreign.C.Types (CFloat)
-import           Control.Applicative ((<$>))
 import           System.Directory (doesDirectoryExist)
 import qualified Data.Map as M
 
@@ -170,6 +166,8 @@ runFrameUpdate besRef = do
       mainFBO = gfxMainFBO gfxs
   -- Only update if the render is dirty
   when (gsRenderDirty gs) $ do
+    -- FIXME: Should this code really be here? What about in GraphicsGL?
+
     glBindFramebuffer gl_FRAMEBUFFER (fboFrameBuffer mainFBO)
     glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
     glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
