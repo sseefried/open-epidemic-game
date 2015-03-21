@@ -21,6 +21,7 @@ module GLM (
   BlurGLSL(..),
   Screen(..),
   FBO(..),
+  GLSLProgram(..),
   MipMapIndex,
   ProgramId,
   ShaderId,
@@ -65,6 +66,10 @@ type UniformLocation   = GLint
 type VariableLocation  = GLuint
 type TextureId         = GLuint
 type FrameBufferId     = GLuint
+
+data GLSLProgram = GLSLProgram { glslVertexShader :: String
+                               , glslFragmentShader :: String }
+
 
 data GfxState = GfxState { gfxBlurGLSL    :: BlurGLSL
                          , gfxWorldGLSL   :: WorldGLSL

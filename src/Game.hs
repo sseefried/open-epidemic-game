@@ -364,7 +364,6 @@ killGerm :: R2 -> GameM Bool
 killGerm p = do
   (germsToKill, germToEscape) <- germsPartitionM (pointCollides p)
   let kkk (germId, germ) = do
-        gs <- get
         let hc = germHipCirc germ
         pos <- runOnHipState $ do
                   pos' <- getHipCircPos hc

@@ -9,18 +9,12 @@ import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
 import           Graphics.Rendering.OpenGL.Raw
 import           Data.Bits
-import           Data.List (intersperse)
 import           Data.IORef
 import           Data.Time
 import           Text.Printf
 import           Control.Monad
 import           System.Exit
-import           Foreign.Ptr (Ptr, nullPtr)
 import           Foreign.C.Types (CFloat)
-import           Foreign.C.String (withCString, withCStringLen, peekCString)
-import           Foreign.Marshal.Array (allocaArray, pokeArray)
-import           Foreign.Marshal.Alloc (alloca, allocaBytes)
-import           Foreign.Storable (peek)
 import           Control.Applicative ((<$>))
 import           System.Directory (doesDirectoryExist)
 import qualified Data.Map as M
@@ -39,7 +33,7 @@ import Util
 import FrameRateBuffer
 import GraphicsGL
 import Coordinate
-import FreeType
+
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
@@ -59,35 +53,9 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besLevelMusic     :: Maybe M.Music
                                  , besSquishSound    :: Maybe M.Chunk
                                  }
-
 ----------------------------------------------------------------------------------------------------
-compileGLSLProgram :: GLSLProgram -> IO ProgramId
-compileGLSLProgram p = do
-  etVertexShader   <- loadShader (glslVertexShader p) gl_VERTEX_SHADER
-  vertexShader     <- exitOnLeft etVertexShader
-  etFragmentShader <- loadShader (glslFragmentShader p) gl_FRAGMENT_SHADER
-  fragmentShader   <- exitOnLeft etFragmentShader
-  programId        <- glCreateProgram
-  when (programId == 0 ) $ exitWithError "Could not create GLSL program"
-  glAttachShader programId vertexShader
-  glAttachShader programId fragmentShader
-  glLinkProgram programId
-  linked <- alloca $ \ptrLinked -> do
-    glGetProgramiv programId gl_LINK_STATUS ptrLinked
-    peek ptrLinked
-  when (linked == 0) $ do
-     errorStr <- getGLError glGetProgramiv glGetProgramInfoLog programId
-     exitWithError errorStr
-  return programId
-  where
-    exitOnLeft et = case et of
-                      Left error -> debugLog error >> exitWith (ExitFailure 1)
-                      Right val  -> return val
-
-----------------------------------------------------------------------------------------------------
-
-initOpenGL :: S.Window -> (Int, Int) -> String -> IO (GfxState, S.GLContext)
-initOpenGL window (w,h) resourcePath = do
+initOpenGL :: S.Window -> IO S.GLContext
+initOpenGL window = do
   --
   -- On iOS the you must set these attributes *before* the gl context is created.
   --
@@ -100,123 +68,8 @@ initOpenGL window (w,h) resourcePath = do
   mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
-  screenFBId <- getScreenFrameBufferId -- get this value before any new frame buffers created.
-  --  glEnable gl_TEXTURE_2D is meaningless in GLSL  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
-  glEnable gl_BLEND
-  glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
-  glEnable gl_DEPTH_TEST
-  glDepthFunc gl_LESS
-  glViewport 0 0 (fromIntegral w) (fromIntegral h)
+  return context
 
-  mainFBO   <- genFBO (w,h)
-  worldGLSL <- initWorldGLSL (w,h)
-  blurGLSL  <- initBlurGLSL (w,h)
-  fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
-
-
-  --
-  let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
-                      , gfxBlurGLSL    = blurGLSL
-                      , gfxFontFace    = fontFace
-                      , gfxMainFBO     = mainFBO
-                      , gfxScreenFBId  = screenFBId
-                      }
-  return (gfxs, context)
-
-initWorldGLSL :: (Int, Int) -> IO WorldGLSL
-initWorldGLSL (w,h) = do
-  programId <- compileGLSLProgram worldGLSLProgram
-  --
-  -- The co-ordinates are set to be the world co-ordinate system. This saves us
-  -- converting for OpenGL calls
-  --
-  let bds = orthoBounds (w,h)
-  ortho2D programId bds
-  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
-  [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
-  return $ WorldGLSL { worldGLSLPosition    = positionLoc
-                     , worldGLSLTexcoord    = texCoordLoc
-                     , worldGLSLDrawTexture = drawTextureLoc
-                     , worldGLSLColor       = colorLoc
-                     , worldGLSLOrthoBounds = bds
-                     , worldGLSLProgramId   = programId
-                     }
-
-initBlurGLSL :: (Int, Int) -> IO BlurGLSL
-initBlurGLSL (w, h) = do
-  programId <- compileGLSLProgram blurGLSLProgram
-  glUseProgram programId
-  let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
-  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
-  [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
-                                                 ("axis":"radius":blurFactorNames)
-  fbo <- genFBO (w,h)
-  glUniform1f radius (fromIntegral $ min w h)
-  return $ BlurGLSL { blurGLSLPosition  = positionLoc
-                    , blurGLSLTexcoord  = texCoordLoc
-                    , blurGLSLFactor0   = bf0
-                    , blurGLSLFactor1   = bf1
-                    , blurGLSLFactor2   = bf2
-                    , blurGLSLFactor3   = bf3
-                    , blurGLSLFactor4   = bf4
-                    , blurGLSLAxis      = axis
-                    , blurGLSLPhase1FBO = fbo
-                    , blurGLSLProgramId = programId
-                    }
-
-
-----------------------------------------------------------------------------------------------------
-getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
-                  -> IO VariableLocation
-getShaderLocation getLoc variableSort programId s = do
-  idx <- withCString s $ \str -> getLoc programId str
-  when (idx < 0) $ exitWithError (printf "%s '%s' is not in shader program" variableSort s)
-  return $ fromIntegral idx
-
-----------------------------------------------------------------------------------------------------
-getAttributeLocation :: ProgramId -> String -> IO AttributeLocation
-getAttributeLocation = getShaderLocation glGetAttribLocation "Attribute"
-
-----------------------------------------------------------------------------------------------------
-getUniformLocation :: ProgramId -> String -> IO UniformLocation
-getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation "Uniform" p s
-
-----------------------------------------------------------------------------------------------------
---
--- Open GL functions 'glOrtho' and 'glOrtho2D' are not supported by GL ES 2.0 so we write
--- our own function to create the correct matrix.
---
--- See http://en.wikipedia.org/wiki/Orthographic_projection
---
--- One of the particularly confusing aspects of the orthographic projection is the
--- definitions of the terms "near" and "far". (See http://math.hws.edu/graphicsnotes/c3/s5.html)
--- 'near = -zMax' and 'far = -zMin'
---
---
-ortho2D :: ProgramId -> OrthoBounds -> IO ()
-ortho2D texGLSLProgramId bds = do
-  glUseProgram texGLSLProgramId
-  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation texGLSLProgramId cstr
-  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
-  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
-    pokeArray ortho $ map d2gl
-      [ a,   0,  0, 0
-      , 0,   b,  0, 0
-      , 0,   0,  c, 0
-      , tx, ty, tz, 1 ]
-    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
-  where
-    (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
-    near = realToFrac $ -zMax
-    far  = realToFrac $ -zMin
-    d2gl :: Double -> GLfloat
-    d2gl = realToFrac
-    a    = 2 / (right - left)
-    b    =  2 / (top - bottom)
-    c    = -2 / (far - near)
-    tx   = - (right + left)/(right - left)
-    ty   = - (top + bottom)/(top - bottom)
-    tz   =   (far + near)/(far - near)
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Maybe String -> IO (IORef BackendState)
@@ -241,7 +94,8 @@ initialize title mbResourcePath = do
   dirExists <- doesDirectoryExist resourcePath
   when (not dirExists ) $ exitWithError $
     printf "Resource path `%s' does not exist" resourcePath
-  (gfxState, context) <- initOpenGL window (w,h) resourcePath
+  context <- initOpenGL window
+  gfxState <- initGfxState (w,h) resourcePath
   (levelMusic, squishSound) <- case platform of
     NoSound -> return (Nothing, Nothing)
     _       -> do
@@ -478,187 +332,3 @@ logFrameRate besRef = do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 
-----------------------------------------------------------------------------------------------------
-getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())
-           -> (GLuint -> GLsizei -> Ptr GLsizei -> Ptr GLchar -> IO ())
-           -> GLuint -> IO String
-getGLError getVal getInfoLog ident = do
-        infoLen <- alloca $ \ptrInfoLen -> do
-          getVal ident gl_INFO_LOG_LENGTH ptrInfoLen
-          peek ptrInfoLen
-        if (infoLen > 1)
-                    then
-                      allocaBytes (fromIntegral infoLen) $ \infoCStr -> do
-                        getInfoLog ident infoLen nullPtr infoCStr
-                        peekCString infoCStr
-                    else return "Shader compiler failure. Couldn't get errorLog"
-----------------------------------------------------------------------------------------------------
-loadShader :: String -> ShaderType -> IO (Either String ShaderId)
-loadShader src typ = do
-  shaderId <- glCreateShader typ
-  if (shaderId == 0)
-   then return $ Left "Could not create shader"
-   else do
-     withCStringLen src $ \(cString, len) -> allocaArray 1 $ \ptrCString -> allocaArray 1 $ \ptrLength -> do
-       pokeArray ptrCString [cString]
-       pokeArray ptrLength [fromIntegral len]
-       glShaderSource shaderId 1 ptrCString ptrLength
-     glCompileShader shaderId
-     compileStatus <- alloca $ \ptr -> do
-       glGetShaderiv shaderId gl_COMPILE_STATUS ptr
-       peek ptr
-     if compileStatus == 0
-      then do -- error
-        errorStr <- getGLError glGetShaderiv glGetShaderInfoLog shaderId
-        return $ Left errorStr
-      else return $ Right shaderId
-
-----------------------------------------------------------------------------------------------------
-data GLSLProgram = GLSLProgram { glslVertexShader :: String
-                               , glslFragmentShader :: String }
-
-glslVertexShaderDefault :: String
-glslVertexShaderDefault =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "attribute vec3 position;"
-          , "attribute vec2 texCoord;"
-          , "varying vec2   vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_Position = vec4(position,1);"
-          , "  vTexCoord = texCoord;"
-          , "}"
-          ]
-
-worldGLSLProgram :: GLSLProgram
-worldGLSLProgram =
-  GLSLProgram {
-      glslVertexShader =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "attribute vec3 position;"
-          , "attribute vec2 texCoord;"
-          , "uniform mat4 modelView;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_Position = modelView * vec4(position,1);"
-          , "  vTexCoord = texCoord;"
-          , "}"
-          ]
-
-    , glslFragmentShader =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "uniform sampler2D texture;"
-          , "uniform bool drawTexture;"
-          , "uniform vec4 color;"
-          , " "
-          , "varying vec2 vTexCoord;"
-          , " "
-          , "void main()"
-          , "{"
-          , "  if (drawTexture) {"
-          , "    // sample the texture at the interpolated texture coordinate"
-          , "    // and write it to gl_FragColor "
-          , "    gl_FragColor = texture2D(texture, vTexCoord);"
-          , "  } else {"
-          , "    gl_FragColor = color;"
-          , "  }"
-          , "}"
-          ]
-  }
-
-blurGLSLProgram :: GLSLProgram
-blurGLSLProgram =
-  GLSLProgram {
-      glslVertexShader = glslVertexShaderDefault
-    , glslFragmentShader =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "uniform sampler2D texture;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "uniform float blurFactor0;"
-          , "uniform float blurFactor1;"
-          , "uniform float blurFactor2;"
-          , "uniform float blurFactor3;"
-          , "uniform float blurFactor4;"
-          , "uniform float radius;"
-          , ""
-          , "uniform bool axis;"
-          , ""
-          , "float scale = 1.0/radius;"
-          , "vec4 blurComponent(float dist, float blurFactor) {"
-          , "  if (axis) { // y-axis"
-          , "   return texture2D(texture, vec2(vTexCoord.x, vTexCoord.y + dist*scale))*blurFactor;"
-          , "  } else {"
-          , "   return texture2D(texture, vec2(vTexCoord.x + dist*scale, vTexCoord.y))*blurFactor;"
-          , "  }"
-          , "}"
-          , ""
-          , "void main() {"
-          , "  vec4 sum = vec4(0.0);"
-          , "  sum += blurComponent( 0.0, blurFactor0);"
-          , "  sum += blurComponent( 1.0, blurFactor1);"
-          , "  sum += blurComponent(-1.0, blurFactor1);"
-          , "  sum += blurComponent( 2.0, blurFactor2);"
-          , "  sum += blurComponent(-2.0, blurFactor2);"
-          , "  sum += blurComponent( 3.0, blurFactor3);"
-          , "  sum += blurComponent(-3.0, blurFactor3);"
-          , "  sum += blurComponent( 4.0, blurFactor4);"
-          , "  sum += blurComponent(-4.0, blurFactor4);"
-          , ""
-          , "  gl_FragColor = vec4(sum.xyz, 1.0);"
-          --,  "if ((axis ? 1.0 : 1.0) + (blurFactor0 + blurFactor1 + blurFactor2 +"
-          --,  "  blurFactor3 + blurFactor4) > 0.0) {gl_FragColor =  texture2D(texture, vTexCoord); } else { gl_FragColor =  texture2D(texture, vTexCoord); }"
-          , "}"
-        ]
-  }
-
---
--- A GLSL program that just passes a texture straight through.
---
-_idGLSLProgram :: GLSLProgram
-_idGLSLProgram =
-  GLSLProgram {
-      glslVertexShader   =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "attribute vec3 position;"
-          , "attribute vec2 texCoord;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_Position = vec4(position,1);"
-          , "  vTexCoord = texCoord;"
-          , "}"
-          ]
-    , glslFragmentShader =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "uniform sampler2D texture;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_FragColor = texture2D(texture, vTexCoord);"
-          , "}"
-          ]
-  }

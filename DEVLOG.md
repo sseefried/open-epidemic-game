@@ -1,3 +1,9 @@
+# Fri 20 Mar 2015
+
+Apparently branch in shaders is particularly bad. First I want to get a feel for why this is so.
+
+
+
 # Thu 19 Mar 2015
 
 I spent almost all day working out why I had a "magenta screen of death" on the iOS Simuator.
@@ -13,6 +19,15 @@ it with (in C)
 
 Now we have the problem that the game is a *lot* slower on Android and iOS with the blur effect.
 
+## Performance tuning
+
+It seems that creating "one big shader" is actually a good idea.
+
+See [here](http://stackoverflow.com/questions/16096661/opengl-performance-overhead-from-frequently-swapping-between-two-shaders)
+
+    changing the shaders flushes the GPU execution pipelines. And it takes a few dozen clock cycles
+    for the pipelines and branch predictors to settle for the newly switched to shader.
+
 # Wed 18 Mar 2015
 
 Game design:
@@ -25,7 +40,7 @@ Game design:
 Game design feedback.
 
 My friend Tim mentioned that the exponential nature of the game is what makes it surprising.
-Unless you get the germs nice and early you suddently lose control. It's how things work, but is
+Unless you get the germs nice and early you suddenly lose control. It's how things work, but is
 this fun?
 
 ---

@@ -3,7 +3,8 @@ module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
     drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic, genFBO,
-    renderQuadWithColor, genTexture, genFrameBuffer, getScreenFrameBufferId, rgbFormat, blur
+    renderQuadWithColor, genTexture, genFrameBuffer, getScreenFrameBufferId, rgbFormat, blur,
+    initGfxState, initWorldGLSL, initBlurGLSL
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -12,11 +13,15 @@ import           Foreign.Marshal.Alloc (allocaBytes, alloca)
 import           Foreign.Marshal.Array (allocaArray, pokeArray)
 import           Foreign.Ptr
 import           Foreign.Storable
+import           Foreign.C.String (withCString, withCStringLen, peekCString)
 import           GHC.Word (Word8)
 import           Control.Monad
 import           Data.Bits
 import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
+import           Control.Applicative
+import           Text.Printf
+import           System.Exit
 
 -- friends
 import Types
@@ -25,6 +30,9 @@ import Game.Types (GermGL(..))
 import Graphics
 import Platform
 import Util
+import FreeType (loadFontFace)
+import GLSLPrograms
+import Coordinate
 
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLint
@@ -61,6 +69,21 @@ getScreenFrameBufferId = do
     do glGetIntegerv gl_FRAMEBUFFER_BINDING ptr
        fbId <- peek ptr
        return $ fromIntegral fbId
+----------------------------------------------------------------------------------------------------
+getShaderLocation :: (ProgramId -> Ptr GLchar -> IO GLint) -> String -> ProgramId -> String
+                  -> IO VariableLocation
+getShaderLocation getLoc variableSort programId s = do
+  idx <- withCString s $ \str -> getLoc programId str
+  when (idx < 0) $ exitWithError (printf "%s '%s' is not in shader program" variableSort s)
+  return $ fromIntegral idx
+
+----------------------------------------------------------------------------------------------------
+getAttributeLocation :: ProgramId -> String -> IO AttributeLocation
+getAttributeLocation = getShaderLocation glGetAttribLocation "Attribute"
+
+----------------------------------------------------------------------------------------------------
+getUniformLocation :: ProgramId -> String -> IO UniformLocation
+getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation "Uniform" p s
 
 ----------------------------------------------------------------------------------------------------
 withBoundTexture :: TextureId -> IO a -> IO a
@@ -517,3 +540,163 @@ drawScreenSizedTexture texId pos texCoord = do
       glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
                                                    (vs `plusPtr` (2*floatSize))
       glDrawArrays gl_TRIANGLE_STRIP 0 4
+----------------------------------------------------------------------------------------------------
+--
+-- Precondition: An OpenGL context must have been created.
+--
+initGfxState :: (Int, Int) -> String -> IO GfxState
+initGfxState (w,h) resourcePath = do
+  screenFBId <- getScreenFrameBufferId -- get this value before any new frame buffers created.
+  --  glEnable gl_TEXTURE_2D is meaningless in GLSL  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
+  glEnable gl_BLEND
+  glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
+  glEnable gl_DEPTH_TEST
+  glDepthFunc gl_LESS
+  glViewport 0 0 (fromIntegral w) (fromIntegral h)
+
+  mainFBO   <- genFBO (w,h)
+  worldGLSL <- initWorldGLSL (w,h)
+  blurGLSL  <- initBlurGLSL (w,h)
+  fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
+  let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
+                      , gfxBlurGLSL    = blurGLSL
+                      , gfxFontFace    = fontFace
+                      , gfxMainFBO     = mainFBO
+                      , gfxScreenFBId  = screenFBId
+                      }
+  return gfxs
+
+initWorldGLSL :: (Int, Int) -> IO WorldGLSL
+initWorldGLSL (w,h) = do
+  programId <- compileGLSLProgram worldGLSLProgram
+  --
+  -- The co-ordinates are set to be the world co-ordinate system. This saves us
+  -- converting for OpenGL calls
+  --
+  let bds = orthoBounds (w,h)
+  ortho2D programId bds
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
+  return $ WorldGLSL { worldGLSLPosition    = positionLoc
+                     , worldGLSLTexcoord    = texCoordLoc
+                     , worldGLSLDrawTexture = drawTextureLoc
+                     , worldGLSLColor       = colorLoc
+                     , worldGLSLOrthoBounds = bds
+                     , worldGLSLProgramId   = programId
+                     }
+
+initBlurGLSL :: (Int, Int) -> IO BlurGLSL
+initBlurGLSL (w, h) = do
+  programId <- compileGLSLProgram blurGLSLProgram
+  glUseProgram programId
+  let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
+                                                 ("axis":"radius":blurFactorNames)
+  fbo <- genFBO (w,h)
+  glUniform1f radius (fromIntegral $ min w h)
+  return $ BlurGLSL { blurGLSLPosition  = positionLoc
+                    , blurGLSLTexcoord  = texCoordLoc
+                    , blurGLSLFactor0   = bf0
+                    , blurGLSLFactor1   = bf1
+                    , blurGLSLFactor2   = bf2
+                    , blurGLSLFactor3   = bf3
+                    , blurGLSLFactor4   = bf4
+                    , blurGLSLAxis      = axis
+                    , blurGLSLPhase1FBO = fbo
+                    , blurGLSLProgramId = programId
+                    }
+----------------------------------------------------------------------------------------------------
+--
+-- Open GL functions 'glOrtho' and 'glOrtho2D' are not supported by GL ES 2.0 so we write
+-- our own function to create the correct matrix.
+--
+-- See http://en.wikipedia.org/wiki/Orthographic_projection
+--
+-- One of the particularly confusing aspects of the orthographic projection is the
+-- definitions of the terms "near" and "far". (See http://math.hws.edu/graphicsnotes/c3/s5.html)
+-- 'near = -zMax' and 'far = -zMin'
+--
+--
+ortho2D :: ProgramId -> OrthoBounds -> IO ()
+ortho2D texGLSLProgramId bds = do
+  glUseProgram texGLSLProgramId
+  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation texGLSLProgramId cstr
+  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
+  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
+    pokeArray ortho $ map d2gl
+      [ a,   0,  0, 0
+      , 0,   b,  0, 0
+      , 0,   0,  c, 0
+      , tx, ty, tz, 1 ]
+    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
+  where
+    (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
+    near = realToFrac $ -zMax
+    far  = realToFrac $ -zMin
+    d2gl :: Double -> GLfloat
+    d2gl = realToFrac
+    a    = 2 / (right - left)
+    b    =  2 / (top - bottom)
+    c    = -2 / (far - near)
+    tx   = - (right + left)/(right - left)
+    ty   = - (top + bottom)/(top - bottom)
+    tz   =   (far + near)/(far - near)
+
+----------------------------------------------------------------------------------------------------
+compileGLSLProgram :: GLSLProgram -> IO ProgramId
+compileGLSLProgram p = do
+  etVertexShader   <- loadShader (glslVertexShader p) gl_VERTEX_SHADER
+  vertexShader     <- exitOnLeft etVertexShader
+  etFragmentShader <- loadShader (glslFragmentShader p) gl_FRAGMENT_SHADER
+  fragmentShader   <- exitOnLeft etFragmentShader
+  programId        <- glCreateProgram
+  when (programId == 0 ) $ exitWithError "Could not create GLSL program"
+  glAttachShader programId vertexShader
+  glAttachShader programId fragmentShader
+  glLinkProgram programId
+  linked <- alloca $ \ptrLinked -> do
+    glGetProgramiv programId gl_LINK_STATUS ptrLinked
+    peek ptrLinked
+  when (linked == 0) $ do
+     errorStr <- getGLError glGetProgramiv glGetProgramInfoLog programId
+     exitWithError errorStr
+  return programId
+  where
+    exitOnLeft et = case et of
+                      Left error -> debugLog error >> exitWith (ExitFailure 1)
+                      Right val  -> return val
+----------------------------------------------------------------------------------------------------
+getGLError :: (GLuint -> GLenum -> Ptr GLint -> IO ())
+           -> (GLuint -> GLsizei -> Ptr GLsizei -> Ptr GLchar -> IO ())
+           -> GLuint -> IO String
+getGLError getVal getInfoLog ident = do
+        infoLen <- alloca $ \ptrInfoLen -> do
+          getVal ident gl_INFO_LOG_LENGTH ptrInfoLen
+          peek ptrInfoLen
+        if (infoLen > 1)
+                    then
+                      allocaBytes (fromIntegral infoLen) $ \infoCStr -> do
+                        getInfoLog ident infoLen nullPtr infoCStr
+                        peekCString infoCStr
+                    else return "Shader compiler failure. Couldn't get errorLog"
+----------------------------------------------------------------------------------------------------
+loadShader :: String -> ShaderType -> IO (Either String ShaderId)
+loadShader src typ = do
+  shaderId <- glCreateShader typ
+  if (shaderId == 0)
+   then return $ Left "Could not create shader"
+   else do
+     withCStringLen src $ \(cString, len) -> allocaArray 1 $ \ptrCString -> allocaArray 1 $ \ptrLength -> do
+       pokeArray ptrCString [cString]
+       pokeArray ptrLength [fromIntegral len]
+       glShaderSource shaderId 1 ptrCString ptrLength
+     glCompileShader shaderId
+     compileStatus <- alloca $ \ptr -> do
+       glGetShaderiv shaderId gl_COMPILE_STATUS ptr
+       peek ptr
+     if compileStatus == 0
+      then do -- error
+        errorStr <- getGLError glGetShaderiv glGetShaderInfoLog shaderId
+        return $ Left errorStr
+      else return $ Right shaderId

@@ -1,6 +1,9 @@
 High priority
 -------------
 
+[ ] Create a profiling harness to test the GLSL shaders. These *must* be fast.
+    Write a tutorial about how you do it on the game blog.
+
 [ ] Remove modelView matrix from from blur Program
 
 
