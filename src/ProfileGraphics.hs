@@ -30,15 +30,13 @@ import Util
 ----------------------------------------------------------------------------------------------------
 data S = S { sWindow    :: S.Window
            , sGfxState  :: GfxState
-           , sGerms     :: GLMW [GermGL]
+           , sGerms     :: GLM [GermGL]
            , sGLContext :: S.GLContext
            , sFrames    :: Int
            , sStartTime :: UTCTime
            }
 
-type GLMW a = GLM WorldGLSL a
-
-nGerms = 50
+nGerms = 200
 
 ----------------------------------------------------------------------------------------------------
 initialize :: IO (IORef S)
@@ -133,15 +131,15 @@ prof1 gfxs germGLs = do
 ----------------------------------------------------------------------------------------------------
 prof2 :: GfxState -> [GermGL] -> IO ()
 prof2 gfxs germGLs = do
-      let draw :: GermGL -> GLMW ()
+      let draw :: GermGL -> GLM ()
           draw germGL = germGLFun germGL 0 (R2 0 0) 0 10 1
-          drawGerms :: GLMW ()
+          drawGerms :: GLM ()
           drawGerms = sequence_ $ map draw germGLs
       glBindFramebuffer gl_FRAMEBUFFER $ fboFrameBuffer $ gfxMainFBO gfxs
       glClearColor 1 1 1 1 -- here it must be opaque
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
-      let blurred :: GLMW ()
-          blurred = blur 1.0 drawGerms `unsafeSequenceGLM` return ()
+      let blurred :: GLM ()
+          blurred = blur 1.0 drawGerms
       runGLMIO gfxs $ blurred
       glFlush
 
@@ -158,10 +156,10 @@ isKeyDown ed code = case ed of
   _ -> False
 
 ----------------------------------------------------------------------------------------------------
-newGermGLM :: GLMW GermGL
+newGermGLM :: GLM GermGL
 newGermGLM = join foo
   where
-    foo :: GLMW (GLMW GermGL)
+    foo :: GLM (GLM GermGL)
     foo = do
       germGfx <- liftGLM $ evalRandIO randomGermGfx
       return $ germGfxToGermGL germGfx

@@ -68,7 +68,7 @@ _renderCairoToNewTexture dims r =
 -- The relative co-ordinate system for the Cairo graphics will have its origin at the
 -- *centre* of the quad.
 --
-renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM WorldGLSL a
+renderCairoToQuad :: (Double, Double) -> (Double, Double) -> Render a -> GLM a
 renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
   --
   -- Since Cairo must render to a texture buffer (which is an integral number of pixels)
@@ -129,7 +129,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
         return res
 
 ----------------------------------------------------------------------------------------------------
-renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM p ()
+renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = glm $ \gfxs -> do
   let ts = gfxWorldGLSL gfxs
       positionLoc    = worldGLSLPosition ts
@@ -209,7 +209,7 @@ forMi_ v f = V.foldM' f' 0 v >> return ()
 -- returns the position of the point at time zero. This is used for the texture co-ordinates,
 -- while [movingPtToPt] is used for the polygon vertices.
 --
-germGfxToGermGL :: GermGfx -> GLM WorldGLSL GermGL
+germGfxToGermGL :: GermGfx -> GLM GermGL
 germGfxToGermGL gfx = glm $ const $ do
   textureId <- drawToMipmapTexture (germGfxRenderBody gfx)
   --
@@ -275,7 +275,7 @@ germGfxToGermGL gfx = glm $ const $ do
 --
 -- Draw antibiotic *centred* at (x, y)
 --
-drawAntibiotic :: R2 -> Antibiotic -> Double -> GLM WorldGLSL ()
+drawAntibiotic :: R2 -> Antibiotic -> Double -> GLM ()
 drawAntibiotic (R2 x y) ab effectiveness = do
   let s = antibioticWidth
   renderCairoToQuad (x,y) (s,s) $ do
@@ -283,7 +283,7 @@ drawAntibiotic (R2 x y) ab effectiveness = do
     flask (antibioticColor ab effectiveness)
 ----------------------------------------------------------------------------------------------------
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
-drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM WorldGLSL Double
+drawText :: TextConstraint -> Gradient -> R2 -> Double -> String -> GLM Double
 drawText tc grad (R2 x y) len s = do
   st <- getGfxState
   let textR :: Render Double
@@ -296,18 +296,18 @@ drawText tc grad (R2 x y) len s = do
 
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth, drawTextOfHeight :: Gradient -> R2 -> Double -> String -> GLM WorldGLSL Double
+drawTextOfWidth, drawTextOfHeight :: Gradient -> R2 -> Double -> String -> GLM Double
 drawTextOfWidth  = drawText Width
 drawTextOfHeight = drawText Height
 
 ----------------------------------------------------------------------------------------------------
-drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM WorldGLSL ()
+drawTextOfWidth_, drawTextOfHeight_ :: Gradient -> R2 -> Double -> String -> GLM ()
 drawTextOfWidth_ a b c d = drawText Width a b c d >> return ()
 drawTextOfHeight_ a b c d= drawText Height a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
 -- FIXME: sseefried: Rewrite this function so that you don't use [runWithoutRender]
-drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM WorldGLSL Double
+drawTextLinesOfWidth :: Color -> R2 -> Double -> [String] -> GLM Double
 drawTextLinesOfWidth color (R2 x y) w ss = do
   st <- getGfxState
   let textR :: Render Double
@@ -316,11 +316,11 @@ drawTextLinesOfWidth color (R2 x y) w ss = do
   renderCairoToQuad (x, y) (w,h) $ textR
 
 ----------------------------------------------------------------------------------------------------
-drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM WorldGLSL ()
+drawTextLinesOfWidth_ :: Color -> R2 -> Double -> [String] -> GLM ()
 drawTextLinesOfWidth_ a b c d = drawTextLinesOfWidth a b c d >> return ()
 
 ----------------------------------------------------------------------------------------------------
-drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM WorldGLSL ()
+drawLetterBox :: (Double, Double) -> (Double, Double) -> GLM ()
 drawLetterBox pos (w,h) =
   when (w > 0 && h > 0 ) $ renderQuadWithColor pos (w,h) (Color 0 0 0 1)
 
@@ -330,7 +330,7 @@ drawLetterBox pos (w,h) =
 -- Reads from [srcFBO]
 -- Renders to [destFBO] if [mbDestFBO] is [Just destFBO] and to screen if [Nothing]
 --
-blurOnAxis :: Double -> Bool -> FBO -> Maybe FBO -> GLM BlurGLSL ()
+blurOnAxis :: Double -> Bool -> FBO -> Maybe FBO -> GLM ()
 blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
   let bs = gfxBlurGLSL gfxs
       frameBufferId = maybe (gfxScreenFBId gfxs) fboFrameBuffer mbDestFBO
@@ -360,15 +360,15 @@ gaussSample sigma n = map (/total) (center:xs)
 
 ----------------------------------------------------------------------------------------------------
 -- FIXME:: Needs to do both axes.
-blur :: Double -> GLM WorldGLSL () -> GLM Screen ()
+blur :: Double -> GLM () -> GLM ()
 blur sigma m = do
   gfxs <- getGfxState
   let mainFBO = gfxMainFBO gfxs
       phase1FBO = blurGLSLPhase1FBO $ gfxBlurGLSL gfxs
-      blur1 :: GLM BlurGLSL ()
+      blur1 :: GLM ()
       blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
       blur2 = blurOnAxis sigma True  phase1FBO Nothing
-  m `unsafeSequenceGLM` (blur1 >> blur2) `unsafeSequenceGLM` return ()
+  m >> blur1 >> blur2
 
 
 ----------------------------------------------------------------------------------------------------

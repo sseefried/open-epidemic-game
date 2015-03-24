@@ -550,7 +550,7 @@ physics duration = do
   modify $ \gs -> gs { gsLevelTime = gsLevelTime gs + duration }
 
 ----------------------------------------------------------------------------------------------------
-addRender :: GLM WorldGLSL () -> GameM ()
+addRender :: GLM () -> GameM ()
 addRender glm = modify $ \gs -> gs { gsWorldRender = gsWorldRender gs >> glm
                                    , gsRenderDirty = True }
 
@@ -573,7 +573,7 @@ screenRender = modify $ \gs ->
 gameFieldRender :: GameM ()
 gameFieldRender = do
   gs <- get
-  let drawOneGerm :: (Int, Germ) -> GameM (GLM WorldGLSL ())
+  let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
       drawOneGerm (i,g) = do
         pos <- germPos g
         let (ampScale, timeScale) = scales g
@@ -590,7 +590,7 @@ gameFieldRender = do
 sideBarRender :: GameM ()
 sideBarRender = do
   gs <- get
-  let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM WorldGLSL()
+  let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
       drawOneAntibiotic (ab, abd) =
         when (abEnabled abd) $ drawAntibiotic (abPos abd) ab (abEffectiveness abd)
       renderAntibiotics = mapM_ drawOneAntibiotic (M.toList $ gsAntibiotics gs)

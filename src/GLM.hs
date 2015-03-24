@@ -39,8 +39,8 @@ module GLM (
   glm, -- smart constructor
   liftGLM,
   getGfxState,
-  runGLMIO, -- FIXME: Change to runIOGLM or even just runGLM
-  unsafeSequenceGLM
+  runGLMIO,
+--  unsafeSequenceGLM
 ) where
 
 import Graphics.Rendering.Cairo (FontFace)
@@ -105,37 +105,37 @@ data Screen = Screen
 
 data FBO = FBO { fboFrameBuffer :: FrameBufferId, fboTexture :: TextureId }
 
-data GLM p a = GLM { unGLM :: GfxState -> IO a }
+data GLM a = GLM { unGLM :: GfxState -> IO a }
 
-instance Functor (GLM p) where
+instance Functor GLM where
   -- (a -> b) -> (GLM a -> GLM b)
   fmap f (GLM g) = GLM $ fmap f . g
 
-instance Monad (GLM p) where
+instance Monad GLM where
   return = GLM . const . return
   (GLM f) >>= k = GLM $ \as -> f as >>= \a -> unGLM (k a) as
 
-instance Applicative (GLM p) where
+instance Applicative GLM where
   pure = return
   (GLM f) <*> (GLM f') = GLM $ liftA2 (<*>) f f'
 
 --
 -- Lifts an [IO] in to the [GLM] monad.
 --
-liftGLM :: IO a -> (GLM p) a
+liftGLM :: IO a -> GLM a
 liftGLM io = GLM $ const io
 
 -- Same as the GLM constructor. The difference is that [GLM] is opaque and can't be
 -- pattern matched against
 --
-glm :: (GfxState -> IO a) -> GLM p a
+glm :: (GfxState -> IO a) -> GLM a
 glm = GLM
 
-getGfxState :: GLM p GfxState
+getGfxState :: GLM GfxState
 getGfxState = GLM return
 
-runGLMIO :: GfxState -> GLM p a -> IO a
+runGLMIO :: GfxState -> GLM a -> IO a
 runGLMIO glsls (GLM f) = f glsls
 
-unsafeSequenceGLM :: GLM p1 a -> GLM p2 b -> GLM p2 b
-unsafeSequenceGLM (GLM f) glm' = (GLM f) >> glm'
+--unsafeSequenceGLM :: GLM p1 a -> GLM p2 b -> GLM p2 b
+--unsafeSequenceGLM (GLM f) glm' = (GLM f) >> glm'

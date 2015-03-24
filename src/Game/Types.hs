@@ -20,12 +20,12 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> Time   -- cumulative animation time
                                  -> Double -- radius
                                  -> Double -- amplitude scale
-                                 -> GLM WorldGLSL ()
-                     , germGLFinaliser :: GLM WorldGLSL ()
+                                 -> GLM ()
+                     , germGLFinaliser :: GLM ()
                      }
 
-data GameState = GameState { gsScreenRender  :: GLM Screen () -- GL commands
-                           , gsWorldRender   :: GLM WorldGLSL ()
+data GameState = GameState { gsScreenRender  :: GLM () -- GL commands
+                           , gsWorldRender   :: GLM ()
                            , gsRenderDirty   :: Bool
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
