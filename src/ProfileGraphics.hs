@@ -15,6 +15,7 @@ import           Data.IORef
 import           Control.Monad.Random
 import           Control.Monad
 import           Data.Bits
+import           Data.Time
 
 -- friends
 import Types
@@ -27,10 +28,13 @@ import GraphicsGL
 import Util
 
 ----------------------------------------------------------------------------------------------------
-data S = S { sWindow :: S.Window
-           , sGfxState :: GfxState
-           , sGerms :: GLMW [ GermGL ]
-           , sGLContext :: S.GLContext  }
+data S = S { sWindow    :: S.Window
+           , sGfxState  :: GfxState
+           , sGerms     :: GLMW [GermGL]
+           , sGLContext :: S.GLContext
+           , sFrames    :: Int
+           , sStartTime :: UTCTime
+           }
 
 type GLMW a = GLM WorldGLSL a
 
@@ -57,33 +61,32 @@ initialize = do
                 _ -> [ (S.GLDepthSize,           24) ]
   mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
-
---  when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
-
+  when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   resourcePath <- iOSResourcePath
   gfxState <- initGfxState (w,h) resourcePath
-
---  glUseProgram (worldGLSLProgramId $ gfxWorldGLSL gfxState)
-
-
   let germs = replicateM 50 newGermGLM
+  t <- getCurrentTime
   newIORef $ S { sWindow    = window
                , sGfxState  = gfxState
                , sGerms     = germs
                , sGLContext = context
+               , sFrames    = 0
+               , sStartTime = t
                }
 
 ----------------------------------------------------------------------------------------------------
 main :: IO ()
 main = do
   sRef <- initialize
-  mainLoop sRef
+  s <- readIORef sRef
+  germGLs <- runGLMIO (sGfxState s) (sGerms s)
+  mainLoop sRef germGLs prof2
   where
 
 
 ----------------------------------------------------------------------------------------------------
-mainLoop :: IORef S -> IO ()
-mainLoop sRef = go
+mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
+mainLoop sRef st prof = go
   where
     go :: IO ()
     go = do
@@ -92,19 +95,55 @@ mainLoop sRef = go
       let quit = maybe False (checkForQuit . S.eventData) mbE
       when quit $ exitWith ExitSuccess
       ---
-      let gfxs = sGfxState s
-      germGLs <- runGLMIO gfxs $ sGerms s
+      prof (sGfxState s) st
+      S.glSwapWindow (sWindow s)
+      ---
+      let frames = sFrames s
+      when (frames `mod` 100 == 0) $ logFramerate s
+      writeIORef sRef $ s { sFrames = frames + 1 }
+      go
+
+----------------------------------------------------------------------------------------------------
+logFramerate :: S -> IO ()
+logFramerate s = do
+  let t = sStartTime s
+  t' <- getCurrentTime
+  let dt  = realToFrac $ diffUTCTime t' t
+      fps :: Double
+      fps = (fromIntegral $ sFrames s)/ dt
+  debugLog $ printf "Frames/s: %.1f\n" fps
+
+----------------------------------------------------------------------------------------------------
+--
+-- First profiling
+--
+prof1 :: GfxState -> [GermGL] -> IO ()
+prof1 gfxs germGLs = do
       let draw :: GermGL -> IO ()
           draw germGL = runGLMIO gfxs $ do
-            germGLFun germGL 0 (R2 0 0) 0 30 1
+            germGLFun germGL 0 (R2 0 0) 0 10 1
       glBindFramebuffer gl_FRAMEBUFFER $ gfxScreenFBId gfxs
       glClearColor 1 1 1 1 -- here it must be opaque
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
-      sequence $ map draw germGLs
+      sequence_ $ map draw germGLs
+      -- now do the blur
+
       glFlush
-      S.glSwapWindow (sWindow s)
-      ---
-      go
+
+----------------------------------------------------------------------------------------------------
+prof2 :: GfxState -> [GermGL] -> IO ()
+prof2 gfxs germGLs = do
+      let draw :: GermGL -> GLMW ()
+          draw germGL = germGLFun germGL 0 (R2 0 0) 0 10 1
+          drawGerms :: GLMW ()
+          drawGerms = sequence_ $ map draw germGLs
+      glBindFramebuffer gl_FRAMEBUFFER $ fboFrameBuffer $ gfxMainFBO gfxs
+      glClearColor 1 1 1 1 -- here it must be opaque
+      glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
+      let blurred :: GLMW ()
+          blurred = blur 1.0 drawGerms `unsafeSequenceGLM` return ()
+      runGLMIO gfxs $ blurred
+      glFlush
 
 ----------------------------------------------------------------------------------------------------
 checkForQuit :: S.EventData -> Bool
