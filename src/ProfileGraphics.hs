@@ -113,7 +113,7 @@ logFramerate s = do
 
 ----------------------------------------------------------------------------------------------------
 --
--- First profiling
+-- Just draw [nGerms] germs.
 --
 prof1 :: GfxState -> [GermGL] -> IO ()
 prof1 gfxs germGLs = do
@@ -129,6 +129,9 @@ prof1 gfxs germGLs = do
       glFlush
 
 ----------------------------------------------------------------------------------------------------
+--
+-- Draw germs and then blur using a second program.
+--
 prof2 :: GfxState -> [GermGL] -> IO ()
 prof2 gfxs germGLs = do
       let draw :: GermGL -> GLM ()
@@ -142,6 +145,13 @@ prof2 gfxs germGLs = do
           blurred = blur 1.0 drawGerms
       runGLMIO gfxs $ blurred
       glFlush
+
+----------------------------------------------------------------------------------------------------
+--
+-- Draw germs and blur using the same GLSL program.
+--
+prof3 :: GfxState -> [GermGL] -> IO ()
+prof3 _ _ = return ()
 
 ----------------------------------------------------------------------------------------------------
 checkForQuit :: S.EventData -> Bool
