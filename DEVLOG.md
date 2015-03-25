@@ -1,7 +1,56 @@
+# Wed 25 Mar 2015
+
+In trying to refactor to easy profiling I'm going to try out the trick where you have two
+modules with exactly the same interface but you only import the one you need.
+
+---
+
+So, I'm sanguine about the idea that I can still pass around values of type `WorldGLSL` or
+`BlurGLSL` but have them be initialised differently for two different GLSL programs.
+
+I need to separate out the idea of a data structure containing uniform/attribute locations from the
+idea of a data structure containing the program ID.
+
+Presumably, my "all in one shader" will create a `WorldGLSL` and a `BlurGLSL` value.
+
+Let's look at the design of this. I used to have this data structure.
+
+    data GLSLProgram a = GLSLProgram { glslVertexShader   :: String
+                                     , glslFragmentShader :: String
+
+I think I'm going to rename this to `GLSLSource` and now create a new data structure:
+
+    data GLSLProgram a = GLSLProgram { glslProgramId      :: ProgramId
+                                     , glslAPI            :: a
+                                     , glslInit           :: GLM ()
+                                     }
+
+I'm planning to instantiate `glslAPI` with either `WorldGLSL` or `BlurGLSL`. But I also need the
+`glslInit` field in order to initialise the program to use the API in `glslAPI`. For my current
+situation where I have a distinct program for world rendering and for blurring this will
+just be `return ()`, but when I use "one big shader" it will set an important uniform(s) that
+will choose which subroutine(s) of the "one big shader" to use.
+
+
+
+# Tue 24 Mar 2015
+
+## The problem of profiling in perpetuity
+
+This is a bit of a conundrum. I want to test a few different GLSL programs to see which is the
+fastest. I also want to keep the profiling program around so that I can test any time I make
+a small change to one of the GLSL programs. The idea is I will only keep the programs that are
+the fastest.
+
+The problem is that this requires me to do one of two things with my existing OpenGL code.
+
+a) I generalise it sufficiently that you can "plug in" various GLSL programs or
+b) I copy code. I copy older versions of GLSL programs into module ProfileGraphics.
+
+
 # Fri 20 Mar 2015
 
 Apparently branch in shaders is particularly bad. First I want to get a feel for why this is so.
-
 
 
 # Thu 19 Mar 2015

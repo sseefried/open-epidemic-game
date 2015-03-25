@@ -1,32 +1,20 @@
-module GLSLPrograms where
+module GLSLPrograms.SeparateShaders (
+  initShaders
+) where
 
-import           Data.List
+import Graphics.Rendering.OpenGL.Raw
 
 -- friends
+import Util
 import GLM
+import GraphicsGL.Util
+import Coordinate
+
 
 ----------------------------------------------------------------------------------------------------
-glslVertexShaderDefault :: String
-glslVertexShaderDefault =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "attribute vec3 position;"
-          , "attribute vec2 texCoord;"
-          , "varying vec2   vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_Position = vec4(position,1);"
-          , "  vTexCoord = texCoord;"
-          , "}"
-          ]
-
-----------------------------------------------------------------------------------------------------
-worldGLSLProgram :: GLSLProgram
-worldGLSLProgram =
-  GLSLProgram {
+worldGLSLSource :: GLSLSource
+worldGLSLSource =
+  GLSLSource {
       glslVertexShader =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
@@ -69,10 +57,25 @@ worldGLSLProgram =
   }
 
 ----------------------------------------------------------------------------------------------------
-blurGLSLProgram :: GLSLProgram
-blurGLSLProgram =
-  GLSLProgram {
-      glslVertexShader = glslVertexShaderDefault
+blurGLSLSource :: GLSLSource
+blurGLSLSource =
+  GLSLSource {
+      glslVertexShader =
+        concat $ intersperse "\n" [
+            "#ifdef GL_ES"
+          , "precision mediump float;"
+          , "#endif"
+          , "attribute vec3 position;"
+          , "attribute vec2 texCoord;"
+          , "varying vec2   vTexCoord;"
+          , ""
+          , "void main()"
+          , "{"
+          , "  gl_Position = vec4(position,1);"
+          , "  vTexCoord = texCoord;"
+          , "}"
+          ]
+
     , glslFragmentShader =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
@@ -119,38 +122,57 @@ blurGLSLProgram =
   }
 
 ----------------------------------------------------------------------------------------------------
---
--- A GLSL program that just passes a texture straight through.
---
-_idGLSLProgram :: GLSLProgram
-_idGLSLProgram =
-  GLSLProgram {
-      glslVertexShader   =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "attribute vec3 position;"
-          , "attribute vec2 texCoord;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_Position = vec4(position,1);"
-          , "  vTexCoord = texCoord;"
-          , "}"
-          ]
-    , glslFragmentShader =
-        concat $ intersperse "\n" [
-            "#ifdef GL_ES"
-          , "precision mediump float;"
-          , "#endif"
-          , "uniform sampler2D texture;"
-          , "varying vec2 vTexCoord;"
-          , ""
-          , "void main()"
-          , "{"
-          , "  gl_FragColor = texture2D(texture, vTexCoord);"
-          , "}"
-          ]
-  }
+initShaders :: (Int, Int) -> IO (GLSLProgram WorldGLSL, GLSLProgram BlurGLSL)
+initShaders bds = do
+  worldGLSL <- initWorldGLSL bds
+  blurGLSL  <- initBlurGLSL bds
+  return (worldGLSL, blurGLSL)
+
+----------------------------------------------------------------------------------------------------
+initWorldGLSL :: (Int, Int) -> IO (GLSLProgram WorldGLSL)
+initWorldGLSL (w,h) = do
+  programId <- compileGLSLSource worldGLSLSource
+  --
+  -- The co-ordinates are set to be the world co-ordinate system. This saves us
+  -- converting for OpenGL calls
+  --
+  let bds = orthoBounds (w,h)
+  ortho2D programId bds
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
+  let worldData =  WorldGLSL { worldGLSLPosition    = positionLoc
+                             , worldGLSLTexcoord    = texCoordLoc
+                             , worldGLSLDrawTexture = drawTextureLoc
+                             , worldGLSLColor       = colorLoc
+                             , worldGLSLOrthoBounds = bds
+                             }
+  return $ GLSLProgram { glslProgramId = programId
+                       , glslData = worldData
+                       , glslInit = return ()
+                       }
+
+----------------------------------------------------------------------------------------------------
+initBlurGLSL :: (Int, Int) -> IO (GLSLProgram BlurGLSL)
+initBlurGLSL (w, h) = do
+  programId <- compileGLSLSource blurGLSLSource
+  glUseProgram programId
+  let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
+  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
+  [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
+                                                 ("axis":"radius":blurFactorNames)
+  fbo <- genFBO (w,h)
+  glUniform1f radius (fromIntegral $ min w h)
+  let blurData = BlurGLSL { blurGLSLPosition  = positionLoc
+                          , blurGLSLTexcoord  = texCoordLoc
+                          , blurGLSLFactor0   = bf0
+                          , blurGLSLFactor1   = bf1
+                          , blurGLSLFactor2   = bf2
+                          , blurGLSLFactor3   = bf3
+                          , blurGLSLFactor4   = bf4
+                          , blurGLSLAxis      = axis
+                          , blurGLSLPhase1FBO = fbo
+                          }
+  return $ GLSLProgram { glslProgramId = programId
+                       , glslData = blurData
+                       , glslInit = return ()
+                       }

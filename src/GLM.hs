@@ -21,6 +21,7 @@ module GLM (
   BlurGLSL(..),
   Screen(..),
   FBO(..),
+  GLSLSource(..),
   GLSLProgram(..),
   MipMapIndex,
   ProgramId,
@@ -45,10 +46,10 @@ module GLM (
 
 import Graphics.Rendering.Cairo (FontFace)
 import Graphics.Rendering.OpenGL.Raw
-import Control.Applicative
 
 -- friends
 import Types.Basic
+import Util
 
 --
 -- Magnitude of near and far planes in orthographic project
@@ -67,25 +68,32 @@ type VariableLocation  = GLuint
 type TextureId         = GLuint
 type FrameBufferId     = GLuint
 
-data GLSLProgram = GLSLProgram { glslVertexShader :: String
-                               , glslFragmentShader :: String }
+
+data GLSLSource = GLSLSource { glslVertexShader   :: String
+                             , glslFragmentShader :: String
+                             }
+
+data GLSLProgram a = GLSLProgram { glslProgramId      :: ProgramId
+                                 , glslData           :: a
+                                 , glslInit           :: GLM ()
+                                 }
 
 
-data GfxState = GfxState { gfxBlurGLSL    :: BlurGLSL
-                         , gfxWorldGLSL   :: WorldGLSL
+data GfxState = GfxState { gfxBlurGLSL    :: GLSLProgram BlurGLSL
+                         , gfxWorldGLSL   :: GLSLProgram WorldGLSL
                          , gfxFontFace    :: FontFace
                          , gfxMainFBO     :: FBO
                          -- on iOS this is not 0!
                          , gfxScreenFBId  :: FrameBufferId
                          }
 
+-- FIXME: Probably want to change the names of these data structures
 data WorldGLSL = WorldGLSL {
                      worldGLSLPosition    :: AttributeLocation
                    , worldGLSLTexcoord    :: AttributeLocation
                    , worldGLSLDrawTexture :: UniformLocation
                    , worldGLSLColor       :: UniformLocation
                    , worldGLSLOrthoBounds :: OrthoBounds
-                   , worldGLSLProgramId   :: ProgramId
                    }
 
 data BlurGLSL = BlurGLSL {
@@ -98,7 +106,6 @@ data BlurGLSL = BlurGLSL {
                 , blurGLSLFactor4   :: UniformLocation
                 , blurGLSLAxis      :: UniformLocation
                 , blurGLSLPhase1FBO :: FBO
-                , blurGLSLProgramId :: ProgramId
                 }
 
 data Screen = Screen

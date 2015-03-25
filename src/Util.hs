@@ -7,7 +7,8 @@ module Util (
   module Control.Monad,
   module System.Exit,
   module Text.Printf,
-  module Data.Maybe
+  module Data.Maybe,
+  module Data.List
 )
   where
 
@@ -17,6 +18,7 @@ import Control.Monad
 import System.Exit
 import Text.Printf
 import Data.Maybe
+import Data.List
 
 
 

@@ -4,7 +4,7 @@ module GraphicsGL (
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
     drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic, genFBO,
     renderQuadWithColor, genTexture, genFrameBuffer, getScreenFrameBufferId, rgbFormat, blur,
-    initGfxState, initWorldGLSL, initBlurGLSL
+    initGfxState
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -21,17 +21,16 @@ import Game.Types (GermGL(..))
 import Graphics
 import Util
 import FreeType (loadFontFace)
-import GLSLPrograms
-import Coordinate
 import Foreign
+-- import either GLSLPrograms.SeparateShaders or GLSLPrograms.OneBigShader
+import GLSLPrograms.SeparateShaders
+
 
 
 ----------------------------------------------------------------------------------------------------
 -- Resolution of largest texture for mipmap is 2^powOfTwo
 powOfTwo :: Int
 powOfTwo = 7
-
-
 
 ----------------------------------------------------------------------------------------------------
 renderCairoToTexture :: TextureId -> Maybe MipMapIndex -> (Int, Int) -> Render a -> IO a
@@ -75,7 +74,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
   -- we take the ceiling of [w] and [h] and use that as our bounds.
   -- We then scale the [cairoRender] by that amount (which will be very close to 1.)
   --
-  let ts = gfxWorldGLSL gfxs
+  let p = gfxWorldGLSL gfxs
+      ts = glslData p
       positionIdx = worldGLSLPosition ts
       texCoordIdx = worldGLSLTexcoord ts
       drawTextureLoc = worldGLSLDrawTexture ts
@@ -93,7 +93,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
-  glUseProgram $ worldGLSLProgramId ts
+  glUseProgram $ glslProgramId p
   withNewTexture $ \tid -> do
     res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
@@ -131,7 +131,8 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
 ----------------------------------------------------------------------------------------------------
 renderQuadWithColor :: (Double, Double) -> (Double, Double) -> Color -> GLM ()
 renderQuadWithColor (x,y) (w, h) (Color r g b a) = glm $ \gfxs -> do
-  let ts = gfxWorldGLSL gfxs
+  let p = gfxWorldGLSL gfxs
+      ts = glslData p
       positionLoc    = worldGLSLPosition ts
       drawTextureLoc = worldGLSLDrawTexture ts
       colorLoc       = worldGLSLColor ts
@@ -229,11 +230,12 @@ germGfxToGermGL gfx = glm $ const $ do
       stride = fromIntegral $ perVertex * floatSize
       finaliser = glm . const $ delTexture textureId
       germGLFun = \zIndex (R2 x' y') t r scale -> glm $ \gfxs -> do
-        let ts = gfxWorldGLSL gfxs
+        let p = gfxWorldGLSL gfxs
+            ts = glslData p
             positionIdx    = worldGLSLPosition ts
             texCoordIdx    = worldGLSLTexcoord ts
             drawTextureLoc = worldGLSLDrawTexture ts
-        glUseProgram $ worldGLSLProgramId ts
+        glUseProgram $ glslProgramId p
         withBoundTexture textureId $ do
           glUniform1i drawTextureLoc 1 -- set to 'true'
 
@@ -332,10 +334,11 @@ drawLetterBox pos (w,h) =
 --
 blurOnAxis :: Double -> Bool -> FBO -> Maybe FBO -> GLM ()
 blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
-  let bs = gfxBlurGLSL gfxs
+  let p  = gfxBlurGLSL gfxs
+      bs = glslData p
       frameBufferId = maybe (gfxScreenFBId gfxs) fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
-  glUseProgram (blurGLSLProgramId bs)
+  glUseProgram (glslProgramId p)
   let [bf0, bf1, bf2, bf3, bf4] = map f2gl $ gaussSample sigma 4
   glUniform1f (blurGLSLFactor0 bs) bf0
   glUniform1f (blurGLSLFactor1 bs) bf1
@@ -364,7 +367,7 @@ blur :: Double -> GLM () -> GLM ()
 blur sigma m = do
   gfxs <- getGfxState
   let mainFBO = gfxMainFBO gfxs
-      phase1FBO = blurGLSLPhase1FBO $ gfxBlurGLSL gfxs
+      phase1FBO = blurGLSLPhase1FBO $ glslData $ gfxBlurGLSL gfxs
       blur1 :: GLM ()
       blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
       blur2 = blurOnAxis sigma True  phase1FBO Nothing
@@ -419,8 +422,7 @@ initGfxState (w,h) resourcePath = do
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
 
   mainFBO   <- genFBO (w,h)
-  worldGLSL <- initWorldGLSL (w,h)
-  blurGLSL  <- initBlurGLSL (w,h)
+  (worldGLSL, blurGLSL) <- initShaders (w,h)
   fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
   let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
                       , gfxBlurGLSL    = blurGLSL
@@ -429,81 +431,4 @@ initGfxState (w,h) resourcePath = do
                       , gfxScreenFBId  = screenFBId
                       }
   return gfxs
-
-initWorldGLSL :: (Int, Int) -> IO WorldGLSL
-initWorldGLSL (w,h) = do
-  programId <- compileGLSLProgram worldGLSLProgram
-  --
-  -- The co-ordinates are set to be the world co-ordinate system. This saves us
-  -- converting for OpenGL calls
-  --
-  let bds = orthoBounds (w,h)
-  ortho2D programId bds
-  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
-  [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
-  return $ WorldGLSL { worldGLSLPosition    = positionLoc
-                     , worldGLSLTexcoord    = texCoordLoc
-                     , worldGLSLDrawTexture = drawTextureLoc
-                     , worldGLSLColor       = colorLoc
-                     , worldGLSLOrthoBounds = bds
-                     , worldGLSLProgramId   = programId
-                     }
-
-initBlurGLSL :: (Int, Int) -> IO BlurGLSL
-initBlurGLSL (w, h) = do
-  programId <- compileGLSLProgram blurGLSLProgram
-  glUseProgram programId
-  let blurFactorNames = map (printf "blurFactor%d") [0..4 :: Int]
-  [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
-  [axis,radius, bf0, bf1, bf2, bf3, bf4] <- mapM (getUniformLocation programId)
-                                                 ("axis":"radius":blurFactorNames)
-  fbo <- genFBO (w,h)
-  glUniform1f radius (fromIntegral $ min w h)
-  return $ BlurGLSL { blurGLSLPosition  = positionLoc
-                    , blurGLSLTexcoord  = texCoordLoc
-                    , blurGLSLFactor0   = bf0
-                    , blurGLSLFactor1   = bf1
-                    , blurGLSLFactor2   = bf2
-                    , blurGLSLFactor3   = bf3
-                    , blurGLSLFactor4   = bf4
-                    , blurGLSLAxis      = axis
-                    , blurGLSLPhase1FBO = fbo
-                    , blurGLSLProgramId = programId
-                    }
-----------------------------------------------------------------------------------------------------
---
--- Open GL functions 'glOrtho' and 'glOrtho2D' are not supported by GL ES 2.0 so we write
--- our own function to create the correct matrix.
---
--- See http://en.wikipedia.org/wiki/Orthographic_projection
---
--- One of the particularly confusing aspects of the orthographic projection is the
--- definitions of the terms "near" and "far". (See http://math.hws.edu/graphicsnotes/c3/s5.html)
--- 'near = -zMax' and 'far = -zMin'
---
---
-ortho2D :: ProgramId -> OrthoBounds -> IO ()
-ortho2D texGLSLProgramId bds = do
-  glUseProgram texGLSLProgramId
-  modelView <- withCString "modelView" $ \cstr -> glGetUniformLocation texGLSLProgramId cstr
-  when (modelView < 0) $ exitWithError "'modelView' uniform doesn't exist"
-  allocaArray 16 $ \(ortho :: Ptr GLfloat) -> do
-    pokeArray ortho $ map d2gl
-      [ a,   0,  0, 0
-      , 0,   b,  0, 0
-      , 0,   0,  c, 0
-      , tx, ty, tz, 1 ]
-    glUniformMatrix4fv modelView 1 (fromIntegral gl_FALSE ) ortho
-  where
-    (left,right,bottom,top) = (orthoLeft bds, orthoRight bds, orthoBottom bds, orthoTop bds )
-    near = realToFrac $ -zMax
-    far  = realToFrac $ -zMin
-    d2gl :: Double -> GLfloat
-    d2gl = realToFrac
-    a    = 2 / (right - left)
-    b    =  2 / (top - bottom)
-    c    = -2 / (far - near)
-    tx   = - (right + left)/(right - left)
-    ty   = - (top + bottom)/(top - bottom)
-    tz   =   (far + near)/(far - near)
 

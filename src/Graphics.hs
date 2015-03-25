@@ -16,7 +16,6 @@ import           Graphics.Rendering.Cairo
 import qualified Graphics.Rendering.Cairo.Matrix as M
 import           Control.Monad.Random
 import           Foreign.Marshal.Alloc (allocaBytes)
-import           Data.List (maximumBy)
 import           Control.Monad
 
 -- friends

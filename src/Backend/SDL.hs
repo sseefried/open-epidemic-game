@@ -173,7 +173,7 @@ runFrameUpdate besRef = do
     glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
     runGLMIO gfxs $ gsScreenRender gs
     mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
-          (letterBoxes . worldGLSLOrthoBounds . gfxWorldGLSL $ gfxs)
+          (letterBoxes . worldGLSLOrthoBounds . glslData . gfxWorldGLSL $ gfxs)
     when debugSystem $ renderDebugInfo besRef
     glFlush
     ---
