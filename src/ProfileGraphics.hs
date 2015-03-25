@@ -26,6 +26,7 @@ import CUtil
 import GraphicsGL
 import Util
 import FrameRateBuffer
+import GraphicsGL.GLSLPrograms.SeparateShaders as Separate
 
 ----------------------------------------------------------------------------------------------------
 data S = S { sWindow    :: S.Window
@@ -46,7 +47,7 @@ main = do
   sRef <- initialize
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs prof1
+  mainLoop sRef germGLs blurSeparateShaders
   where
 
 
@@ -94,7 +95,7 @@ initialize = do
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   resourcePath <- iOSResourcePath
-  gfxState <- initGfxState (w,h) resourcePath
+  gfxState <- initGfxState (w,h) Separate.initShaders resourcePath
   let germs = replicateM 50 newGermGLM
   t <- getCurrentTime
   frBuf <- initFRBuf windowSize
@@ -120,8 +121,8 @@ logFramerate s = do
 --
 -- Just draw [nGerms] germs.
 --
-prof1 :: GfxState -> [GermGL] -> IO ()
-prof1 gfxs germGLs = do
+justGerms :: GfxState -> [GermGL] -> IO ()
+justGerms gfxs germGLs = do
       let draw :: GermGL -> IO ()
           draw germGL = runGLMIO gfxs $ do
             germGLFun germGL 0 (R2 0 0) 0 10 1
@@ -137,8 +138,8 @@ prof1 gfxs germGLs = do
 --
 -- Draw germs and then blur using a second program.
 --
-prof2 :: GfxState -> [GermGL] -> IO ()
-prof2 gfxs germGLs = do
+blurSeparateShaders :: GfxState -> [GermGL] -> IO ()
+blurSeparateShaders gfxs germGLs = do
       let draw :: GermGL -> GLM ()
           draw germGL = germGLFun germGL 0 (R2 0 0) 0 10 1
           drawGerms :: GLM ()

@@ -15,6 +15,7 @@ import           System.Directory (doesDirectoryExist)
 import qualified Data.Map as M
 
 -- friends
+import GraphicsGL.GLSLPrograms.SeparateShaders as GLSL1
 import Backend.Events
 import Types
 import Game.Types
@@ -28,7 +29,6 @@ import FrameRateBuffer
 import GraphicsGL
 import Coordinate
 import Foreign (CFloat)
-
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
@@ -48,6 +48,7 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besLevelMusic     :: Maybe M.Music
                                  , besSquishSound    :: Maybe M.Chunk
                                  }
+
 ----------------------------------------------------------------------------------------------------
 initOpenGL :: S.Window -> IO S.GLContext
 initOpenGL window = do
@@ -90,7 +91,7 @@ initialize title mbResourcePath = do
   when (not dirExists ) $ exitWithError $
     printf "Resource path `%s' does not exist" resourcePath
   context <- initOpenGL window
-  gfxState <- initGfxState (w,h) resourcePath
+  gfxState <- initGfxState (w,h) GLSL1.initShaders resourcePath
   (levelMusic, squishSound) <- case platform of
     NoSound -> return (Nothing, Nothing)
     _       -> do

@@ -1,9 +1,19 @@
 # Wed 25 Mar 2015
 
+## First profiling results
+
+Commit: d7e0eddeb03ac17cb50e458f1c9ebab3f8b668e5
+
+- justGerms: 800-830 fps
+- blurSeparateShaders: 335-345 fps
+
+
+## Profiling - refactoring
+
 In trying to refactor to easy profiling I'm going to try out the trick where you have two
 modules with exactly the same interface but you only import the one you need.
 
----
+## Profiling
 
 So, I'm sanguine about the idea that I can still pass around values of type `WorldGLSL` or
 `BlurGLSL` but have them be initialised differently for two different GLSL programs.
@@ -30,17 +40,6 @@ I'm planning to instantiate `glslAPI` with either `WorldGLSL` or `BlurGLSL`. But
 situation where I have a distinct program for world rendering and for blurring this will
 just be `return ()`, but when I use "one big shader" it will set an important uniform(s) that
 will choose which subroutine(s) of the "one big shader" to use.
-
-## Wildly differing framerates depending on monitor setup
-
-So, at the moment my first profiling program just draw 200 germs and does no blurring.
-
-I get some very different results depending on my monitor setup. I have an MBP late 2013 with
-retina display.
-
-- no external monitor. 1440x900.
-
-
 
 ## Refactoring is a dream in Haskell
 

@@ -23,6 +23,7 @@ module GraphicsGL.GLM (
   FBO(..),
   GLSLSource(..),
   GLSLProgram(..),
+  ShadersGenerator,
   MipMapIndex,
   ProgramId,
   ShaderId,
@@ -106,6 +107,8 @@ data BlurGLSL = BlurGLSL {
                 , blurGLSLAxis      :: UniformLocation
                 , blurGLSLPhase1FBO :: FBO
                 }
+
+type ShadersGenerator = (Int,Int) -> IO (GLSLProgram WorldGLSL, GLSLProgram BlurGLSL)
 
 data Screen = Screen
 

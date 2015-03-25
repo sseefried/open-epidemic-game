@@ -18,17 +18,12 @@ import qualified Data.Vector.Unboxed as V
 -- friends
 import GraphicsGL.GLM
 import GraphicsGL.Util
-import GraphicsGL.GLSLPrograms.SeparateShaders
 import Types
 import Game.Types (GermGL(..))
 import Graphics
 import Util
 import FreeType (loadFontFace)
 import Foreign
--- import either GLSLPrograms.SeparateShaders or GLSLPrograms.OneBigShader
-
-
-
 
 ----------------------------------------------------------------------------------------------------
 -- Resolution of largest texture for mipmap is 2^powOfTwo
@@ -414,8 +409,8 @@ drawScreenSizedTexture texId pos texCoord = do
 --
 -- Precondition: An OpenGL context must have been created.
 --
-initGfxState :: (Int, Int) -> String -> IO GfxState
-initGfxState (w,h) resourcePath = do
+initGfxState :: (Int, Int) -> ShadersGenerator -> String -> IO GfxState
+initGfxState (w,h) initShaders resourcePath = do
   screenFBId <- getScreenFrameBufferId -- get this value before any new frame buffers created.
   --  glEnable gl_TEXTURE_2D is meaningless in GLSL  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
   glEnable gl_BLEND
