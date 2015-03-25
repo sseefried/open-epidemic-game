@@ -336,6 +336,7 @@ blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
       bs = glslData p
       frameBufferId = maybe (gfxScreenFBId gfxs) fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
+  glClear (gl_COLOR_BUFFER_BIT .|. gl_DEPTH_BUFFER_BIT)
   glslProgramUseAndInit p
   let [bf0, bf1, bf2, bf3, bf4] = map f2gl $ gaussSample sigma 4
   glUniform1f (blurGLSLFactor0 bs) bf0
@@ -360,13 +361,11 @@ gaussSample sigma n = map (/total) (center:xs)
 
 
 ----------------------------------------------------------------------------------------------------
--- FIXME:: Needs to do both axes.
 blur :: Double -> GLM () -> GLM ()
 blur sigma m = do
   gfxs <- getGfxState
   let mainFBO = gfxMainFBO gfxs
       phase1FBO = blurGLSLPhase1FBO $ glslData $ gfxBlurGLSL gfxs
-      blur1 :: GLM ()
       blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
       blur2 = blurOnAxis sigma True  phase1FBO Nothing
   m >> blur1 >> blur2

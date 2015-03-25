@@ -175,7 +175,6 @@ runFrameUpdate besRef = do
     mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
           (letterBoxes . worldGLSLOrthoBounds . glslData . gfxWorldGLSL $ gfxs)
     when debugSystem $ renderDebugInfo besRef
-    glFlush
     ---
     modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
     S.glSwapWindow (besWindow bes)
