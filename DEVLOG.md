@@ -31,7 +31,15 @@ situation where I have a distinct program for world rendering and for blurring t
 just be `return ()`, but when I use "one big shader" it will set an important uniform(s) that
 will choose which subroutine(s) of the "one big shader" to use.
 
+## Refactoring is a dream in Haskell
 
+I just performed that whole refactor in less than 30 minutes. I cannot imagine doing this in a
+language that didn't have such a strong typing system. Scala, Haskell, OCaml are all languages
+that would have been equivalently easy. I cannot imagine having done this in Ruby.
+
+The fact that once all the compiler errors went away, I compiled the program and it worked just
+as it did before is as astounding to me today as it was the first time I performed a refactor
+like this. Haskell makes refactoring easy, okay! That is one of its key strengths.
 
 # Tue 24 Mar 2015
 
