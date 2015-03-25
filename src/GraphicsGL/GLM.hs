@@ -13,7 +13,7 @@
 -- For now, try to enforce the discipline of only creating GLM things from the building blocks
 -- in module [GraphicsGL]
 --
-module GLM (
+module GraphicsGL.GLM (
   -- Types
   GLM, -- opaque
   GfxState(..),

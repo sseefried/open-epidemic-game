@@ -1,4 +1,4 @@
-module GLSLPrograms.SeparateShaders (
+module GraphicsGL.GLSLPrograms.SeparateShaders (
   initShaders
 ) where
 
@@ -6,7 +6,7 @@ import Graphics.Rendering.OpenGL.Raw
 
 -- friends
 import Util
-import GLM
+import GraphicsGL.GLM
 import GraphicsGL.Util
 import Coordinate
 

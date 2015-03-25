@@ -12,7 +12,7 @@ import           Data.Map (Map)
 
 -- friends
 import Types.Basic
-import GLM
+import GraphicsGL.GLM
 
 
 data GermGL = GermGL { germGLFun :: Int    -- z index

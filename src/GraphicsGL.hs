@@ -2,9 +2,11 @@
 module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
-    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic, genFBO,
-    renderQuadWithColor, genTexture, genFrameBuffer, getScreenFrameBufferId, rgbFormat, blur,
-    initGfxState
+    drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic,
+    renderQuadWithColor, blur, initGfxState,
+    -- re-export module(s)
+    module GraphicsGL.GLM,
+    module GraphicsGL.Util
   ) where
 
 import qualified Graphics.Rendering.Cairo as C
@@ -14,16 +16,17 @@ import           Data.Vector.Unboxed (Vector, Unbox)
 import qualified Data.Vector.Unboxed as V
 
 -- friends
+import GraphicsGL.GLM
 import GraphicsGL.Util
+import GraphicsGL.GLSLPrograms.SeparateShaders
 import Types
-import GLM
 import Game.Types (GermGL(..))
 import Graphics
 import Util
 import FreeType (loadFontFace)
 import Foreign
 -- import either GLSLPrograms.SeparateShaders or GLSLPrograms.OneBigShader
-import GLSLPrograms.SeparateShaders
+
 
 
 

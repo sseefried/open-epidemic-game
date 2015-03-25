@@ -39,7 +39,14 @@ that would have been equivalently easy. I cannot imagine having done this in Rub
 
 The fact that once all the compiler errors went away, I compiled the program and it worked just
 as it did before is as astounding to me today as it was the first time I performed a refactor
-like this. Haskell makes refactoring easy, okay! That is one of its key strengths.
+like this. Strong type systems makes refactoring easy, okay! That is one of its key strengths.
+
+## More refactoring of modules
+
+
+GraphicsGL.Util
+GLM
+
 
 # Tue 24 Mar 2015
 

@@ -12,7 +12,7 @@ import           GHC.Word
 -- friends
 import Types
 import Util
-import GLM
+import GraphicsGL.GLM
 import Platform
 
 ----------------------------------------------------------------------------------------------------
