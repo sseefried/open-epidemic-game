@@ -44,6 +44,8 @@ library
                    , GameM, Types, Types.Basic, Types.Constants, Platform
                    , Graphics, GraphicsGL, GraphicsGL.Util, GraphicsGL.GLM
                    , GraphicsGL.GLSLPrograms.SeparateShaders
+                   , GraphicsGL.GLSLPrograms.OneBigShader
+                   , ProfileGraphics
                    , CUtil, Util, FrameRateBuffer, FreeType
                    , Coordinate, GameEvent
     exposed: True
@@ -86,7 +88,9 @@ library
     if flag(debug-system)
       cpp-options: -DDEBUG_SYSTEM
       cc-options:  -DDEBUG_SYSTEM
-
+    if flag(profile-graphics)
+      cpp-options: -DPROFILE_GRAPHICS
+      cc-options:  -DPROFILE_GRAPHICS
 
 executable         EpidemicStaticLib
     hs-source-dirs:   src
