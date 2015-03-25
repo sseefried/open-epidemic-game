@@ -132,7 +132,7 @@ withNewTexture :: (TextureId -> IO a) -> IO a
 withNewTexture f = do
   textureId <- genTexture
   res <- f textureId
-  delTexture textureId
+  delTexture textureId -- FIXME: Poor performance
   return res
 
 ----------------------------------------------------------------------------------------------------
