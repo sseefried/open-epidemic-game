@@ -45,12 +45,10 @@ windowSize = 10000
 ----------------------------------------------------------------------------------------------------
 main :: IO ()
 main = do
-  sRef <- initialize
+  sRef <- initialize OneBig.initShaders
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs blurSeparateShaders
-  where
-
+  mainLoop sRef germGLs justGerms
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
@@ -67,15 +65,15 @@ mainLoop sRef st prof = go
       S.glSwapWindow (sWindow s)
       ---
       let frames = sFrames s
-      when (frames `mod` 100 == 0) $ logFramerate s
+      logFramerate s
       t <- getCurrentTime
       addTick (sFRBuf s) $ realToFrac $ diffUTCTime t (sLastTime s)
       writeIORef sRef $ s { sFrames = frames + 1, sLastTime = t }
       go
 
 ----------------------------------------------------------------------------------------------------
-initialize :: IO (IORef S)
-initialize = do
+initialize :: ShadersGenerator -> IO (IORef S)
+initialize initShaders = do
   S.init [S.InitVideo]
   (w,h) <- case screenDimensions of
     Just (w',h') -> return (w', h')
@@ -96,7 +94,7 @@ initialize = do
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   resourcePath <- iOSResourcePath
-  gfxState <- initGfxState (w,h) Separate.initShaders resourcePath
+  gfxState <- initGfxState (w,h) initShaders resourcePath
   let germs = replicateM 50 newGermGLM
   t <- getCurrentTime
   frBuf <- initFRBuf windowSize
@@ -113,7 +111,7 @@ initialize = do
 ----------------------------------------------------------------------------------------------------
 logFramerate :: S -> IO ()
 logFramerate s = do
-  when (sFrames s `mod` 100 == 0) $ do
+  when (sFrames s `mod` 1000 == 0) $ do
     avTick <- averageTick (sFRBuf s)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 
@@ -133,14 +131,12 @@ justGerms gfxs germGLs = do
       sequence_ $ map draw germGLs
       -- now do the blur
 
-      glFlush
-
 ----------------------------------------------------------------------------------------------------
 --
 -- Draw germs and then blur using a second program.
 --
-blurSeparateShaders :: GfxState -> [GermGL] -> IO ()
-blurSeparateShaders gfxs germGLs = do
+blurGerms :: GfxState -> [GermGL] -> IO ()
+blurGerms gfxs germGLs = do
       let draw :: GermGL -> GLM ()
           draw germGL = germGLFun germGL 0 (R2 0 0) 0 10 1
           drawGerms :: GLM ()
@@ -151,14 +147,6 @@ blurSeparateShaders gfxs germGLs = do
       let blurred :: GLM ()
           blurred = blur 1.0 drawGerms
       runGLMIO gfxs $ blurred
-      glFlush
-
-----------------------------------------------------------------------------------------------------
---
--- Draw germs and blur using the same GLSL program.
---
-prof3 :: GfxState -> [GermGL] -> IO ()
-prof3 _ _ = return ()
 
 ----------------------------------------------------------------------------------------------------
 checkForQuit :: S.EventData -> Bool
