@@ -41,8 +41,10 @@ library
     default-language: Haskell2010
 
     Exposed-Modules: AndroidMain, Backend.SDL, Backend.Events, Game, Game.Types
-                   , GameM, Types, Types.Basic, Types.Constants, GLM, Platform
-                   , Graphics, GraphicsGL, CUtil, Util, FrameRateBuffer, FreeType
+                   , GameM, Types, Types.Basic, Types.Constants, Platform
+                   , Graphics, GraphicsGL, GraphicsGL.Util, GraphicsGL.GLM
+                   , GraphicsGL.GLSLPrograms.SeparateShaders
+                   , CUtil, Util, FrameRateBuffer, FreeType
                    , Coordinate, GameEvent
     exposed: True
     if flag(android)
