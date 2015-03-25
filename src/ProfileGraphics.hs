@@ -27,6 +27,7 @@ import GraphicsGL
 import Util
 import FrameRateBuffer
 import GraphicsGL.GLSLPrograms.SeparateShaders as Separate
+import GraphicsGL.GLSLPrograms.OneBigShader as OneBig
 
 ----------------------------------------------------------------------------------------------------
 data S = S { sWindow    :: S.Window
