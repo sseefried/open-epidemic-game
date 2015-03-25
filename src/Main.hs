@@ -6,8 +6,13 @@ module Main where
 -- friends
 import Game
 import Backend.SDL as B
+import CUtil
+import ProfileGraphics
 
 main :: IO ()
-main = do
+main = if profilingGraphics then profileGraphics Nothing else gameMain
+
+gameMain ::  IO ()
+gameMain = do
   besRef <- B.initialize "Epidemic" Nothing
   B.mainLoop besRef handleEvent

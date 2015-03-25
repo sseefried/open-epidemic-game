@@ -564,7 +564,7 @@ clearRender = modify $ \gs -> gs { gsWorldRender  = return ()
 screenRender :: GameM ()
 screenRender = modify $ \gs ->
    gs { gsScreenRender = blur (blurSigma (gsLevelTime gs)) (gsWorldRender gs)
-     , gsRenderDirty = True }
+       , gsRenderDirty = True }
 
 ----------------------------------------------------------------------------------------------------
 --

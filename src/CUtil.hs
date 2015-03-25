@@ -41,3 +41,10 @@ iOSResourcePath = return "This is an Android build. There is not iOS resource pa
 foreign import ccall "ios_resource_path" ciOSResourcePath :: IO CString
 iOSResourcePath = ciOSResourcePath >>= peekCString
 #endif
+
+profilingGraphics :: Bool
+#ifdef PROFILE_GRAPHICS
+profilingGraphics = True
+#else
+profilingGraphics = False
+#endif

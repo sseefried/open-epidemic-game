@@ -5,6 +5,9 @@ if [ $# -gt 0 ]; then
     --debug)
       DEBUG_FLAG=-fdebug-game
     ;;
+    --profile)
+      DEBUG_FLAG=-fprofile-graphics
+    ;;
   esac
 
 fi

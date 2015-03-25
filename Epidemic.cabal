@@ -32,6 +32,9 @@ Flag debug-system
   Description: Print debug info about the system on the screen
   Default: False
 
+Flag profile-graphics
+  Description: Whether to profile graphics or not
+  Default: False
 
 library
     hs-source-dirs:   src
@@ -125,6 +128,10 @@ executable         EpidemicStaticLib
     if flag(debug-system)
       cpp-options: -DDEBUG_SYSTEM
       cc-options:  -DDEBUG_SYSTEM
+    if flag(profile-graphics)
+      cpp-options: -DPROFILE_GRAPHICS
+      cc-options:  -DPROFILE_GRAPHICS
+
 
 executable         Epidemic
     hs-source-dirs : src
@@ -170,53 +177,16 @@ executable         Epidemic
       Buildable: False
     else
       Buildable: True
+
     if flag(debug-game)
       cpp-options: -DDEBUG_GAME
       cc-options:  -DDEBUG_GAME
     if flag(debug-system)
       cpp-options: -DDEBUG_SYSTEM
       cc-options:  -DDEBUG_SYSTEM
-
--- For profile graphics and just graphics.
-executable         ProfileGraphics
-    hs-source-dirs : src
-    default-language:  Haskell2010
-    ghc-options: -W -threaded -O2
-    ghc-prof-options: -prof -auto-all
-
-    main-is:       ProfileGraphics.hs
-
-    build-depends: Hipmunk
-                 , MonadRandom
-                 , SDL2
-                 , OpenGLRaw
-                 , sdl2-mixer
-                 , cairo
-                 , control-monad-free
-                 -- everything below this line is a dependency of above
-                 -- the line. We fix to specific versions
-                 , base
-                 , array
-                 , containers
-                 , time
-                 , StateVar
-                 , mtl
-                 , primitive
-                 , random
-                 , text
-                 , transformers
-                 , utf8-string
-                 , vector
-                 , directory
-                 , cmdargs
-
-    c-sources: src/util.c src/freetype_util.c src/objc_util.m
-    pkgconfig-depends: freetype2, cairo
-
-    if flag(android) || flag(ios)
-      Buildable: False
-    else
-      Buildable: True
+    if flag(profile-graphics)
+      cpp-options: -DPROFILE_GRAPHICS
+      cc-options:  -DPROFILE_GRAPHICS
 
 executable         GenerateIcons
     hs-source-dirs:    src

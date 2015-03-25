@@ -1,4 +1,4 @@
-module Main where
+module ProfileGraphics where
 
 --
 -- This module just profiles graphics. I hope to answer the question of whether I should
@@ -41,14 +41,14 @@ data S = S { sWindow    :: S.Window
 
 nGerms = 200
 
-windowSize = 10000
+windowSize = 100
 ----------------------------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  sRef <- initialize OneBig.initShaders
+profileGraphics :: Maybe String -> IO ()
+profileGraphics mbResourcePath = do
+  sRef <- initialize mbResourcePath OneBig.initShaders
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs justGerms
+  mainLoop sRef germGLs blurGerms
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
@@ -72,8 +72,8 @@ mainLoop sRef st prof = go
       go
 
 ----------------------------------------------------------------------------------------------------
-initialize :: ShadersGenerator -> IO (IORef S)
-initialize initShaders = do
+initialize :: Maybe String -> ShadersGenerator -> IO (IORef S)
+initialize mbResourcePath initShaders = do
   S.init [S.InitVideo]
   (w,h) <- case screenDimensions of
     Just (w',h') -> return (w', h')
@@ -83,7 +83,6 @@ initialize initShaders = do
   when (w < h) $ exitWithError $
     printf "Width of screen (%d) must be greater than or equal to height (%d)" w h
   window <- S.createWindow "Profile Graphics" (S.Position 0 0) (S.Size w h) [S.WindowShown]
-
   let glAttrs = case True of
                 _ | platform `elem` [Android, IOSPlatform] ->
                        [ (S.GLDepthSize,           24)
@@ -93,7 +92,11 @@ initialize initShaders = do
   mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
-  resourcePath <- iOSResourcePath
+  resourcePath <- case platform of
+    Android ->
+      maybe (exitWithError "Resource path must be provided to haskell_main for Android")
+            return mbResourcePath
+    _ -> iOSResourcePath
   gfxState <- initGfxState (w,h) initShaders resourcePath
   let germs = replicateM 50 newGermGLM
   t <- getCurrentTime
@@ -111,7 +114,7 @@ initialize initShaders = do
 ----------------------------------------------------------------------------------------------------
 logFramerate :: S -> IO ()
 logFramerate s = do
-  when (sFrames s `mod` 1000 == 0) $ do
+  when (sFrames s `mod` windowSize == 0) $ do
     avTick <- averageTick (sFRBuf s)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
 

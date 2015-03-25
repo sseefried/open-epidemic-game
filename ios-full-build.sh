@@ -10,5 +10,5 @@ if [ "$IOS_SCRIPTS" = "" -o "$EPIDEMIC_IOS_BUILD_DIR" = "" ]; then
 fi
 
 for arch in i386 arm aarch64; do
-  env -i IOS_SCRIPTS=$IOS_SCRIPTS EPIDEMIC_IOS_BUILD_DIR=$EPIDEMIC_IOS_BUILD_DIR ./ios-$arch-build.sh
+  env -i IOS_SCRIPTS=$IOS_SCRIPTS EPIDEMIC_IOS_BUILD_DIR=$EPIDEMIC_IOS_BUILD_DIR ./ios-$arch-build.sh $@
 done

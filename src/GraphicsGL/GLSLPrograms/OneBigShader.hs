@@ -65,6 +65,7 @@ glslSource =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
           , "precision mediump float;"
+          , "precision mediump int;"
           , "#endif"
           , "#define WORLD 0"
           , "#define BLUR  1"
@@ -89,6 +90,7 @@ glslSource =
         concat $ intersperse "\n" [
             "#ifdef GL_ES"
           , "precision mediump float;"
+          , "precision mediump int;"
           , "#endif"
           , "#define WORLD 0"
           , "#define BLUR  1"
