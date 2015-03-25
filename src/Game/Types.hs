@@ -14,7 +14,6 @@ import           Data.Map (Map)
 import Types.Basic
 import GraphicsGL.GLM
 
-
 data GermGL = GermGL { germGLFun :: Int    -- z index
                                  -> R2     -- position
                                  -> Time   -- cumulative animation time

@@ -20,12 +20,12 @@ import           Data.Time
 -- friends
 import Types
 import Game.Types
-import GLM
 import Graphics
 import Platform
 import CUtil
 import GraphicsGL
 import Util
+import FrameRateBuffer
 
 ----------------------------------------------------------------------------------------------------
 data S = S { sWindow    :: S.Window
@@ -33,10 +33,43 @@ data S = S { sWindow    :: S.Window
            , sGerms     :: GLM [GermGL]
            , sGLContext :: S.GLContext
            , sFrames    :: Int
-           , sStartTime :: UTCTime
+           , sLastTime  :: UTCTime
+           , sFRBuf     :: FRBuf
            }
 
 nGerms = 200
+
+windowSize = 10000
+----------------------------------------------------------------------------------------------------
+main :: IO ()
+main = do
+  sRef <- initialize
+  s <- readIORef sRef
+  germGLs <- runGLMIO (sGfxState s) (sGerms s)
+  mainLoop sRef germGLs prof1
+  where
+
+
+----------------------------------------------------------------------------------------------------
+mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
+mainLoop sRef st prof = go
+  where
+    go :: IO ()
+    go = do
+      s <- readIORef sRef
+      mbE <- S.pollEvent
+      let quit = maybe False (checkForQuit . S.eventData) mbE
+      when quit $ exitWith ExitSuccess
+      ---
+      prof (sGfxState s) st
+      S.glSwapWindow (sWindow s)
+      ---
+      let frames = sFrames s
+      when (frames `mod` 100 == 0) $ logFramerate s
+      t <- getCurrentTime
+      addTick (sFRBuf s) $ realToFrac $ diffUTCTime t (sLastTime s)
+      writeIORef sRef $ s { sFrames = frames + 1, sLastTime = t }
+      go
 
 ----------------------------------------------------------------------------------------------------
 initialize :: IO (IORef S)
@@ -64,52 +97,24 @@ initialize = do
   gfxState <- initGfxState (w,h) resourcePath
   let germs = replicateM 50 newGermGLM
   t <- getCurrentTime
+  frBuf <- initFRBuf windowSize
   newIORef $ S { sWindow    = window
                , sGfxState  = gfxState
                , sGerms     = germs
                , sGLContext = context
                , sFrames    = 0
-               , sStartTime = t
+               , sLastTime  = t
+               , sFRBuf     = frBuf
                }
 
-----------------------------------------------------------------------------------------------------
-main :: IO ()
-main = do
-  sRef <- initialize
-  s <- readIORef sRef
-  germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs prof2
-  where
-
-
-----------------------------------------------------------------------------------------------------
-mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
-mainLoop sRef st prof = go
-  where
-    go :: IO ()
-    go = do
-      s <- readIORef sRef
-      mbE <- S.pollEvent
-      let quit = maybe False (checkForQuit . S.eventData) mbE
-      when quit $ exitWith ExitSuccess
-      ---
-      prof (sGfxState s) st
-      S.glSwapWindow (sWindow s)
-      ---
-      let frames = sFrames s
-      when (frames `mod` 100 == 0) $ logFramerate s
-      writeIORef sRef $ s { sFrames = frames + 1 }
-      go
 
 ----------------------------------------------------------------------------------------------------
 logFramerate :: S -> IO ()
 logFramerate s = do
-  let t = sStartTime s
-  t' <- getCurrentTime
-  let dt  = realToFrac $ diffUTCTime t' t
-      fps :: Double
-      fps = (fromIntegral $ sFrames s)/ dt
-  debugLog $ printf "Frames/s: %.1f\n" fps
+  when (sFrames s `mod` 100 == 0) $ do
+    avTick <- averageTick (sFRBuf s)
+    debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)
+
 
 ----------------------------------------------------------------------------------------------------
 --

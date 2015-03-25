@@ -234,3 +234,8 @@ ortho2D texGLSLProgramId bds = do
     ty   = - (top + bottom)/(top - bottom)
     tz   =   (far + near)/(far - near)
 
+----------------------------------------------------------------------------------------------------
+glslProgramUseAndInit :: GLSLProgram a -> IO ()
+glslProgramUseAndInit p = do
+  glUseProgram (glslProgramId p)
+  glslInit p

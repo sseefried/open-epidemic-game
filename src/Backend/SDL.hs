@@ -101,7 +101,7 @@ initialize title mbResourcePath = do
       squishSound <- M.loadWAVRW rwOps False
       return (Just levelMusic, Just squishSound)
   t     <- getCurrentTime
-  frBuf <- initFRBuf
+  frBuf <- initFRBuf 100 -- FIXME: Turn framebuffer window size into constant
   gs    <- newGameState (w,h)
   pressHistory <- newIORef $ PressHistory Nothing M.empty
   newIORef $ BackendState { _besStartTime     = t
@@ -324,7 +324,7 @@ delayBasedOnAverageFramerate besRef = do
 logFrameRate :: IORef BackendState -> IO ()
 logFrameRate besRef = do
   bes <- readIORef besRef
-  let sz = fromIntegral frBufWindowSize
+  let sz = fromIntegral 100 -- FIXME: window size constant
   when (besFrames bes `mod` sz == 0 && besFSMState bes == FSMPlayingLevel) $ do
     avTick <- averageTick (besFRBuf bes)
     debugLog $ printf "Framerate = %.2f frames/s\n" (1/avTick)

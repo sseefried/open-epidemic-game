@@ -73,11 +73,10 @@ data GLSLSource = GLSLSource { glslVertexShader   :: String
                              , glslFragmentShader :: String
                              }
 
-data GLSLProgram a = GLSLProgram { glslProgramId      :: ProgramId
-                                 , glslData           :: a
-                                 , glslInit           :: GLM ()
+data GLSLProgram a = GLSLProgram { glslProgramId :: ProgramId
+                                 , glslData      :: a
+                                 , glslInit      :: IO ()
                                  }
-
 
 data GfxState = GfxState { gfxBlurGLSL    :: GLSLProgram BlurGLSL
                          , gfxWorldGLSL   :: GLSLProgram WorldGLSL

@@ -31,6 +31,17 @@ situation where I have a distinct program for world rendering and for blurring t
 just be `return ()`, but when I use "one big shader" it will set an important uniform(s) that
 will choose which subroutine(s) of the "one big shader" to use.
 
+## Wildly differing framerates depending on monitor setup
+
+So, at the moment my first profiling program just draw 200 germs and does no blurring.
+
+I get some very different results depending on my monitor setup. I have an MBP late 2013 with
+retina display.
+
+- no external monitor. 1440x900.
+
+
+
 ## Refactoring is a dream in Haskell
 
 I just performed that whole refactor in less than 30 minutes. I cannot imagine doing this in a
@@ -40,13 +51,6 @@ that would have been equivalently easy. I cannot imagine having done this in Rub
 The fact that once all the compiler errors went away, I compiled the program and it worked just
 as it did before is as astounding to me today as it was the first time I performed a refactor
 like this. Strong type systems makes refactoring easy, okay! That is one of its key strengths.
-
-## More refactoring of modules
-
-
-GraphicsGL.Util
-GLM
-
 
 # Tue 24 Mar 2015
 

@@ -96,7 +96,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
-  glUseProgram $ glslProgramId p
+  glslProgramUseAndInit p
   withNewTexture $ \tid -> do
     res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
@@ -238,7 +238,7 @@ germGfxToGermGL gfx = glm $ const $ do
             positionIdx    = worldGLSLPosition ts
             texCoordIdx    = worldGLSLTexcoord ts
             drawTextureLoc = worldGLSLDrawTexture ts
-        glUseProgram $ glslProgramId p
+        glslProgramUseAndInit p
         withBoundTexture textureId $ do
           glUniform1i drawTextureLoc 1 -- set to 'true'
 
@@ -341,7 +341,7 @@ blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
       bs = glslData p
       frameBufferId = maybe (gfxScreenFBId gfxs) fboFrameBuffer mbDestFBO
   glBindFramebuffer gl_FRAMEBUFFER frameBufferId -- bind destination frame buffer
-  glUseProgram (glslProgramId p)
+  glslProgramUseAndInit p
   let [bf0, bf1, bf2, bf3, bf4] = map f2gl $ gaussSample sigma 4
   glUniform1f (blurGLSLFactor0 bs) bf0
   glUniform1f (blurGLSLFactor1 bs) bf1
