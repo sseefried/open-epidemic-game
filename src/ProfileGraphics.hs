@@ -48,7 +48,7 @@ profileGraphics mbResourcePath = do
   sRef <- initialize mbResourcePath Separate.initShaders
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs justBlur
+  mainLoop sRef germGLs blurGerms
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
@@ -82,7 +82,7 @@ initialize mbResourcePath initShaders = do
       return (fromIntegral (S.displayModeWidth mode), fromIntegral (S.displayModeHeight mode))
   when (w < h) $ exitWithError $
     printf "Width of screen (%d) must be greater than or equal to height (%d)" w h
-  window <- S.createWindow "Profile Graphics" (S.Position 0 0) (S.Size w h) [S.WindowShown]
+  window <- S.createWindow "Profile Graphics" (S.Position 0 0) (S.Size w h) wflags
   let glAttrs = case True of
                 _ | platform `elem` [Android, IOSPlatform] ->
                        [ (S.GLDepthSize,           24)
@@ -109,7 +109,8 @@ initialize mbResourcePath initShaders = do
                , sLastTime  = t
                , sFRBuf     = frBuf
                }
-
+  where
+    wflags = [S.WindowShown] ++ (case platform of IOSPlatform -> [S.WindowBorderless]; _ -> [])
 
 ----------------------------------------------------------------------------------------------------
 logFramerate :: S -> IO ()
