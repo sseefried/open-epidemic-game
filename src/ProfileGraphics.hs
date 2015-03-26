@@ -45,10 +45,10 @@ windowSize = 100
 ----------------------------------------------------------------------------------------------------
 profileGraphics :: Maybe String -> IO ()
 profileGraphics mbResourcePath = do
-  sRef <- initialize mbResourcePath OneBig.initShaders
+  sRef <- initialize mbResourcePath Separate.initShaders
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs blurGerms
+  mainLoop sRef germGLs justBlur
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()
@@ -124,14 +124,14 @@ logFramerate s = do
 -- Just draw [nGerms] germs.
 --
 justGerms :: GfxState -> [GermGL] -> IO ()
-justGerms gfxs germGLs = do
+justGerms gfxs _ = do
       let draw :: GermGL -> IO ()
           draw germGL = runGLMIO gfxs $ do
             germGLFun germGL 0 (R2 0 0) 0 10 1
       glBindFramebuffer gl_FRAMEBUFFER $ gfxScreenFBId gfxs
       glClearColor 1 1 1 1 -- here it must be opaque
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
-      sequence_ $ map draw germGLs
+
       -- now do the blur
 
 ----------------------------------------------------------------------------------------------------
@@ -149,6 +149,15 @@ blurGerms gfxs germGLs = do
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
       let blurred :: GLM ()
           blurred = blur 1.0 drawGerms
+      runGLMIO gfxs $ blurred
+----------------------------------------------------------------------------------------------------
+justBlur :: GfxState -> [GermGL] -> IO ()
+justBlur gfxs _ = do
+      glBindFramebuffer gl_FRAMEBUFFER $ fboFrameBuffer $ gfxMainFBO gfxs
+      glClearColor 1 1 1 1 -- here it must be opaque
+      glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
+      let blurred :: GLM ()
+          blurred = blur 1.0 (return ())
       runGLMIO gfxs $ blurred
 
 ----------------------------------------------------------------------------------------------------
