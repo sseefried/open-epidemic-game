@@ -77,11 +77,10 @@ blurGLSLSource =
           ----
           , "float scale = 1.0/radius;"
           , "vec2 calcBlurCoord(vec2 coord, float dist) {"
-          , "  if (axis) {"
-          , "    return vec2(coord.x, coord.y + dist*scale);"
-          , "  } else {"
-          , "    return vec2(coord.x + dist*scale, coord.y);"
-          , "  }"
+          , "  float offset = dist*scale;"
+          , "  float xoffset = (axis ? 0.0 : 1.0) * offset;"
+          , "  float yoffset = (axis ? 1.0 : 0.0) * offset;"
+          , "  return vec2(coord.x + xoffset , coord.y + yoffset);"
           , "}"
           ----
           , "void main()"

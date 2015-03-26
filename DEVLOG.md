@@ -1,5 +1,40 @@
 # Thu 26 Mar 2015
 
+
+## 11:00
+
+Last night I turn `ProfileGraphics` into just another module that one imports rather than
+the main module for a separate program. This is good because it now means I can run the
+profile code on iOS and Android with minimal changes.
+
+I can safely say after all this work that the shaders are not the source of the performance slow
+down. The slow down may well be due to many "not best practice" things I'm doing.
+
+This [page](https://developer.apple.com/library/ios/documentation/3DDrawing/Conceptual/OpenGLES_ProgrammingGuide/TechniquesforWorkingwithVertexData/TechniquesforWorkingwithVertexData.html)
+looks like it's going to very useful in helping me improve the performance of my code.
+
+One thing I've realised is that I repeatedly send vertex array data. I do it once for each germ.
+Perhaps it would be better to send this data all at once and then get each germ to draw itself
+from portions of the vertex array by changing the `first` offset in `glDrawArrays`.
+
+I also need to look into VBOs and VAOs and also the `glMapBufferRange` extension.
+
+I need to know a little bit more about these extensions. Are they supported on all devices or does
+one need to performance a check in software when initialising OpenGL and then use the code
+only when that extension is available? I suspect it's the latter.
+
+Here are some answers:
+
+- VBOs are suppored in GL ES 2.0
+- VAOs need to be checked for as an extension. Otherwise don't use them.
+
+
+## 13:40 Plain old blur is slow!
+
+The blur effect is just plain old slow. 3 fps on iOS Simulator. (Yes, really that low!) I'm sure
+this just can't be right and I'm doing something horribly wrong. I wonder what it is.
+
+
 ## 15:34 It's texture2D calls that are slowing it down
 
 I removed all the texture2D calls from the guassian blur and it's back up to being very fast again.
@@ -32,37 +67,11 @@ An example of a program with a dependent texture read is:
 My blur fragment shader has *eight* dependent texture reads. Ouch. The trick is to move these
 into the vertex shader.
 
-## 13:40 Plain old blur is slow!
+## 16:40 Hell yeah, pre-calculating texture co-ordinates speeds things up a lot!
 
-The blur effect is just plain old slow. 3 fps on iOS Simulator. (Yes, really that low!) I'm sure
-this just can't be right and I'm doing something horribly wrong. I wonder what it is.
+Android: Went from 12fps to 52fps. (That's still below 60 so we've got more to do.)
+iOS Simulator:
 
-## 11:00
-
-Last night I turn `ProfileGraphics` into just another module that one imports rather than
-the main module for a separate program. This is good because it now means I can run the
-profile code on iOS and Android with minimal changes.
-
-I can safely say after all this work that the shaders are not the source of the performance slow
-down. The slow down may well be due to many "not best practice" things I'm doing.
-
-This [page](https://developer.apple.com/library/ios/documentation/3DDrawing/Conceptual/OpenGLES_ProgrammingGuide/TechniquesforWorkingwithVertexData/TechniquesforWorkingwithVertexData.html)
-looks like it's going to very useful in helping me improve the performance of my code.
-
-One thing I've realised is that I repeatedly send vertex array data. I do it once for each germ.
-Perhaps it would be better to send this data all at once and then get each germ to draw itself
-from portions of the vertex array by changing the `first` offset in `glDrawArrays`.
-
-I also need to look into VBOs and VAOs and also the `glMapBufferRange` extension.
-
-I need to know a little bit more about these extensions. Are they supported on all devices or does
-one need to performance a check in software when initialising OpenGL and then use the code
-only when that extension is available? I suspect it's the latter.
-
-Here are some answers:
-
-- VBOs are suppored in GL ES 2.0
-- VAOs need to be checked for as an extension. Otherwise don't use them.
 
 
 # Wed 25 Mar 2015
