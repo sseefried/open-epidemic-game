@@ -80,17 +80,16 @@ blurGLSLSource =
           , "void main()"
           , "{"
           , "  gl_Position = vec4(position,1);"
-          , "  float axisX = axis ? 0.0 : 1.0;"
-          , "  float axisY = axis ? 1.0 : 0.0;"
+          , "  vec2 axisV = axis ? vec2(0.0,1.0) : vec2(1.0,0.0);"
           , "  blurTexCoords[0] = texCoord;"
-          , "  blurTexCoords[1] = vec2(texCoord.x +     axisX*scale, texCoord.y +     axisY*scale);"
-          , "  blurTexCoords[2] = vec2(texCoord.x -     axisX*scale, texCoord.y -     axisY*scale);"
-          , "  blurTexCoords[3] = vec2(texCoord.x + 2.0*axisX*scale, texCoord.y + 2.0*axisY*scale);"
-          , "  blurTexCoords[4] = vec2(texCoord.x - 2.0*axisX*scale, texCoord.y - 2.0*axisY*scale);"
-          , "  blurTexCoords[5] = vec2(texCoord.x + 3.0*axisX*scale, texCoord.y + 3.0*axisY*scale);"
-          , "  blurTexCoords[6] = vec2(texCoord.x - 3.0*axisX*scale, texCoord.y - 3.0*axisY*scale);"
-          , "  blurTexCoords[7] = vec2(texCoord.x + 4.0*axisX*scale, texCoord.y + 4.0*axisY*scale);"
-          , "  blurTexCoords[8] = vec2(texCoord.x - 4.0*axisX*scale, texCoord.y - 4.0*axisY*scale);"
+          , "  blurTexCoords[1] = texCoord.xy + 1.0*axisV*scale;"
+          , "  blurTexCoords[2] = texCoord.xy - 1.0*axisV*scale;"
+          , "  blurTexCoords[3] = texCoord.xy + 2.0*axisV*scale;"
+          , "  blurTexCoords[4] = texCoord.xy - 2.0*axisV*scale;"
+          , "  blurTexCoords[5] = texCoord.xy + 3.0*axisV*scale;"
+          , "  blurTexCoords[6] = texCoord.xy - 3.0*axisV*scale;"
+          , "  blurTexCoords[7] = texCoord.xy + 4.0*axisV*scale;"
+          , "  blurTexCoords[8] = texCoord.xy - 4.0*axisV*scale;"
           , "}"
           ]
 
@@ -110,10 +109,6 @@ blurGLSLSource =
           , "uniform float blurFactor3;"
           , "uniform float blurFactor4;"
           ----
-          --, "vec4 blurComponent(int i, float blurFactor) {"
-          --, "   return texture2D(texture, blurTexCoords[i])*blurFactor;"
-          --, "}"
-          ----
           , "void main() {"
           , "  lowp vec4 sum = vec4(0.0);"
           , "  sum += texture2D(texture, blurTexCoords[0])*blurFactor0;"
@@ -126,8 +121,6 @@ blurGLSLSource =
           , "  sum += texture2D(texture, blurTexCoords[7])*blurFactor4;"
           , "  sum += texture2D(texture, blurTexCoords[8])*blurFactor4;"
           , "  gl_FragColor = vec4(sum.xyz, 1.0);"
-          --,  "if ((axis ? 1.0 : 1.0) + (blurFactor0 + blurFactor1 + blurFactor2 +"
-          --,  "  blurFactor3 + blurFactor4) > 0.0) {gl_FragColor =  texture2D(texture, vTexCoord); } else { gl_FragColor =  texture2D(texture, vTexCoord); }"
           , "}"
         ]
   }
