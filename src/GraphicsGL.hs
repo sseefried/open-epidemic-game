@@ -345,13 +345,14 @@ blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
   glUniform1f (blurGLSLFactor3 bs) bf3
   glUniform1f (blurGLSLFactor4 bs) bf4
   glUniform1i (blurGLSLAxis bs)    (if axis then 1 else 0)
-  drawScreenSizedTexture (fboTexture srcFBO) (blurGLSLPosition bs) (blurGLSLTexcoord bs)
+  drawScreenSizedTexture bs (fboTexture srcFBO)
 
 ----------------------------------------------------------------------------------------------------
 gauss :: Double -> Double -> Double
 gauss sigma x = (1 / sqrt (2*pi*sigmaSquared)) * exp (-(x*x)/(2*sigmaSquared))
   where
     sigmaSquared = sigma*sigma
+
 gaussSample :: Double -> Int -> [Double]
 gaussSample sigma n = map (/total) (center:xs)
    where
@@ -364,7 +365,7 @@ gaussSample sigma n = map (/total) (center:xs)
 blur :: Double -> GLM () -> GLM ()
 blur sigma m = do
   gfxs <- getGfxState
-  let mainFBO = gfxMainFBO gfxs
+  let mainFBO   = gfxMainFBO gfxs
       phase1FBO = blurGLSLPhase1FBO $ glslData $ gfxBlurGLSL gfxs
       blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
       blur2 = blurOnAxis sigma True  phase1FBO Nothing
@@ -384,26 +385,21 @@ blur sigma m = do
 -- The destination of the texture at [texId] will depend on the last called to
 -- [glBindFramebuffer].
 --
-drawScreenSizedTexture :: TextureId -> AttributeLocation -> AttributeLocation -> IO ()
-drawScreenSizedTexture texId pos texCoord = do
-  let stride = fromIntegral $ 4 * floatSize
+drawScreenSizedTexture :: BlurGLSL -> TextureId -> IO ()
+drawScreenSizedTexture bs texId = do
+  let pos       = blurGLSLPosition bs
+      texCoord  = blurGLSLTexcoord bs
+      stride    = fromIntegral $ 4 * floatSize
       floatSize = sizeOf (undefined :: GLfloat)
   withBoundTexture texId $ do
-    glBindTexture gl_TEXTURE_2D texId
     glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
+    glBindBuffer gl_ARRAY_BUFFER $ blurVBO bs
     glEnableVertexAttribArray pos
     glEnableVertexAttribArray texCoord
-    -- FIXME: sseefried: Needs a depth
-    allocaArray (4*4*floatSize) $ \(vs :: Ptr GLfloat) -> do
-      pokeArray vs [ -1, -1, 0, 0  -- left-bottom
-                   ,  1, -1, 1, 0  -- right-bottom
-                   , -1,  1, 0, 1  -- left-top
-                   ,  1,  1, 1, 1  -- right-top
-                   ]
-      glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride vs
-      glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
-                                                   (vs `plusPtr` (2*floatSize))
-      glDrawArrays gl_TRIANGLE_STRIP 0 4
+    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr
+    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride (nullPtr `plusPtr` (2*floatSize))
+    glDrawArrays gl_TRIANGLE_STRIP 0 4
+    glBindBuffer gl_ARRAY_BUFFER 0 -- reset
 ----------------------------------------------------------------------------------------------------
 --
 -- Precondition: An OpenGL context must have been created.
@@ -411,7 +407,7 @@ drawScreenSizedTexture texId pos texCoord = do
 initGfxState :: (Int, Int) -> ShadersGenerator -> String -> IO GfxState
 initGfxState (w,h) initShaders resourcePath = do
   screenFBId <- getScreenFrameBufferId -- get this value before any new frame buffers created.
-  --  glEnable gl_TEXTURE_2D is meaningless in GLSL  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
+  --  glEnable gl_TEXTURE_2D is meaningless in GLSL
   glEnable gl_BLEND
   glBlendFunc gl_SRC_ALPHA gl_ONE_MINUS_SRC_ALPHA
   glEnable gl_DEPTH_TEST

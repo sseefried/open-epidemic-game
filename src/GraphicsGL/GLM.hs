@@ -33,6 +33,7 @@ module GraphicsGL.GLM (
   VariableLocation,
   TextureId,
   FrameBufferId,
+  BufferId,
  -- constants
   zMax,
   zMin,
@@ -68,6 +69,7 @@ type UniformLocation   = GLint
 type VariableLocation  = GLuint
 type TextureId         = GLuint
 type FrameBufferId     = GLuint
+type BufferId          = GLuint
 
 
 data GLSLSource = GLSLSource { glslVertexShader   :: String
@@ -106,6 +108,7 @@ data BlurGLSL = BlurGLSL {
                 , blurGLSLFactor4   :: UniformLocation
                 , blurGLSLAxis      :: UniformLocation
                 , blurGLSLPhase1FBO :: FBO
+                , blurVBO           :: BufferId
                 }
 
 type ShadersGenerator = (Int,Int) -> IO (GLSLProgram WorldGLSL, GLSLProgram BlurGLSL)

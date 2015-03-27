@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module GraphicsGL.GLSLPrograms.SeparateShaders (
   initShaders
 ) where
@@ -9,6 +10,7 @@ import Util
 import GraphicsGL.GLM
 import GraphicsGL.Util
 import Coordinate
+import Foreign
 
 
 ----------------------------------------------------------------------------------------------------
@@ -110,7 +112,7 @@ blurGLSLSource =
           , "uniform float blurFactor4;"
           ----
           , "void main() {"
-          , "  lowp vec4 sum = vec4(0.0);"
+          , "  vec4 sum = vec4(0.0);"
           , "  sum += texture2D(texture, blurTexCoords[0])*blurFactor0;"
           , "  sum += texture2D(texture, blurTexCoords[1])*blurFactor1;"
           , "  sum += texture2D(texture, blurTexCoords[2])*blurFactor1;"
@@ -166,6 +168,18 @@ initBlurGLSL (w, h) = do
                                                  ("axis":"radius":blurFactorNames)
   fbo <- genFBO (w,h)
   glUniform1f radius (fromIntegral $ min w h)
+  vertexBuf <- genBuffer
+  let bufSize = (4*4*floatSize)
+  -- FIXME: sseefried: Needs a depth
+  allocaArray bufSize $ \(vs :: Ptr GLfloat) -> do
+    pokeArray vs [ -1, -1, 0, 0  -- left-bottom
+                 ,  1, -1, 1, 0  -- right-bottom
+                 , -1,  1, 0, 1  -- left-top
+                 ,  1,  1, 1, 1  -- right-top
+                 ]
+    glBindBuffer gl_ARRAY_BUFFER vertexBuf
+    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW
+
   let blurData = BlurGLSL { blurGLSLPosition  = positionLoc
                           , blurGLSLTexcoord  = texCoordLoc
                           , blurGLSLFactor0   = bf0
@@ -175,6 +189,7 @@ initBlurGLSL (w, h) = do
                           , blurGLSLFactor4   = bf4
                           , blurGLSLAxis      = axis
                           , blurGLSLPhase1FBO = fbo
+                          , blurVBO           = vertexBuf
                           }
   return $ GLSLProgram { glslProgramId = programId
                        , glslData = blurData

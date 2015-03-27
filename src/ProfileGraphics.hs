@@ -48,7 +48,7 @@ profileGraphics mbResourcePath = do
   sRef <- initialize mbResourcePath Separate.initShaders
   s <- readIORef sRef
   germGLs <- runGLMIO (sGfxState s) (sGerms s)
-  mainLoop sRef germGLs blurGerms
+  mainLoop sRef germGLs justBlur
 
 ----------------------------------------------------------------------------------------------------
 mainLoop :: IORef S -> a -> (GfxState -> a -> IO ()) -> IO ()

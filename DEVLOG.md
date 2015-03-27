@@ -1,5 +1,33 @@
-# Thu 26 Mar 2015
 
+
+# Fri 27 Mar 2015
+
+## Slow blur shaders
+
+There is something just plain slow about the way I'm *invoking* the blur shader. Even when I
+comment most of it out so that it's barely performing any calculations at all it still runs slowly
+at about 50 f/s on the iPhone Simulator. That's slow.
+
+I'm pretty sure that I'm recalculating a lot of stuff. Also, I'm going to try using VBOs this time
+around.
+
+I notice that 50 f/s is half of the 100 f/s that seems to be about the limit of what I've ever
+got on the iPhone Simulator.
+
+## CADisplayLink and OpenGL ES Tools in Xcode 6
+
+I couldn't get timings that I can see in some of the pictures [here](https://developer.apple.com/library/ios/documentation/3DDrawing/Conceptual/OpenGLES_ProgrammingGuide/ToolsOverview/ToolsOverview.html).
+
+    Note: Some features of the FPS gauge and GPU report rely on a display link timer. If you do not
+    use the CADisplayLink  or GLKViewController classes to animate your OpenGL ES displays, the
+    gauge and report cannot show performance relative  to a target frame rate or provide accurate
+    CPU frame time information.
+
+It turns out it's because we're not using a `CADisplayLink`. I had a look through the SDL2
+source code and there is a `startAnimation` method that uses it. However, I'm not using
+animation callbacks in my game, so `CADisplayLink` is not being used.
+
+# Thu 26 Mar 2015
 
 ## 11:00
 

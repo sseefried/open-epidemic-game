@@ -2,11 +2,6 @@
 module GraphicsGL.Util where
 
 import           Graphics.Rendering.OpenGL.Raw
-import           Foreign.Marshal.Alloc (allocaBytes, alloca)
-import           Foreign.Marshal.Array (allocaArray, pokeArray)
-import           Foreign.Ptr
-import           Foreign.Storable
-import           Foreign.C.String (withCString, withCStringLen, peekCString)
 import           GHC.Word
 
 -- friends
@@ -14,6 +9,7 @@ import Types
 import Util
 import GraphicsGL.GLM
 import Platform
+import Foreign
 
 ----------------------------------------------------------------------------------------------------
 bytesPerWord32 :: Int
@@ -39,12 +35,21 @@ rgbFormat = fromIntegral $ case platform of
   _           -> gl_RGBA
 
 ----------------------------------------------------------------------------------------------------
+-- Helper function
+genGen :: Storable a => (GLint -> Ptr a -> IO ()) -> IO a
+genGen gen = alloca $ \(ptr :: Ptr a) -> do { gen 1 ptr; peek ptr }
+
+----------------------------------------------------------------------------------------------------
 genTexture :: IO TextureId
-genTexture = alloca $ \(ptr :: Ptr TextureId) -> do { glGenTextures 1 ptr; peek ptr }
+genTexture = genGen glGenTextures
 
 ----------------------------------------------------------------------------------------------------
 genFrameBuffer :: IO FrameBufferId
-genFrameBuffer = alloca $ \(ptr :: Ptr FrameBufferId) -> do { glGenFramebuffers 1 ptr; peek ptr }
+genFrameBuffer = genGen glGenFramebuffers
+
+----------------------------------------------------------------------------------------------------
+genBuffer :: IO BufferId
+genBuffer = genGen glGenBuffers
 
 ----------------------------------------------------------------------------------------------------
 getScreenFrameBufferId :: IO FrameBufferId
@@ -97,7 +102,6 @@ genFBO (w,h) = do
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MAG_FILTER (fromIntegral gl_NEAREST)
     glTexParameteri gl_TEXTURE_2D gl_TEXTURE_MIN_FILTER (fromIntegral gl_NEAREST)
     glFramebufferTexture2D gl_FRAMEBUFFER gl_COLOR_ATTACHMENT0 gl_TEXTURE_2D texture 0
-
     status <- glCheckFramebufferStatus gl_FRAMEBUFFER
     when (status /= gl_FRAMEBUFFER_COMPLETE) $ do
       exitWithError "Framebuffer error"
