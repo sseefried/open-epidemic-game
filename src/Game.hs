@@ -29,11 +29,13 @@ import Util
 --
 blurSigma :: Time -> Double
 blurSigma t =
-  let endTime  = 3 -- seconds
-      maxSigma = 4
+  let maxSigma = 4
       periods = 1 -- number of "focussing attempts"
-      damping t = (endTime - t) / endTime -- 1 at t=0, 0 at t=1
-  in if t > endTime then 0.01 else (damping t) * maxSigma * sin (periods*2*pi/endTime*t)
+      damping t = (blurEndTime - t) / blurEndTime -- 1 at t=0, 0 at t=1
+  in if t > blurEndTime then 0.01 else (damping t) * maxSigma * sin (periods*2*pi/blurEndTime*t)
+
+blurEndTime :: Double
+blurEndTime  = 3.0 -- seconds
 
 ----------------------------------------------------------------------------------------------------
 --

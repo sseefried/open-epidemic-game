@@ -1,6 +1,13 @@
 High priority
 -------------
 
+[ ] For profiling have the tick happen *before* the swap in order to
+    determine true frame rate.
+
+[ ] Have blur turn off after blurEndTime to consume no resources.
+
+[ ] Try to get blur running on Android faster than 52 fps.
+
 [ ] Create a profiling harness to test the GLSL shaders. These *must* be fast.
     Write a tutorial about how you do it on the game blog.
 
