@@ -178,7 +178,8 @@ initBlurGLSL (w, h) = do
                  ,  1,  1, 1, 1  -- right-top
                  ]
     glBindBuffer gl_ARRAY_BUFFER vertexBuf
-    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW
+    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW -- P1
+    glBindBuffer gl_ARRAY_BUFFER 0
 
   let blurData = BlurGLSL { blurGLSLPosition  = positionLoc
                           , blurGLSLTexcoord  = texCoordLoc

@@ -1,6 +1,8 @@
 High priority
 -------------
 
+[ ] Find out why glBindBuffer gl_ARRAY_BUFFER 0 is so important on iOS
+
 [ ] For profiling have the tick happen *before* the swap in order to
     determine true frame rate.
 

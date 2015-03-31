@@ -396,8 +396,8 @@ drawScreenSizedTexture bs texId = do
     glBindBuffer gl_ARRAY_BUFFER $ blurVBO bs
     glEnableVertexAttribArray pos
     glEnableVertexAttribArray texCoord
-    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr
-    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride (nullPtr `plusPtr` (2*floatSize))
+    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr -- P1
+    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride (nullPtr `plusPtr` (2*floatSize)) -- P1
     glDrawArrays gl_TRIANGLE_STRIP 0 4
     glBindBuffer gl_ARRAY_BUFFER 0 -- reset
 ----------------------------------------------------------------------------------------------------

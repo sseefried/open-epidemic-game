@@ -1,3 +1,13 @@
+# Tue 31 Mar 2015
+
+On iOS I have just found that in the following code, the `glBindBuffer gl_ARRAY_BUFFER 0`
+is *very* important. On Android it did not seem important.
+
+    glBindBuffer gl_ARRAY_BUFFER vertexBuf
+    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW -- P1
+    glBindBuffer gl_ARRAY_BUFFER 0
+
+I have not yet determined the reason.
 
 
 # Fri 27 Mar 2015
