@@ -1,3 +1,38 @@
+# Wed  1 Apr 2015
+
+Well, after finally getting someone from the UPX to fix a bug with packing ARM executables, I
+discover that Apple is pretty thorough in the checks it does on .ipa archives. Here are some of
+the errors I got:
+
+
+      The binary is invalid. The encryption info in the LC_ENCRYPTION_INFO load command
+      is either missing or invalid, or the binary is already encrypted. This binary does not
+      seem to have been build with Apple's linker.
+
+      Invalid Segment Alignment. The app binary at 'Epidemic.app/Epidemic' does not have
+      proper segment alignment. Try rebuilding the app with the latest Xcode version.
+
+      Invalid Bundle. The bundle Epidemic.app does not support the minimum OS Version specified
+      in the Info.plist
+
+I inspected an executable before code signing and found that it has a *load command* called
+`LC_ENCRYPTION_INFO` which is missing once you compress it with UPX.
+
+For the second error I don't know what the proper segment alignment would be.
+
+The third error I'm pretty sure is caused because of a missing `LC_VERSION_MIN_IPHONEOS` load
+command.
+
+
+The upshot of this is that
+unless we can rewrite UPX to respect these headers, keep them around somehow, then we're never
+going to be able to submit something to the App store.
+
+
+
+This problem is too big for me to solve by myself.
+
+
 # Tue 31 Mar 2015
 
 On iOS I have just found that in the following code, the `glBindBuffer gl_ARRAY_BUFFER 0`
