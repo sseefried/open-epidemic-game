@@ -48,3 +48,10 @@ profilingGraphics = True
 #else
 profilingGraphics = False
 #endif
+
+profiling :: Bool
+#ifdef PROFILE
+profiling = True
+#else
+profiling = False
+#endif

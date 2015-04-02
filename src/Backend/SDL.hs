@@ -306,7 +306,7 @@ mainLoop besRef handleEvent = loop $ do
   runFrameUpdate       besRef
   runInputEventHandler besRef handleEvent
   runPhysicsEventHandler besRef handleEvent
-  delayBasedOnAverageFramerate besRef
+  when (not profiling) $ delayBasedOnAverageFramerate besRef
   logFrameRate besRef
   where
     loop :: IO () -> IO ()

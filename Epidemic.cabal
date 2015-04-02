@@ -36,6 +36,10 @@ Flag profile-graphics
   Description: Whether to profile graphics or not
   Default: False
 
+Flag profile
+  Description: Run at highest frame rate for profiling
+  Default: False
+
 library
     hs-source-dirs:   src
     default-language: Haskell2010
@@ -193,6 +197,10 @@ executable         Epidemic
     if flag(profile-graphics)
       cpp-options: -DPROFILE_GRAPHICS
       cc-options:  -DPROFILE_GRAPHICS
+    if flag(profile)
+      cpp-options: -DPROFILE
+      cc-options:  -DPROFILE
+
 
 executable         GenerateIcons
     hs-source-dirs:    src
