@@ -87,6 +87,7 @@ data GfxState = GfxState { gfxBlurGLSL    :: GLSLProgram BlurGLSL
                          , gfxMainFBO     :: FBO
                          -- on iOS this is not 0!
                          , gfxScreenFBId  :: FrameBufferId
+                         , gfxTexturePool  :: IORef [TextureId]
                          }
 
 -- FIXME: Probably want to change the names of these data structures

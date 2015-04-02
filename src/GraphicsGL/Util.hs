@@ -82,9 +82,21 @@ getUniformLocation p s = fromIntegral <$> getShaderLocation glGetUniformLocation
 --
 -- Frees the [textureId] for reuse and deletes any bound textures.
 --
-delTexture :: TextureId -> IO ()
-delTexture textureId =
-  alloca $ \(ptr :: Ptr GLuint) -> do { poke ptr textureId; glDeleteTextures 1 ptr }
+poolTexture :: GfxState -> TextureId -> IO ()
+poolTexture gfxs textureId = modifyIORef (gfxTexturePool gfxs) (textureId:)
+
+----------------------------------------------------------------------------------------------------
+--
+-- Gets new textureId from the pool.
+--
+getTextureIdFromPool :: GfxState -> IO TextureId
+getTextureIdFromPool gfxs = do
+  let ref = gfxTexturePool gfxs
+  textures  <- readIORef ref
+  textureId <- case textures of
+                 []                     -> genTexture
+                 (textureId:textureIds) -> writeIORef ref textureIds >> return textureId
+  return textureId
 
 ----------------------------------------------------------------------------------------------------
 --
@@ -136,11 +148,11 @@ clearBuffer (Color r g b a) n ptr = do
 --
 -- Generates a new texture, does something with it, frees it.
 --
-withNewTexture :: (TextureId -> IO a) -> IO a
-withNewTexture f = do
-  textureId <- genTexture
-  res <- f textureId
-  delTexture textureId -- FIXME: Poor performance
+withPooledTexture :: GfxState -> (TextureId -> IO a) -> IO a
+withPooledTexture gfxs f = do
+  textureId <- getTextureIdFromPool gfxs
+  res       <- f textureId
+  poolTexture gfxs textureId
   return res
 
 ----------------------------------------------------------------------------------------------------

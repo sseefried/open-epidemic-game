@@ -92,7 +92,7 @@ renderCairoToQuad (x',y') (w',h') cairoRender  = glm $ \gfxs -> do
       perVertex = ptsInPos + ptsInTex
       stride    = fromIntegral $ perVertex*floatSize
   glslProgramUseAndInit p
-  withNewTexture $ \tid -> do
+  withPooledTexture gfxs $ \tid -> do
     res <- renderCairoToTexture tid Nothing (wi, hi) $ do
       C.scale (sx*scale) (sy*scale)
       C.translate (w'/2) (h'/2)
@@ -226,7 +226,7 @@ germGfxToGermGL gfx = glm $ const $ do
       (ptsInPos', ptsInTex') = (fromIntegral ptsInPos, fromIntegral ptsInTex)
       perVertex = ptsInPos + ptsInTex
       stride = fromIntegral $ perVertex * floatSize
-      finaliser = glm . const $ delTexture textureId
+      finaliser = glm $ \gfxs -> poolTexture gfxs textureId
       germGLFun = \zIndex (R2 x' y') t r scale -> glm $ \gfxs -> do
         let p = gfxWorldGLSL gfxs
             ts = glslData p
@@ -415,14 +415,16 @@ initGfxState (w,h) initShaders resourcePath = do
   glDepthFunc gl_LESS
   glViewport 0 0 (fromIntegral w) (fromIntegral h)
 
-  mainFBO   <- genFBO (w,h)
+  mainFBO               <- genFBO (w,h)
   (worldGLSL, blurGLSL) <- initShaders (w,h)
-  fontFace  <- loadFontFace $ resourcePath ++ "/font.ttf"
+  fontFace              <- loadFontFace $ resourcePath ++ "/font.ttf"
+  texturesRef           <- newIORef []
   let gfxs = GfxState { gfxWorldGLSL   = worldGLSL
                       , gfxBlurGLSL    = blurGLSL
                       , gfxFontFace    = fontFace
                       , gfxMainFBO     = mainFBO
                       , gfxScreenFBId  = screenFBId
+                      , gfxTexturePool = texturesRef
                       }
   return gfxs
 

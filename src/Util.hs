@@ -8,7 +8,8 @@ module Util (
   module System.Exit,
   module Text.Printf,
   module Data.Maybe,
-  module Data.List
+  module Data.List,
+  module Data.IORef
 )
   where
 
@@ -19,6 +20,7 @@ import System.Exit
 import Text.Printf
 import Data.Maybe
 import Data.List
+import Data.IORef
 
 
 
