@@ -21,11 +21,15 @@ floatSize = sizeOf (undefined :: GLfloat)
 
 ----------------------------------------------------------------------------------------------------
 withBoundTexture :: TextureId -> IO a -> IO a
-withBoundTexture textureId io = do
-  glBindTexture gl_TEXTURE_2D textureId
-  res <- io
-  glBindTexture gl_TEXTURE_2D 0
-  return res
+withBoundTexture textureId io = withBinder (glBindTexture gl_TEXTURE_2D) textureId io
+
+----------------------------------------------------------------------------------------------------
+withVBO :: BufferId -> IO a -> IO a
+withVBO bufferId io = withBinder (glBindBuffer gl_ARRAY_BUFFER) bufferId io
+
+----------------------------------------------------------------------------------------------------
+withBinder :: Num b => (b -> IO ()) -> b -> IO a -> IO a
+withBinder f i io = do { f i; res <- io; f 0; return res }
 
 ----------------------------------------------------------------------------------------------------
 rgbFormat :: GLint

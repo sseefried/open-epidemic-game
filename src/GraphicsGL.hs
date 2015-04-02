@@ -393,13 +393,14 @@ drawScreenSizedTexture bs texId = do
       floatSize = sizeOf (undefined :: GLfloat)
   withBoundTexture texId $ do
     glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
-    glBindBuffer gl_ARRAY_BUFFER $ blurVBO bs
-    glEnableVertexAttribArray pos
-    glEnableVertexAttribArray texCoord
-    glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr -- P1
-    glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride (nullPtr `plusPtr` (2*floatSize)) -- P1
-    glDrawArrays gl_TRIANGLE_STRIP 0 4
-    glBindBuffer gl_ARRAY_BUFFER 0 -- reset
+    withVBO (blurVBO bs) $ do
+      glEnableVertexAttribArray pos
+      glEnableVertexAttribArray texCoord
+      glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr
+      glVertexAttribPointer texCoord 2 gl_FLOAT (fromIntegral gl_FALSE) stride
+                                                (nullPtr `plusPtr` (2*floatSize))
+      glDrawArrays gl_TRIANGLE_STRIP 0 4
+
 ----------------------------------------------------------------------------------------------------
 --
 -- Precondition: An OpenGL context must have been created.

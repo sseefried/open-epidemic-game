@@ -13,9 +13,6 @@ High priority
 [ ] Create a profiling harness to test the GLSL shaders. These *must* be fast.
     Write a tutorial about how you do it on the game blog.
 
-[ ] Remove modelView matrix from from blur Program
-
-
 [ ] Add main menu. Allow control of things like SFX volume and music volume.
 
 [ ] Bug: Show all the new germs before you show game over screen.
@@ -36,7 +33,6 @@ High priority
 
 [ ] Look at the battery usage of the game on Android.
 
-[ ] Remove the status bar on iOS version
 
 
 [ ] Add liquid from bottle sound effect for antibiotics
@@ -91,6 +87,10 @@ Low priority
 ----
 DONE
 ----
+[X] Remove the status bar on iOS version
+
+[X] Remove modelView matrix from from blur Program
+
 [X] Focussing microscope effect. Blur to different extent finally coming into
     focus.
 
