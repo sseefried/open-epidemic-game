@@ -47,6 +47,7 @@ library
     Exposed-Modules: AndroidMain, Backend.SDL, Backend.Events, Game, Game.Types
                    , GameM, Types, Types.Basic, Types.Constants, Platform
                    , Graphics, GraphicsGL, GraphicsGL.Util, GraphicsGL.GLM
+                   , HipM
                    , GraphicsGL.GLSLPrograms.SeparateShaders
                    , GraphicsGL.GLSLPrograms.OneBigShader
                    , ProfileGraphics
