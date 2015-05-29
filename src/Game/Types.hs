@@ -23,9 +23,7 @@ data GermGL = GermGL { germGLFun :: Int    -- z index
                      , germGLFinaliser :: GLM ()
                      }
 
-data GameState = GameState { gsScreenRender  :: GLM () -- GL commands
-                           , gsWorldRender   :: GLM ()
-                           , gsRenderDirty   :: Bool
+data GameState = GameState { gsRenderDirty   :: Bool
                            , gsBounds        :: !(Int, Int)
                            , gsGerms         :: !(Map GermId Germ)
                            , gsNextGermId    :: !GermId

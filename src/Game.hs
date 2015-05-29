@@ -10,12 +10,17 @@ module Game where
 import           Control.Monad.Random hiding (getRandom, evalRand)
 import qualified Data.Map as M
 import           Data.Map (Map)
+import           Graphics.Rendering.OpenGL.Raw
+import           Data.Bits
+
+
 
 -- friends
 import Types
 import Game.Types
 -- DO NOT import GLM. Should only be using building blocks in GraphicsGL
 import GameEvent
+import HipM
 import GameM
 import Graphics   -- vector graphics
 import GraphicsGL -- GL graphics
@@ -164,9 +169,7 @@ addBoundsToHipSpace hipSpace = runHipM hipSpace $ do
 initGameState :: (Int,Int) -> HipSpace -> [Germ] -> GameState
 initGameState bounds hipSpace germs =
   GameState {
-      gsWorldRender   = return ()
-    , gsScreenRender  = return ()
-    , gsRenderDirty   = False
+      gsRenderDirty   = True
     , gsBounds        = bounds
     , gsGerms         = germMapList
     , gsNextGermId    = (length germs)
@@ -241,8 +244,6 @@ handleEvent fsmState ev = do
       if M.size (gsGerms gs) > maxGerms
        then do
          t <- getTime
-         addRender $ drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
-         screenRender
          addToSoundQueue GSLevelMusicStop
          return $ FSMGameOver t
        else do
@@ -258,10 +259,13 @@ handleEvent fsmState ev = do
     --------------------------------------
     fsmAntibioticUnlocked :: (UTCTime, Antibiotic) -> GameM FSMState
     fsmAntibioticUnlocked (t,ab) = do
+      gs <- get
       let unlockedMsg = do
-            clearRender
-            gameFieldRender
-            addRender $ drawTextLinesOfWidth_ black (R2 0 0) fieldWidth
+            gameFieldRender <- gameFieldRenderGen
+            runGLM $ do
+              clearRender
+              gameFieldRender
+              drawTextLinesOfWidth_ black (R2 0 0) fieldWidth
                             [ printf "You unlocked %s!" (show ab)
                             , ""
                             , "Some germs are immune."
@@ -272,10 +276,14 @@ handleEvent fsmState ev = do
                             , "use an antibiotic"
                             , "the chance of germ"
                             , "immunity increases!" ]
-            sideBarRender
-            screenRender
+              letterBoxesRender
+              sideBarRender gs
+          unlockedMsg' =  do
+            unlockedMsg
+            runGLM $ screenRender gs
             return $ FSMAntibioticUnlocked t ab
-      whenEventsMutedOtherwise t unlockedMsg $ do
+
+      whenEventsMutedOtherwise t unlockedMsg' $ do
         case ev of
           _ | isContinue ev -> do
             --
@@ -285,42 +293,68 @@ handleEvent fsmState ev = do
             gs <- get
             t <- getTime
             return $ if M.size (gsGerms gs) == 0 then FSMLevelComplete t else FSMPlayingLevel
-          _                 -> unlockedMsg *>> tapToContinue
-
+          _                 -> do
+            unlockedMsg
+            runGLM $ do
+              tapToContinue gs
+              screenRender gs
+            return $ FSMAntibioticUnlocked t ab
     --------------------------------------
     fsmLevelComplete :: UTCTime -> GameM FSMState
     fsmLevelComplete t    = do
       gs <- get
       let levelCompleteMsg = do
-            let textRender = drawTextOfWidth_ levelCompleteGrad (R2 0 0) fieldWidth
-                               "Cured!"
-            clearRender
-            sideBarRender
-            addRender textRender
-            screenRender
-            return $ FSMLevelComplete t
-      whenEventsMutedOtherwise t levelCompleteMsg $ do
+            runGLM $ do
+              let textRender = drawTextOfWidth_ levelCompleteGrad (R2 0 0) fieldWidth
+                                 "Cured!"
+              clearRender
+              sideBarRender gs
+              letterBoxesRender
+              textRender
+          levelCompleteMsg' = do
+            levelCompleteMsg
+            runGLM $ screenRender gs
+            return (FSMLevelComplete t)
+      whenEventsMutedOtherwise t levelCompleteMsg' $ do
         case ev of
           _ | isContinue ev -> return $ FSMLevel (gsCurrentLevel gs + 1)
-          _                 -> levelCompleteMsg *>> tapToContinue
+          _                 -> do
+            levelCompleteMsg
+            runGLM $ tapToContinue gs
+            return $ FSMLevelComplete t
     ----------------
 
     --------------------------------------
     fsmGameOver :: UTCTime -> GameM FSMState
     fsmGameOver t         = do
-      let idle = return $ FSMGameOver t
+      gs <- get
+      let infectedMsg = do
+            gameFieldRender <- gameFieldRenderGen
+            runGLM $ do
+              clearRender
+              gameFieldRender
+              sideBarRender gs
+              letterBoxesRender
+              drawTextOfWidth_ gameOverGrad (R2 0 0) fieldWidth "Infected!"
+          idle = do
+            infectedMsg
+            runGLM $ screenRender gs
+            return $ FSMGameOver t
       whenEventsMutedOtherwise t idle $ do
         case ev of
           _ | isContinue ev -> do
             resetGameState
             return $ FSMLevel startLevelGerms
-          _ -> idle *>> tapToContinue
+          _ -> do
+            infectedMsg
+            runGLM $ tapToContinue gs
+            return $ FSMGameOver t
 
-tapToContinue :: GameM ()
-tapToContinue = do
-  addRender $ drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/5)) (fieldWidth/2)
+tapToContinue :: GameState -> GLM ()
+tapToContinue gs = do
+  drawTextOfWidth_ continueGrad (R2 0 (-worldHeight/3)) (fieldWidth/2)
                 "Tap to continue"
-  screenRender
+  screenRender gs
 
 ----------------------------------------------------------------------------------------------------
 isContinue :: Event -> Bool
@@ -381,7 +415,7 @@ killGerm p = do
         let (R2 a b) = R2 (x' - x) (y' - y)
             (R2 a' b') = normalise (R2 a b)
             mag = sqrt (a*a + b*b)
-            scale = 100*1/mag -- FIXME: Magic number, FIXME: use germ constant
+            scale = 0 -- 100*1/mag -- FIXME: Magic number, FIXME: use germ constant
         runOnHipState $ setHipCircVel hc (R2 (vx + a'*scale) (vy + b'*scale))
   poses <- mapM kkk germsToKill
   let anyKilled = length poses > 0
@@ -539,41 +573,60 @@ physics duration = do
   selected <- germsSatisfying germSelected
   poses <- mapM getPos selected
   ----
-  runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
+  let updatePhysics = do
+        runOnHipState $ hipStep duration -- replicateM 10 (hipStep (duration/10))
+        -- reset position of those germs
+        let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
+        mapM_ setPos poses
+  updatePhysics
   ----
-  -- reset position of those germs
-  let setPos (hc, pos) = runOnHipState $ setHipCircPosVel hc pos (R2 0 0)
-  mapM_ setPos poses
-  ----
-  clearRender
-  gameFieldRender
-  sideBarRender
-  screenRender
+  gameFieldRender <- gameFieldRenderGen
+  -------
+  gs <- get
+  when (gsRenderDirty gs) $ do
+    runGLM $ do
+      gfxs <- getGfxState
+      clearRender
+      gameFieldRender
+      letterBoxesRender
+      sideBarRender gs
+      screenRender gs
+    modify $ \gs -> gs { gsRenderDirty = True }
   modify $ \gs -> gs { gsLevelTime = gsLevelTime gs + duration }
 
 ----------------------------------------------------------------------------------------------------
-addRender :: GLM () -> GameM ()
-addRender glm = modify $ \gs -> gs { gsWorldRender = gsWorldRender gs >> glm
-                                   , gsRenderDirty = True }
+clearRender :: GLM ()
+clearRender = do
+  gfxs <- getGfxState
+  liftGLM $ do
+    let (Color r g b _) = backgroundColor
+        f2f = realToFrac
+    glBindFramebuffer gl_FRAMEBUFFER (fboFrameBuffer (gfxMainFBO gfxs))
+    glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
+    glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
 
 ----------------------------------------------------------------------------------------------------
-clearRender :: GameM ()
-clearRender = modify $ \gs -> gs { gsWorldRender  = return ()
-                                 , gsScreenRender = return ()
-                                 , gsRenderDirty  = True }
+letterBoxesRender :: GLM ()
+letterBoxesRender = do
+      gfxs <- getGfxState
+      liftGLM $ do
+        mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
+              (letterBoxes . worldGLSLOrthoBounds . glslData . gfxWorldGLSL $ gfxs)
 
 ----------------------------------------------------------------------------------------------------
-screenRender :: GameM ()
-screenRender = modify $ \gs ->
-   gs { gsScreenRender = blur (blurSigma (gsLevelTime gs)) (gsWorldRender gs)
-       , gsRenderDirty = True }
+screenRender :: GameState -> GLM ()
+screenRender gs = do
+  --let t = gsLevelTime gs
+  --    mbSigma = if t < blurEndTime then Just t else Nothing
+  --conditionalBlur mbSigma
+  conditionalBlur Nothing
 
 ----------------------------------------------------------------------------------------------------
 --
 -- Update [gsRender] field of [GameState]
 --
-gameFieldRender :: GameM ()
-gameFieldRender = do
+gameFieldRenderGen :: GameM (GLM ())
+gameFieldRenderGen = do
   gs <- get
   let drawOneGerm :: (Int, Germ) -> GameM (GLM ())
       drawOneGerm (i,g) = do
@@ -581,17 +634,14 @@ gameFieldRender = do
         let (ampScale, timeScale) = scales g
         return $ (germGLFun . germGL $ g) i pos (germAnimTime g * timeScale)
                  (germSizeFun g (germCumulativeTime g)) ampScale
-  renderGerms <-  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
-  --
-  addRender renderGerms
+  sequence_ <$>  mapM drawOneGerm (zip [50..] $ M.elems $ gsGerms gs)
   where
     -- germ gets angrier when selected
     scales g = if germSelected g then (1.2, 2.0) else (1.0, 1.0)
 
 ----------------------------------------------------------------------------------------------------
-sideBarRender :: GameM ()
-sideBarRender = do
-  gs <- get
+sideBarRender :: GameState -> GLM ()
+sideBarRender gs = do
   let drawOneAntibiotic :: (Antibiotic, AntibioticData) -> GLM ()
       drawOneAntibiotic (ab, abd) =
         when (abEnabled abd) $ drawAntibiotic (abPos abd) ab (abEffectiveness abd)
@@ -604,7 +654,7 @@ sideBarRender = do
             len = fromIntegral $ length score
         drawTextOfWidth_ scoreGrad (R2 x y) (sideBarWidth*0.20*len) $ score
   --
-  addRender (renderAntibiotics >> renderScore)
+  renderAntibiotics >> renderScore
 
 ----------------------------------------------------------------------------------------------------
 playingLevelSelect :: R2 -> GameM FSMState
@@ -676,6 +726,21 @@ whenEventsMutedOtherwise t dflt gm = do
   if (d >= eventMuteTime) then gm else dflt
 
 ----------------------------------------------------------------------------------------------------
-
 addToSoundQueue :: GameSound -> GameM ()
 addToSoundQueue sound = modify $ \gs -> gs { gsSoundQueue = gsSoundQueue gs ++ [sound] }
+
+----------------------------------------------------------------------------------------------------
+-- FIXME: Probably not the module for this. Move.
+type LetterBox = ((Double, Double), (Double, Double))
+
+letterBoxes :: OrthoBounds -> [LetterBox]
+letterBoxes b = [ left, right, bottom, top]
+  where
+    screenWidth = orthoRight b - orthoLeft b
+    screenHeight = orthoTop b - orthoBottom b
+
+    left   = ((orthoLeft b, orthoBottom b), (worldLeft - orthoLeft b,   screenHeight))
+    right  = ((worldRight, orthoBottom b),  (orthoRight b - worldRight, screenHeight))
+    --
+    bottom = ((orthoLeft b, orthoBottom b), (screenWidth, worldBottom - orthoBottom b))
+    top    = ((orthoLeft b, worldTop),      (screenWidth,   orthoTop b - worldTop))

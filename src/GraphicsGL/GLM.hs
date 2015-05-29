@@ -84,10 +84,9 @@ data GLSLProgram a = GLSLProgram { glslProgramId :: ProgramId
 data GfxState = GfxState { gfxBlurGLSL    :: GLSLProgram BlurGLSL
                          , gfxWorldGLSL   :: GLSLProgram WorldGLSL
                          , gfxFontFace    :: FontFace
-                         , gfxMainFBO     :: FBO
-                         -- on iOS this is not 0!
+                         , gfxMainFBO     :: FBO -- on iOS this is not 0!
                          , gfxScreenFBId  :: FrameBufferId
-                         , gfxTexturePool  :: IORef [TextureId]
+                         , gfxTexturePool :: IORef [TextureId]
                          }
 
 -- FIXME: Probably want to change the names of these data structures
@@ -97,6 +96,7 @@ data WorldGLSL = WorldGLSL {
                    , worldGLSLDrawTexture :: UniformLocation
                    , worldGLSLColor       :: UniformLocation
                    , worldGLSLOrthoBounds :: OrthoBounds
+                   , worldVBO             :: BufferId
                    }
 
 data BlurGLSL = BlurGLSL {

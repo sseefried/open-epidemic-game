@@ -27,6 +27,7 @@ initShaders (w,h) = do
                              , worldGLSLDrawTexture = drawTextureLoc
                              , worldGLSLColor       = colorLoc
                              , worldGLSLOrthoBounds = bds
+                             , worldVBO = error "worldVBO not defined"
                              }
       worldInit = glUniform1i functionLoc 0
       worldGLSL = GLSLProgram { glslProgramId = programId
@@ -47,6 +48,7 @@ initShaders (w,h) = do
                           , blurGLSLFactor4   = bf4
                           , blurGLSLAxis      = axis
                           , blurGLSLPhase1FBO = fbo
+                          , blurVBO = error "blurVBO not defined"
                           }
       blurInit = glUniform1i functionLoc 1
       blurGLSL = GLSLProgram { glslProgramId = programId

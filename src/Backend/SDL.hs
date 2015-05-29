@@ -7,8 +7,6 @@ module Backend.SDL (
 import qualified Graphics.UI.SDL          as S
 import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
-import           Graphics.Rendering.OpenGL.Raw
-import           Data.Bits
 import           Data.IORef
 import           Data.Time
 import           System.Directory (doesDirectoryExist)
@@ -28,7 +26,6 @@ import Util
 import FrameRateBuffer
 import GraphicsGL
 import Coordinate
-import Foreign (CFloat)
 
 ----------------------------------------------------------------------------------------------------
 data BackendState = BackendState { _besStartTime     :: UTCTime
@@ -47,6 +44,7 @@ data BackendState = BackendState { _besStartTime     :: UTCTime
                                  , besWindow         :: S.Window
                                  , besLevelMusic     :: Maybe M.Music
                                  , besSquishSound    :: Maybe M.Chunk
+
                                  }
 
 ----------------------------------------------------------------------------------------------------
@@ -65,7 +63,6 @@ initOpenGL window = do
   context <- S.glCreateContext window
   when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   return context
-
 
 ----------------------------------------------------------------------------------------------------
 initialize :: String -> Maybe String -> IO (IORef BackendState)
@@ -156,50 +153,8 @@ _runAndTime besRef upd io = do
 
 ----------------------------------------------------------------------------------------------------
 runFrameUpdate :: IORef BackendState -> IO ()
-runFrameUpdate besRef = do
-  let f2f :: Double -> CFloat
-      f2f = realToFrac
-  bes <- readIORef besRef
-  let gs  = besGameState bes
-      (Color r g b _) = backgroundColor -- FIXME: Shouldn't be transparent
-      gfxs = besGfxState bes
-      mainFBO = gfxMainFBO gfxs
-  -- Only update if the render is dirty
-  when (gsRenderDirty gs) $ do
-    -- FIXME: Should this code really be here? What about in GraphicsGL?
+runFrameUpdate besRef = do { bes <- readIORef besRef; S.glSwapWindow (besWindow bes) }
 
-    glBindFramebuffer gl_FRAMEBUFFER (fboFrameBuffer mainFBO)
-    glClearColor (f2f r) (f2f g) (f2f b) 1 -- here it must be opaque
-    glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
-    runGLMIO gfxs $ gsScreenRender gs
-    mapM_ (runGLMIO gfxs . (uncurry drawLetterBox))
-          (letterBoxes . worldGLSLOrthoBounds . glslData . gfxWorldGLSL $ gfxs)
-    when debugSystem $ renderDebugInfo besRef
-    ---
-    modifyIORef besRef $ \bes -> bes { besGameState = gs { gsRenderDirty = False }}
-    S.glSwapWindow (besWindow bes)
-
-renderDebugInfo :: IORef BackendState -> IO ()
-renderDebugInfo besRef = do
-  bes <- readIORef besRef
-  let glsls = besGfxState bes
-  runGLMIO glsls $ drawTextLinesOfWidth_ (Color 0 0 0 1) (R2 0 0) fieldWidth
-                     [show $ _besDims bes]
-
-----------------------------------------------------------------------------------------------------
-type LetterBox = ((Double, Double), (Double, Double))
-
-letterBoxes :: OrthoBounds -> [LetterBox]
-letterBoxes b = [ left, right, bottom, top]
-  where
-    screenWidth = orthoRight b - orthoLeft b
-    screenHeight = orthoTop b - orthoBottom b
-
-    left   = ((orthoLeft b, orthoBottom b), (worldLeft - orthoLeft b,   screenHeight))
-    right  = ((worldRight, orthoBottom b),  (orthoRight b - worldRight, screenHeight))
-    --
-    bottom = ((orthoLeft b, orthoBottom b), (screenWidth, worldBottom - orthoBottom b))
-    top    = ((orthoLeft b, worldTop),      (screenWidth,   orthoTop b - worldTop))
 
 ----------------------------------------------------------------------------------------------------
 --

@@ -3,7 +3,7 @@ module GraphicsGL (
     -- functions
     germGfxToGermGL, drawTextOfWidth, drawTextOfHeight, drawTextOfWidth_, drawTextOfHeight_,
     drawTextLinesOfWidth, drawTextLinesOfWidth_, drawLetterBox, drawAntibiotic,
-    renderQuadWithColor, blur, initGfxState,
+    renderQuadWithColor, conditionalBlur, initGfxState,
     -- re-export module(s)
     module GraphicsGL.GLM,
     module GraphicsGL.Util
@@ -345,7 +345,7 @@ blurOnAxis sigma axis srcFBO mbDestFBO = glm $ \gfxs -> do
   glUniform1f (blurGLSLFactor3 bs) bf3
   glUniform1f (blurGLSLFactor4 bs) bf4
   glUniform1i (blurGLSLAxis bs)    (if axis then 1 else 0)
-  drawScreenSizedTexture bs (fboTexture srcFBO)
+  drawScreenSizedTexture (blurVBO bs) (blurGLSLPosition bs) (blurGLSLTexcoord bs) (fboTexture srcFBO)
 
 ----------------------------------------------------------------------------------------------------
 gauss :: Double -> Double -> Double
@@ -360,40 +360,50 @@ gaussSample sigma n = map (/total) (center:xs)
     xs     = map (\i -> gauss sigma (fromIntegral i)) [1..n]
     total  = center + 2*sum xs
 
-
 ----------------------------------------------------------------------------------------------------
-blur :: Double -> GLM () -> GLM ()
-blur sigma m = do
+blur :: Double -> GLM ()
+blur sigma = do
   gfxs <- getGfxState
   let mainFBO   = gfxMainFBO gfxs
       phase1FBO = blurGLSLPhase1FBO $ glslData $ gfxBlurGLSL gfxs
       blur1 = blurOnAxis sigma False mainFBO   (Just phase1FBO)
       blur2 = blurOnAxis sigma True  phase1FBO Nothing
-  m >> blur1 >> blur2
+  blur1
+  blur2
 
+----------------------------------------------------------------------------------------------------
+conditionalBlur :: Maybe Double -> GLM ()
+conditionalBlur mbSigma = case mbSigma of
+  Just sigma -> blur sigma
+  Nothing -> do
+    gfxs <- getGfxState
+    let p  = gfxWorldGLSL gfxs
+        ws = glslData $ gfxWorldGLSL gfxs
+    liftGLM $ do
+      glBindFramebuffer gl_FRAMEBUFFER (gfxScreenFBId gfxs) -- bind destination buffer
+      glClear (gl_COLOR_BUFFER_BIT .|. gl_DEPTH_BUFFER_BIT)
+      glslProgramUseAndInit p
+      drawScreenSizedTexture (worldVBO ws) (worldGLSLPosition ws) (worldGLSLTexcoord ws)
+                           (fboTexture $ gfxMainFBO gfxs)
 
 ----------------------------------------------------------------------------------------------------
 --
--- Renders a screen sized texture to the screen using identity modelView matrix.
--- (i.e. -1 <= x <= 1, -1 <= y <= 1)
+-- Renders a screen sized texture to the screen from source frame buffer at [texId] to
+-- a destination (dependent on the last call to [glBindFrameBuffer]).
 --
 -- Precondition: You must be currently using a GLSL program (with [glUseProgram]) that has a [pos]
 -- attribute for specifying the position of vertices, and a [texCoord] attribute for specifiying
 -- the texture-coordinates.
--- The program must use an identity modelView transform matrix.
+-- [vbo] must be a vertex buffer object with four vertices that cover the entire screen as
+-- a triangle strip.
 --
--- The destination of the texture at [texId] will depend on the last called to
--- [glBindFramebuffer].
---
-drawScreenSizedTexture :: BlurGLSL -> TextureId -> IO ()
-drawScreenSizedTexture bs texId = do
-  let pos       = blurGLSLPosition bs
-      texCoord  = blurGLSLTexcoord bs
-      stride    = fromIntegral $ 4 * floatSize
+drawScreenSizedTexture :: BufferId -> AttributeLocation -> AttributeLocation -> TextureId -> IO ()
+drawScreenSizedTexture vbo pos texCoord texId = do
+  let stride    = fromIntegral $ 4 * floatSize
       floatSize = sizeOf (undefined :: GLfloat)
   withBoundTexture texId $ do
     glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT )
-    withVBO (blurVBO bs) $ do
+    withVBO vbo $ do
       glEnableVertexAttribArray pos
       glEnableVertexAttribArray texCoord
       glVertexAttribPointer pos      2 gl_FLOAT (fromIntegral gl_FALSE) stride nullPtr

@@ -149,8 +149,10 @@ blurGerms gfxs germGLs = do
       glClearColor 1 1 1 1 -- here it must be opaque
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
       let blurred :: GLM ()
-          blurred = blur 1.0 drawGerms
-      runGLMIO gfxs $ blurred
+          blurred = conditionalBlur (Just 1.0)
+      runGLMIO gfxs $ do
+        drawGerms
+        blurred
 ----------------------------------------------------------------------------------------------------
 justBlur :: GfxState -> [GermGL] -> IO ()
 justBlur gfxs _ = do
@@ -158,7 +160,7 @@ justBlur gfxs _ = do
       glClearColor 1 1 1 1 -- here it must be opaque
       glClear (gl_DEPTH_BUFFER_BIT .|. gl_COLOR_BUFFER_BIT)
       let blurred :: GLM ()
-          blurred = blur 1.0 (return ())
+          blurred = conditionalBlur (Just 1.0)
       runGLMIO gfxs $ blurred
 
 ----------------------------------------------------------------------------------------------------

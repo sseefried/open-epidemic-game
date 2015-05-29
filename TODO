@@ -1,12 +1,12 @@
 High priority
 -------------
 
+[ ] Have blur turn off after blurEndTime to consume no resources.
+
 [ ] Find out why glBindBuffer gl_ARRAY_BUFFER 0 is so important on iOS
 
 [ ] For profiling have the tick happen *before* the swap in order to
     determine true frame rate.
-
-[ ] Have blur turn off after blurEndTime to consume no resources.
 
 [ ] Try to get blur running on Android faster than 52 fps.
 
@@ -32,8 +32,6 @@ High priority
 [ ] Cache the antibiotic graphic so it's not redrawn every time.
 
 [ ] Look at the battery usage of the game on Android.
-
-
 
 [ ] Add liquid from bottle sound effect for antibiotics
 

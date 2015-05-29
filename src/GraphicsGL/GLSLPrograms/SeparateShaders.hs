@@ -7,6 +7,7 @@ import Graphics.Rendering.OpenGL.Raw
 
 -- friends
 import Util
+import Types.Basic
 import GraphicsGL.GLM
 import GraphicsGL.Util
 import Coordinate
@@ -146,11 +147,19 @@ initWorldGLSL (w,h) = do
   ortho2D programId bds
   [positionLoc, texCoordLoc] <- mapM (getAttributeLocation programId) ["position", "texCoord"]
   [drawTextureLoc, colorLoc] <- mapM (getUniformLocation  programId) ["drawTexture", "color"]
+
+
+  vertexBuf <- screenSizeVBO (realToFrac (orthoLeft bds),
+                              realToFrac (orthoRight bds),
+                              realToFrac (orthoBottom bds),
+                              realToFrac (orthoTop bds))
+
   let worldData =  WorldGLSL { worldGLSLPosition    = positionLoc
                              , worldGLSLTexcoord    = texCoordLoc
                              , worldGLSLDrawTexture = drawTextureLoc
                              , worldGLSLColor       = colorLoc
                              , worldGLSLOrthoBounds = bds
+                             , worldVBO             = vertexBuf
                              }
   return $ GLSLProgram { glslProgramId = programId
                        , glslData = worldData
@@ -168,19 +177,8 @@ initBlurGLSL (w, h) = do
                                                  ("axis":"radius":blurFactorNames)
   fbo <- genFBO (w,h)
   glUniform1f radius (fromIntegral $ min w h)
-  vertexBuf <- genBuffer
-  let bufSize = (4*4*floatSize)
-  -- FIXME: sseefried: Needs a depth
-  allocaArray bufSize $ \(vs :: Ptr GLfloat) -> do
-    pokeArray vs [ -1, -1, 0, 0  -- left-bottom
-                 ,  1, -1, 1, 0  -- right-bottom
-                 , -1,  1, 0, 1  -- left-top
-                 ,  1,  1, 1, 1  -- right-top
-                 ]
-    glBindBuffer gl_ARRAY_BUFFER vertexBuf
-    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW -- P1
-    glBindBuffer gl_ARRAY_BUFFER 0
 
+  vertexBuf <- screenSizeVBO (-1,1,-1,1)
   let blurData = BlurGLSL { blurGLSLPosition  = positionLoc
                           , blurGLSLTexcoord  = texCoordLoc
                           , blurGLSLFactor0   = bf0

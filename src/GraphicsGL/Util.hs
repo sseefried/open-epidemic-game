@@ -259,3 +259,21 @@ glslProgramUseAndInit :: GLSLProgram a -> IO ()
 glslProgramUseAndInit p = do
   glUseProgram (glslProgramId p)
   glslInit p
+
+
+----------------------------------------------------------------------------------------------------
+screenSizeVBO :: (GLfloat, GLfloat, GLfloat, GLfloat) -> IO BufferId
+screenSizeVBO (left, right, bottom, top) = do
+  vertexBuf <- genBuffer
+  let bufSize = (4*4*floatSize)
+  -- FIXME: sseefried: Needs a depth
+  allocaArray bufSize $ \(vs :: Ptr GLfloat) -> do
+    pokeArray vs [ left,  bottom, 0, 0
+                 , right, bottom, 1, 0
+                 , left,  top,    0, 1
+                 , right, top,    1, 1
+                 ]
+    glBindBuffer gl_ARRAY_BUFFER vertexBuf
+    glBufferData gl_ARRAY_BUFFER (fromIntegral bufSize) vs gl_STATIC_DRAW -- P1
+    glBindBuffer gl_ARRAY_BUFFER 0
+  return vertexBuf

@@ -1,3 +1,7 @@
+# Sat 25 Apr 2015
+
+Game design idea: The germs grow faster when bunched together.
+
 # Wed  1 Apr 2015
 
 Well, after finally getting someone from the UPX to fix a bug with packing ARM executables, I
