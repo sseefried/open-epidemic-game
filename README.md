@@ -4,6 +4,7 @@
 
 Epidemic can be built for two targets:
   * Android
+  * iOS
   * Mac OS X
 
 However, you're probably here to build it for Android. In that case see the next section.
@@ -16,6 +17,10 @@ of the following two repos:
 
 * [`docker-epidemic-build-env`](https://github.com/sseefried/docker-epidemic-build-env)
 * [`android-build-epidemic-apk`](https://github.com/sseefried/android-build-epidemic-apk)
+
+## Building for iOS
+
+*Coming soon*
 
 ## Building for Mac OS X
 
