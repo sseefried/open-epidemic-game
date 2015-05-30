@@ -1,10 +1,16 @@
 # Epidemic -- a game about exponential growth written in Haskell
 
+## Introduction
+
+For the past few months I've been working on a simple mobile game written in Haskell. This repo
+contains everything I've done up to this point as open source. I've now forked to a private repo and
+hope to continue development. I've got big plans for the final game, including significant changes
+to the game play. Hint: it will no longer just be a one-tap wonder, and will involve more strategic
+elements.
+
 ## Want to help beta test the game?
 
-This particular repo contains the last version of the game that I'll be releasing to the public
-(at least for now). I've got big plans for the final game, including significant changes to the
-game play. If you'd like to stay in the loop then please [subscribe](http://eepurl.com/boW1vz).
+If you'd like to stay in the loop then please [subscribe](http://eepurl.com/boW1vz).
 
 ## Installation
 
