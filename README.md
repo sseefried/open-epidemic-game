@@ -3,10 +3,12 @@
 ## Introduction
 
 For the past few months I've been working on a simple mobile game written in Haskell. This repo
-contains everything I've done up to this point as open source. I've now forked to a private repo and
-hope to continue development. I've got big plans for the final game, including significant changes
-to the game play. Hint: it will no longer just be a one-tap wonder, and will involve more strategic
-elements.
+contains everything I've done up to this point. It is my gift to the Haskell community and I hope
+it inspires some of you to write more games in Haskell for mobile devices.
+
+I've now forked to a private repo and hope to continue development. I've got big plans for the final
+game, including significant changes to the game play. Hint: it will no longer just be a one-tap
+wonder, and will involve more strategic elements.
 
 ## Want to help beta test the game?
 
