@@ -14,6 +14,17 @@ wonder, and will involve more strategic elements.
 
 If you'd like to stay in the loop then please [subscribe](http://eepurl.com/boW1vz).
 
+## Credits
+
+While the programming was done solely by me I had some help. First, the music was done by a talented
+composer/musician called Anton Kholomiov using his
+Haskell library [`csound-expression`](https://github.com/anton-k/csound-expression),
+a fantastic combinator library that uses [Csound](http://en.wikipedia.org/wiki/Csound).
+
+The artistic style of the game was inspired by the work of [Rauri Rochford](http://esquemedia.com/).
+All failings are mine alone. Had he been further involved it would doubtless have been stunning.
+
+
 ## Installation
 
 Epidemic can be built for two targets:
