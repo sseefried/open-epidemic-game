@@ -45,9 +45,10 @@ I may add instructions for doing this one day, but at the moment it seems unlike
 
 ### Building for Mac OS X
 
-We are using Stackage to build all the requisite libraries. Specifically, we are using the
-snapshot [2014-12-04-ghc78hp-inc](http://www.stackage.org/snapshot/2014-12-04-ghc78hp-inc).
+We are using [`stack`](http://docs.haskellstack.org/en/stable/README/) to build all the
+requisite libraries.
 
-Please ensure you have followed the instruction for setting it up, and then run:
+It should be as simple as
 
-    ./setup.sh
+    $ stack build
+    $ stack exec Epidemic

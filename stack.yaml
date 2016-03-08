@@ -1,0 +1,36 @@
+# For more information, see: http://docs.haskellstack.org/en/stable/yaml_configuration.html
+
+# Specifies the GHC version and set of packages available (e.g., lts-3.5, nightly-2015-09-21, ghc-7.10.2)
+resolver: lts-3.5
+
+# Local packages, usually specified by relative directory name
+packages:
+- location:
+    git: https://github.com/sseefried/hsSDL2
+    commit: e824a16c8374173796b607bf976a45c0f79a121e
+- location:
+    git: https://github.com/sseefried/hs-sdl2-mixer
+    commit: e6bd509a59fc4907d01b49309c2e381e4ec04a1e
+- location:
+    git: https://github.com/sseefried/hs-cairo
+    commit: 922c6fab2d632c220ebd3f07b737e75537bfda70
+- location:
+    git: https://github.com/sseefried/HipMunk
+    commit: 1e9c64f291cc2056e55b4405d117fe40b0161bb2
+- location:
+    git: https://github.com/sseefried/freetype2
+    commit: 185ba5e991592cb84a8a52fabdb798797ad4f3ba
+- location:
+    git: https://github.com/sseefried/hs-sdl2-image
+    commit: 1a7ef66baf96455411433898acab3589f1c4d73d
+
+
+
+# Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
+extra-deps:
+
+# Override default flag values for local packages and extra-deps
+flags: {}
+
+# Extra package databases containing global packages
+extra-package-dbs: []
