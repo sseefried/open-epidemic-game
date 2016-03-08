@@ -2,17 +2,9 @@
 
 ## Introduction
 
-For the past few months I've been working on a simple mobile game written in Haskell. This repo
-contains everything I've done up to this point. It is my gift to the Haskell community and I hope
-it inspires some of you to write more games in Haskell for mobile devices.
-
-I've now forked to a private repo and hope to continue development. I've got big plans for the final
-game, including significant changes to the game play. Hint: it will no longer just be a one-tap
-wonder, and will involve more strategic elements.
-
-## Want to help beta test the game?
-
-If you'd like to stay in the loop then please [subscribe](http://eepurl.com/boW1vz).
+In 2014 I worked on a simple mobile game written in Haskell. This repo contains everything that came
+out of that effort. It is my gift to the Haskell community and I hope it inspires some of you to
+write more games in Haskell for mobile devices.
 
 ## Credits
 
@@ -27,12 +19,16 @@ All failings are mine alone. Had he been further involved it would doubtless hav
 
 ## Installation
 
-Epidemic can be built for two targets:
+Epidemic was designed to be be built for several targets:
   * Android
   * iOS
   * Mac OS X
 
 However, you're probably here to build it for Android. In that case see the next section.
+
+Building on Mac OS X is fairly straightforward but building for iOS was always a long and
+detailed process that I did not get around to automating in the same way that I automated the
+Android build process.
 
 ### Building for Android
 
@@ -45,7 +41,7 @@ of the following two repos:
 
 ### Building for iOS
 
-*Coming soon*
+I may add instructions for doing this one day, but at the moment it seems unlikely.
 
 ### Building for Mac OS X
 
