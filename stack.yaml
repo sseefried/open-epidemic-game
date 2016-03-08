@@ -5,6 +5,7 @@ resolver: lts-3.5
 
 # Local packages, usually specified by relative directory name
 packages:
+- .
 - location:
     git: https://github.com/sseefried/hsSDL2
     commit: e824a16c8374173796b607bf976a45c0f79a121e
@@ -23,8 +24,9 @@ packages:
 - location:
     git: https://github.com/sseefried/hs-sdl2-image
     commit: 1a7ef66baf96455411433898acab3589f1c4d73d
-
-
+- location:
+    git: https://github.com/sseefried/OpenGLRaw
+    commit: c14b666c244cfcb2cda4708b21360c7ff21b342e
 
 # Packages to be pulled from upstream that are not in the resolver (e.g., acme-missiles-0.3)
 extra-deps:

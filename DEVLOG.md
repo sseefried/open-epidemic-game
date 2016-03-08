@@ -557,7 +557,7 @@ This is the key signing command.
 ---
 
 I want to create an interactive environment where I can reload and display Cairo graphics from
-GHCi. Nothing too fancy. No need to watch a file an recompile it each time it changes.
+GHCi. Nothing too fancy. No need to watch a file and recompile it each time it changes.
 I'm quite happy just to type
 
     :r
