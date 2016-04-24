@@ -23,6 +23,7 @@ Epidemic was designed to be be built for several targets:
   * Android
   * iOS
   * Mac OS X
+  * Linux
 
 However, you're probably here to build it for Android. In that case see the next section.
 
@@ -36,14 +37,14 @@ A complete development environment for Android has been developed with the aid o
 [Docker](https://www.docker.com/). The complete instructions are available in the `README.md` files
 of the following two repos:
 
-* [`docker-epidemic-build-env`](https://github.com/sseefried/docker-epidemic-build-env)
-* [`android-build-epidemic-apk`](https://github.com/sseefried/android-build-epidemic-apk)
+* [`docker-game-build-env`](https://github.com/sseefried/docker-game-build-env)
+* [`android-build-game-apk`](https://github.com/sseefried/android-build-game-apk)
 
 ### Building for iOS
 
 I may add instructions for doing this one day, but at the moment it seems unlikely.
 
-### Building for Mac OS X
+### Building for Mac OS X and Linux
 
 We are using [`stack`](http://docs.haskellstack.org/en/stable/README/) to build all the
 requisite libraries.
