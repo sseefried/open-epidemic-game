@@ -40,6 +40,23 @@ of the following two repos:
 * [`docker-game-build-env`](https://github.com/sseefried/docker-game-build-env)
 * [`android-build-game-apk`](https://github.com/sseefried/android-build-game-apk)
 
+The `config.json` file you should use will be something like the following:
+
+```JSON
+{
+  "repo": "/home/androidbuilder/host-code/open-epidemic-game",
+  "haskell_package": "Epidemic",
+  "title": "Epidemic",
+  "package": "com.test.game.epidemic",
+  "version": { "code": "1", "name": "Build 1" },
+  "build_type": "debug",
+  "orientation": "landscape",
+  "assets_dir": "/home/androidbuilder/host-code/open-epidemic-game/assets",
+  "icons_dir": "/home/androidbuilder/host-code/open-epidemic-game/android-icons"
+}
+```
+
+
 ### Building for iOS
 
 I may add instructions for doing this one day, but at the moment it seems unlikely.
