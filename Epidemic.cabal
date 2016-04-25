@@ -97,6 +97,9 @@ library
     if flag(profile-graphics)
       cpp-options: -DPROFILE_GRAPHICS
       cc-options:  -DPROFILE_GRAPHICS
+    if flag(ios)
+      cpp-options: -DIOS
+      cc-options:  -DIOS
 
 executable         EpidemicStaticLib
     hs-source-dirs:   src
@@ -156,7 +159,10 @@ executable         Epidemic
 
     if flag(nosound)
       cpp-options: -DNOSOUND
-
+    if os(linux)
+      cpp-options: -DLINUX
+    if os(darwin)
+      cpp-options: -DMACOSX
     if flag(ios)
       ghc-options: -staticlib
 
@@ -182,7 +188,10 @@ executable         Epidemic
                  , utf8-string
                  , vector
                  , directory
-    c-sources: src/util.c src/freetype_util.c src/objc_util.m
+    c-sources: src/util.c src/freetype_util.c
+    if flag(ios) || os(darwin)
+      c-sources: src/objc_util.m
+
     pkgconfig-depends: freetype2, cairo
 
     if flag(android) || flag(ios)
@@ -212,7 +221,7 @@ executable         GenerateIcons
     main-is:       GenerateIcons.hs
     hs-source-dirs: .
 
-    c-sources: src/util.c src/objc_util.m
+    c-sources: src/util.c
 
     build-depends: Hipmunk
                  , OpenGLRaw

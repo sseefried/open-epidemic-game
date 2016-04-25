@@ -18,7 +18,9 @@ foreign import ccall "set_no_buffering" setNoBuffering ::  IO ()
 #ifdef ANDROID
 foreign import ccall "androidLog" cAndroidLog :: CString -> IO ()
 #else
+#ifdef IOS
 foreign import ccall "ns_log" cNSLog :: CString -> IO ()
+#endif
 #endif
 
 cFloatToDouble :: CFloat -> Double
@@ -31,15 +33,23 @@ nsLog _ = return ()
 #else
 -- dummy function for when we're not building on Android
 androidLog _ = return ()
+#ifdef IOS
 nsLog s = withCString s cNSLog
+#else
+nsLog _ = return ()
+#endif
 #endif
 
 iOSResourcePath :: IO String
 #ifdef ANDROID
-iOSResourcePath = return "This is an Android build. There is not iOS resource path"
+iOSResourcePath = return "This is an Android build. There is no iOS resource path"
 #else
+#if defined(IOS) || defined(MACOSX)
 foreign import ccall "ios_resource_path" ciOSResourcePath :: IO CString
 iOSResourcePath = ciOSResourcePath >>= peekCString
+#else
+iOSResourcePath = return ""
+#endif
 #endif
 
 profilingGraphics :: Bool

@@ -6,6 +6,8 @@ import CUtil
 data Platform = MacOSX
               | IOSPlatform
               | Android
+              | Linux
+              -- FIXME: NoSound should not be a platform!
               | NoSound deriving (Eq, Show)
 
 debugGame, debugSystem :: Bool
@@ -28,12 +30,20 @@ platform = Android
 #ifdef IOS
 platform = IOSPlatform
 #else
+#ifdef MACOSX
+platform = MacOSX
+#else
+#ifdef LINUX
+platform = Linux
+#else
 #ifdef NOSOUND
 platform = NoSound
 #else
-platform = MacOSX
-#endif /* IOS */
+platform = error "This platform is not supported. See Platform.hs"
 #endif /* NOSOUND */
+#endif /* LINUX */
+#endif /* MACOSX */
+#endif /* IOS */
 #endif /* ANDROID */
 
 isMobile, isDesktop :: Bool
@@ -44,8 +54,10 @@ isDesktop = not isMobile
 
 debugLog :: String -> IO ()
 debugLog = case platform of
-  Android -> androidLog
-  _       -> nsLog
+  Android     -> androidLog
+  IOSPlatform -> nsLog
+  MacOSX      -> nsLog
+  _           -> putStrLn
 
 --
 -- [Nothing] means fullscreen. [Just (w,h)] means set screen size to width [w] and height [h]
@@ -54,6 +66,5 @@ screenDimensions :: Maybe (Int,Int)
 screenDimensions = case platform of
   Android     -> Nothing
   IOSPlatform -> Nothing
---  _           -> Just (960,640)
   _           -> Just (1280,720)
 

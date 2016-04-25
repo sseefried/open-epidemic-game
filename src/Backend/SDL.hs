@@ -9,8 +9,9 @@ import qualified Graphics.UI.SDL.Mixer    as M
 import qualified Graphics.UI.SDL.Mixer.Types as M
 import           Data.IORef
 import           Data.Time
-import           System.Directory (doesDirectoryExist)
+import           System.Directory (doesDirectoryExist, getCurrentDirectory)
 import qualified Data.Map as M
+
 
 -- friends
 import GraphicsGL.GLSLPrograms.SeparateShaders as GLSL1
@@ -61,7 +62,7 @@ initOpenGL window = do
                 _ -> [ (S.GLDepthSize,           24) ]
   mapM_ (uncurry S.glSetAttribute) glAttrs
   context <- S.glCreateContext window
-  when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
+  --when (platform == MacOSX) $ S.glSetSwapInterval S.ImmediateUpdates
   return context
 
 ----------------------------------------------------------------------------------------------------
@@ -82,7 +83,11 @@ initialize title mbResourcePath = do
     Android ->
       maybe (exitWithError "Resource path must be provided to haskell_main for Android")
             return mbResourcePath
-    _ -> iOSResourcePath
+    IOSPlatform -> iOSResourcePath
+    MacOSX      -> iOSResourcePath
+    -- FIXME: Somehow the game needs to know where the assets are on Linux
+    -- Need to bundle the executable in with the assets
+    _           -> do { d <- getCurrentDirectory; return $ d ++ "/assets"}
   debugLog $ printf "Resource path is `%s'" resourcePath
   dirExists <- doesDirectoryExist resourcePath
   when (not dirExists ) $ exitWithError $
@@ -119,7 +124,8 @@ initialize title mbResourcePath = do
                           }
   where
     -- WindowBorderLess is required for iOS so that status bar does not show on iOS 6 and below.
-    wflags = [S.WindowShown] ++ (case platform of IOSPlatform -> [S.WindowBorderless]; _ -> [])
+    wflags = [S.WindowShown, S.WindowOpengl] ++ 
+             (case platform of IOSPlatform -> [S.WindowBorderless]; _ -> [])
 
 ----------------------------------------------------------------------------------------------------
 --
