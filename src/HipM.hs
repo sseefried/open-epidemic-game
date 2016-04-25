@@ -10,6 +10,8 @@ module HipM (
   setHipCircPosVel,
   setHipCircRadius,
   addHipStaticPoly,
+  setGravity,
+  setDamping,
   removeHipCirc,
   --
   runHipMIO
@@ -36,6 +38,8 @@ data HipScript next =
   | SetHipCircRadius !HipCirc !Double next
   | AddHipStaticPoly ![R2] next
   | RemoveHipCirc    !HipCirc next
+  | SetGravity       !R2 next
+  | SetDamping       !Double next
 
 type HipM  = Free HipScript
 
@@ -83,6 +87,12 @@ addHipStaticPoly pts = Impure (AddHipStaticPoly pts (Pure ()))
 removeHipCirc :: HipCirc -> HipM ()
 removeHipCirc c = Impure (RemoveHipCirc c (Pure ()))
 
+setGravity :: R2 -> HipM ()
+setGravity v = Impure (SetGravity v (Pure ()))
+
+setDamping :: Double -> HipM ()
+setDamping d = Impure (SetDamping d (Pure ()))
+
 runHipMIO :: HipSpace -> HipM a -> IO a
 runHipMIO space = go
   where
@@ -97,6 +107,8 @@ runHipMIO space = go
       (Impure (SetHipCircRadius hipCirc r p)) -> runSetHipCircRadius hipCirc r >> go p
       (Impure (AddHipStaticPoly pts p))       -> runAddHipStaticPoly pts >> go p
       (Impure (RemoveHipCirc hipCirc p))      -> runRemoveHipCirc hipCirc >> go p
+      (Impure (SetGravity v p))               -> runSetGravity space v >> go p
+      (Impure (SetDamping d p))               -> runSetDamping space d >> go p
       Pure x                                  -> return x
 
     runAddHipCirc :: Double -> R2 -> IO HipCirc
@@ -155,3 +167,9 @@ runHipMIO space = go
     runRemoveHipCirc (HipCirc s) = do
       H.spaceRemove space (H.body s)
       H.spaceRemove space s
+
+    runSetGravity :: H.Space -> R2 -> IO ()
+    runSetGravity space (R2 x y) = H.gravity space $= H.Vector x y
+
+    runSetDamping :: H.Space -> Double -> IO ()
+    runSetDamping space d = H.damping space $= d
