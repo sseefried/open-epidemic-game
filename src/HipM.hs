@@ -54,6 +54,8 @@ instance Functor HipScript where
     SetHipCircRadius a b hs   -> SetHipCircRadius a b (f hs)
     AddHipStaticPoly a hs     -> AddHipStaticPoly a (f hs)
     RemoveHipCirc a hs        -> RemoveHipCirc a (f hs)
+    SetGravity v hs           -> SetGravity v (f hs)
+    SetDamping d hs           -> SetDamping d (f hs)
 
 ----------------------------------------------------------------------------------------------------
 -- Smart constructors for HipM
