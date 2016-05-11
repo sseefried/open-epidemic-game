@@ -70,6 +70,7 @@ initialize :: String -> Maybe String -> IO (IORef BackendState)
 initialize title mbResourcePath = do
   setNoBuffering -- for android debugging
   S.init [S.InitVideo, S.InitAudio]
+  M.init [ M.initOGG ]
   dims@(w,h) <- case screenDimensions of
     Just (w',h') -> return (w', h')
     Nothing -> do
@@ -84,7 +85,6 @@ initialize title mbResourcePath = do
       maybe (exitWithError "Resource path must be provided to haskell_main for Android")
             return mbResourcePath
     IOSPlatform -> iOSResourcePath
-    MacOSX      -> iOSResourcePath
     -- FIXME: Somehow the game needs to know where the assets are on Linux
     -- Need to bundle the executable in with the assets
     _           -> do { d <- getCurrentDirectory; return $ d ++ "/assets"}
@@ -124,7 +124,7 @@ initialize title mbResourcePath = do
                           }
   where
     -- WindowBorderLess is required for iOS so that status bar does not show on iOS 6 and below.
-    wflags = [S.WindowShown, S.WindowOpengl] ++ 
+    wflags = [S.WindowShown, S.WindowOpengl] ++
              (case platform of IOSPlatform -> [S.WindowBorderless]; _ -> [])
 
 ----------------------------------------------------------------------------------------------------
